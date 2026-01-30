@@ -14,6 +14,7 @@
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/&/g, "and")
+      .replace(/['"]/g, "") // important for d'angelo
       .replace(/[^a-z0-9\s-]/g, " ")
       .replace(/\s+/g, " ")
       .trim();
@@ -55,10 +56,10 @@
   function findMatch(idx, query) {
     const key = normalize(query);
     if (!key) return null;
+
     const slug = idx.aliasToSlug?.[key];
     if (!slug) return null;
 
-    // Find canonical entry to get URL/name
     const entry = (idx.entries || []).find((e) => e.slug === slug);
     return entry || { slug, url: `/pasta/${slug}/`, name: slug };
   }
@@ -67,12 +68,12 @@
     const key = normalize(query);
     if (!key) return [];
 
-    // simple "starts with" first, then "includes"
     const names = idx.normalizedNames || [];
     const starts = [];
     const includes = [];
 
     for (const n of names) {
+      if (!n.key) continue;
       if (n.key.startsWith(key)) starts.push(n);
       else if (n.key.includes(key)) includes.push(n);
     }
@@ -83,48 +84,52 @@
     }));
   }
 
-  // Live suggestions while typing (non-invasive)
-  input.addEventListener("input", async () => {
+  async function runSearch(query, { redirectIfFound } = { redirectIfFound: true }) {
     const idx = await getIndex();
     if (!idx) return;
 
-    const q = input.value;
-
-    const match = findMatch(idx, q);
-    if (match) {
+    const match = findMatch(idx, query);
+    if (match && match.url) {
       status.textContent = `Match: ${match.name}`;
       clearSuggestions();
+      if (redirectIfFound) window.location.href = match.url;
       return;
     }
 
-    const s = suggest(idx, q);
-    if (!q.trim()) {
+    const s = suggest(idx, query);
+    if (!query.trim()) {
       status.textContent = "";
       clearSuggestions();
       return;
     }
 
-    status.textContent = s.length ? "Suggestions:" : "No match yet.";
+    status.textContent = s.length ? "No exact match. Suggestions:" : "No match found.";
     renderSuggestions(s);
+  }
+
+  // Live suggestions while typing
+  input.addEventListener("input", () => {
+    runSearch(input.value, { redirectIfFound: false });
   });
 
-  // Submit redirects to the match if found
-  form.addEventListener("submit", async (e) => {
+  // Submit redirects if found
+  form.addEventListener("submit", (e) => {
     e.preventDefault();
-
-    const idx = await getIndex();
-    if (!idx) return;
-
-    const q = input.value;
-    const match = findMatch(idx, q);
-
-    if (match && match.url) {
-      window.location.href = match.url;
-      return;
-    }
-
-    const s = suggest(idx, q);
-    status.textContent = "No exact match. Try a suggestion below.";
-    renderSuggestions(s);
+    runSearch(input.value, { redirectIfFound: true });
   });
+
+  // Handle /?q=... (fallback for normal submits or shared links)
+  (function handleQueryParamOnLoad() {
+    const params = new URLSearchParams(window.location.search);
+    const q = params.get("q");
+    if (!q) return;
+
+    input.value = q;
+
+    // Clean URL immediately (optional, keeps things tidy)
+    // This keeps the user on / while we redirect, and avoids re-trigger on back button.
+    window.history.replaceState({}, "", window.location.pathname);
+
+    runSearch(q, { redirectIfFound: true });
+  })();
 })();
