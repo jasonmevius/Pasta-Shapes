@@ -28,22 +28,41 @@
   let entries = [];
   let loaded = false;
 
-  // Tuneables
   const MAX_SHOW = 30;
 
-  // "Size is relative" - hide/disable size until it would actually help.
-  // If we still have > this many matches after other filters, enable size.
-  const ENABLE_SIZE_WHEN_MATCHES_GT = 25;
+  // Order matters: Type is fixed first, then we will pick the next best dynamically from these.
+  // The "key" is the JSON field name.
+  const QUESTION_DEFS = [
+    { key: "isHollow", el: elHollow, label: "Hollow" },
+    { key: "isRidged", el: elRidged, label: "Ridged" },
+    { key: "isTwisted", el: elTwisted, label: "Twisted" },
+    { key: "isCurved", el: elCurved, label: "Curved" },
+    { key: "sizeClass", el: elSize, label: "Size" },
+  ];
 
   function normVal(v) {
     return String(v || "").trim().toLowerCase();
   }
 
-  function matchesFilter(entry, key, selected) {
-    if (!selected) return true; // Any
-    const val = normVal(entry[key]);
-    if (!val) return selected === "unknown"; // blank data treated as unknown
-    return val === selected;
+  function getLabelEl(selectEl) {
+    // Prefer labels inside the component root, but fall back to document if needed
+    return (
+      root.querySelector(`label[for="${selectEl.id}"]`) ||
+      document.querySelector(`label[for="${selectEl.id}"]`)
+    );
+  }
+
+  function setFieldVisible(selectEl, visible) {
+    const label = getLabelEl(selectEl);
+
+    // If the label wraps the select, hiding label hides both cleanly.
+    if (label && label.contains(selectEl)) {
+      label.style.display = visible ? "" : "none";
+      return;
+    }
+
+    if (label) label.style.display = visible ? "" : "none";
+    selectEl.style.display = visible ? "" : "none";
   }
 
   function clearResults() {
@@ -67,8 +86,6 @@
       a.textContent = r.name;
       li.appendChild(a);
 
-      // Removed meta line entirely (category/geometry/type repeats what the user filtered by)
-      // Keep description for scanability
       if (r.description) {
         const div = document.createElement("div");
         div.style.marginTop = "0.2rem";
@@ -87,6 +104,14 @@
     }
   }
 
+  // Filter matching for yes/no/unknown fields.
+  function matchesFilter(entry, key, selected) {
+    if (!selected) return true; // Any
+    const val = normVal(entry[key]);
+    if (!val) return selected === "unknown"; // blank treated as unknown
+    return val === selected;
+  }
+
   function getFilterState() {
     return {
       type: normVal(elType.value),
@@ -98,97 +123,195 @@
     };
   }
 
-  function isAnyFilterSelected(f) {
-    return !!(f.type || f.isHollow || f.isRidged || f.isTwisted || f.isCurved || f.sizeClass);
+  function applyAllFilters(baseList, filters) {
+    return baseList.filter((e) => {
+      if (filters.type && normVal(e.type) !== filters.type) return false;
+      if (!matchesFilter(e, "isHollow", filters.isHollow)) return false;
+      if (!matchesFilter(e, "isRidged", filters.isRidged)) return false;
+      if (!matchesFilter(e, "isTwisted", filters.isTwisted)) return false;
+      if (!matchesFilter(e, "isCurved", filters.isCurved)) return false;
+
+      // sizeClass is special: allow blank values when selecting unknown
+      if (filters.sizeClass) {
+        const v = normVal(e.sizeClass);
+        if (v !== filters.sizeClass) {
+          if (!(filters.sizeClass === "unknown" && !v)) return false;
+        }
+      }
+
+      return true;
+    });
   }
 
-  function applyFilters({ fromEvent = "" } = {}) {
+  // --- Picking the next best question ---
+
+  function entropyFromCounts(counts) {
+    // counts: number[]
+    const total = counts.reduce((a, b) => a + b, 0);
+    if (!total) return 0;
+    let h = 0;
+    for (const c of counts) {
+      if (!c) continue;
+      const p = c / total;
+      h -= p * Math.log2(p);
+    }
+    return h;
+  }
+
+  function getValueBucket(entry, key) {
+    const v = normVal(entry[key]);
+    return v || "unknown";
+  }
+
+  function scoreQuestion(candidateEntries, key) {
+    // Score is information gain-ish: H(before) - sum(p_i * H(after_i))
+    // But here "after" groups are terminal (no further split), so we just want a balanced split.
+    // Using entropy of the distribution itself works well:
+    // - If all entries share one value -> entropy 0 (bad question)
+    // - If entries split across values -> higher entropy (good question)
+    const buckets = new Map();
+    for (const e of candidateEntries) {
+      const b = getValueBucket(e, key);
+      buckets.set(b, (buckets.get(b) || 0) + 1);
+    }
+
+    // Remove buckets that don't help (all unknown is not helpful)
+    // But if there is a mix of known + unknown, unknown can still be informative.
+    const counts = Array.from(buckets.values());
+    const total = counts.reduce((a, b) => a + b, 0);
+    if (!total) return -1;
+
+    // If everything is unknown, don't ask this.
+    if (buckets.size === 1 && buckets.has("unknown")) return -1;
+
+    // If essentially constant (one bucket dominates), treat as low value.
+    const maxCount = Math.max(...counts);
+    const dominance = maxCount / total; // 1.0 means constant
+    if (dominance >= 0.92) return 0; // near-useless in this subset
+
+    // Entropy prefers more even splits
+    const h = entropyFromCounts(counts);
+
+    // Slight penalty for questions with too many categories (not likely here),
+    // and for heavy "unknown" since it tends to frustrate users.
+    const unknownFrac = (buckets.get("unknown") || 0) / total;
+    const penalty = unknownFrac * 0.35 + Math.max(0, buckets.size - 3) * 0.1;
+
+    return h - penalty;
+  }
+
+  function pickNextQuestion(candidateEntries, answeredKeys) {
+    // Stop if we are already very narrow
+    if (candidateEntries.length <= 1) return null;
+
+    let best = null;
+    let bestScore = -1;
+
+    for (const q of QUESTION_DEFS) {
+      if (answeredKeys.has(q.key)) continue;
+
+      // If user hasn't chosen a Type, don't pick anything (Type is always first)
+      // (Handled outside, but keeping it safe)
+      const s = scoreQuestion(candidateEntries, q.key);
+      if (s > bestScore) {
+        bestScore = s;
+        best = q;
+      }
+    }
+
+    // If nothing has a meaningful score, don't show additional questions
+    if (!best || bestScore <= 0) return null;
+
+    return best;
+  }
+
+  // --- Progressive reveal logic ---
+
+  function getAnsweredKeys() {
+    const answered = new Set();
+    for (const q of QUESTION_DEFS) {
+      if (normVal(q.el.value)) answered.add(q.key);
+    }
+    return answered;
+  }
+
+  function hideAllNonTypeFields() {
+    for (const q of QUESTION_DEFS) setFieldVisible(q.el, false);
+  }
+
+  function showAnsweredAndNext(nextQ) {
+    const answered = getAnsweredKeys();
+
+    // Show answered ones so user can revise
+    for (const q of QUESTION_DEFS) {
+      if (answered.has(q.key)) setFieldVisible(q.el, true);
+      else setFieldVisible(q.el, false);
+    }
+
+    // Show the next recommended question
+    if (nextQ) setFieldVisible(nextQ.el, true);
+  }
+
+  function clearFieldsAfter(changedEl) {
+    // If the user changes an earlier answer, clear everything after it
+    const all = [elType, ...QUESTION_DEFS.map((q) => q.el)];
+    const idx = all.indexOf(changedEl);
+    if (idx === -1) return;
+
+    for (let i = idx + 1; i < all.length; i++) {
+      all[i].value = "";
+    }
+  }
+
+  function updateUI(fromEl) {
     if (!loaded) return;
 
-    const f = getFilterState();
+    // Enforce: Type first
+    const filters = getFilterState();
 
-    // First pass: apply everything EXCEPT size, so we can decide whether size is useful.
-    const resultsNoSize = entries.filter((e) => {
-      if (f.type && normVal(e.type) !== f.type) return false;
-      if (!matchesFilter(e, "isHollow", f.isHollow)) return false;
-      if (!matchesFilter(e, "isRidged", f.isRidged)) return false;
-      if (!matchesFilter(e, "isTwisted", f.isTwisted)) return false;
-      if (!matchesFilter(e, "isCurved", f.isCurved)) return false;
-      return true;
-    });
-
-    // Decide whether to enable Size
-    // - If user already picked a size, keep it enabled
-    // - Else, enable only when there are still a lot of matches
-    const shouldEnableSize = !!f.sizeClass || resultsNoSize.length > ENABLE_SIZE_WHEN_MATCHES_GT;
-
-    // If size isn't useful right now, disable it and clear selection (unless user explicitly changed size)
-    if (!shouldEnableSize) {
-      elSize.disabled = true;
-
-      // Only clear size if the change didn't originate from size itself
-      if (fromEvent !== "size" && elSize.value) elSize.value = "";
-    } else {
-      elSize.disabled = false;
-    }
-
-    // Now apply size too (if selected)
-    const results = resultsNoSize.filter((e) => {
-      if (f.sizeClass && normVal(e.sizeClass) !== f.sizeClass) {
-        // allow "unknown" to include blank
-        if (!(f.sizeClass === "unknown" && !normVal(e.sizeClass))) return false;
-      }
-      return true;
-    });
-
-    // No filters at all
-    if (!isAnyFilterSelected(f)) {
-      setStatus(`Choose a few options to narrow down from ${entries.length} shapes.`);
+    if (!filters.type) {
+      // No type selected yet: hide everything else and clear results
+      hideAllNonTypeFields();
+      setStatus(`Choose a Type to start narrowing down from ${entries.length} shapes.`);
       clearResults();
       return;
     }
 
-    // No matches
+    // Apply filters (including any answered fields)
+    const results = applyAllFilters(entries, filters);
+
     if (!results.length) {
-      // If size is selected and seems to be the culprit, make that obvious
-      if (f.sizeClass) {
-        setStatus("No matches. Try changing Size back to Any (or loosening another option).");
-      } else {
-        setStatus("No matches with those filters. Try loosening one option.");
-      }
+      setStatus("No matches with those answers. Try changing your last selection.");
       clearResults();
+      // Still show answered fields so user can back out
+      showAnsweredAndNext(null);
       return;
     }
 
-    // Matches found
-    let statusText = `${results.length} match${results.length === 1 ? "" : "es"}.`;
+    // Determine next question based on the current remaining results
+    const answeredKeys = getAnsweredKeys();
+    const nextQ = pickNextQuestion(results, answeredKeys);
 
-    // Gentle hint about size only when it's disabled and results are still large
-    if (elSize.disabled && resultsNoSize.length > ENABLE_SIZE_WHEN_MATCHES_GT) {
-      // This situation shouldn't happen because we enable size in that case,
-      // but leaving this as a safe fallback.
-      statusText += " Size may help narrow this down.";
-    } else if (!elSize.disabled && !f.sizeClass && resultsNoSize.length > ENABLE_SIZE_WHEN_MATCHES_GT) {
-      statusText += " Tip: Size can help narrow this down.";
-    }
-
-    setStatus(statusText);
+    // Status and results
+    setStatus(`${results.length} match${results.length === 1 ? "" : "es"}.`);
     render(results);
+
+    // Progressive reveal: show already-answered questions + the single next best question
+    showAnsweredAndNext(nextQ);
   }
 
   function reset() {
     elType.value = "";
-    elHollow.value = "";
-    elRidged.value = "";
-    elTwisted.value = "";
-    elCurved.value = "";
-    elSize.value = "";
-    elSize.disabled = true;
-    applyFilters({ fromEvent: "reset" });
+    for (const q of QUESTION_DEFS) q.el.value = "";
+    hideAllNonTypeFields();
+    setStatus("Choose a Type to start.");
+    clearResults();
   }
 
   async function init() {
     setStatus("Loading feature index...");
+    hideAllNonTypeFields();
+
     try {
       const res = await fetch("/api/pasta-features.json", { cache: "force-cache" });
       if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
@@ -197,10 +320,7 @@
       entries = Array.isArray(json.entries) ? json.entries : [];
       loaded = true;
 
-      // Start with size disabled (since it's the trickiest input)
-      elSize.disabled = true;
-
-      setStatus(`Choose a few options to narrow down from ${entries.length} shapes.`);
+      setStatus(`Choose a Type to start narrowing down from ${entries.length} shapes.`);
     } catch (e) {
       setStatus("Identify-by-shape is unavailable right now.");
       loaded = false;
@@ -208,12 +328,18 @@
   }
 
   // Events
-  elType.addEventListener("change", () => applyFilters({ fromEvent: "type" }));
-  elHollow.addEventListener("change", () => applyFilters({ fromEvent: "hollow" }));
-  elRidged.addEventListener("change", () => applyFilters({ fromEvent: "ridged" }));
-  elTwisted.addEventListener("change", () => applyFilters({ fromEvent: "twisted" }));
-  elCurved.addEventListener("change", () => applyFilters({ fromEvent: "curved" }));
-  elSize.addEventListener("change", () => applyFilters({ fromEvent: "size" }));
+  elType.addEventListener("change", () => {
+    clearFieldsAfter(elType);
+    updateUI(elType);
+  });
+
+  for (const q of QUESTION_DEFS) {
+    q.el.addEventListener("change", () => {
+      clearFieldsAfter(q.el);
+      updateUI(q.el);
+    });
+  }
+
   elReset.addEventListener("click", reset);
 
   init();
