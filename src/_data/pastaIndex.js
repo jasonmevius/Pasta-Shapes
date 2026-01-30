@@ -53,17 +53,24 @@ function splitCSVLine(line) {
 function normalize(s) {
   return (s || "")
     .toLowerCase()
-    .normalize("NFD") // separate accent marks
-    .replace(/[\u0300-\u036f]/g, "") // remove accent marks
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/&/g, "and")
-    .replace(/[^a-z0-9\s-]/g, " ") // drop punctuation
+    .replace(/[^a-z0-9\s-]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
+// Slugify that should match your Nunjucks `| slug` behavior closely enough
+function slugify(s) {
+  return normalize(s)
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
 function splitSynonyms(value) {
   // Expecting something like: "macaroni; maccheroni; elbow macaroni"
-  // If you don't have this column yet, leave blank - it still works.
   return (value || "")
     .split(";")
     .map((s) => s.trim())
@@ -71,7 +78,6 @@ function splitSynonyms(value) {
 }
 
 module.exports = () => {
-  // Update to your CSV location.
   // Common patterns:
   // - src/_data/pasta.csv
   // - src/pasta.csv
@@ -92,46 +98,45 @@ module.exports = () => {
   const csvText = fs.readFileSync(csvPath, "utf8");
   const rows = parseCSV(csvText);
 
-  // Rename these to match your actual CSV columns.
-  // Minimum needed: ShapeName + Slug (or URL).
+  // Column names (match your CSV)
   const COL_NAME = "ShapeName";
-  const COL_SLUG = "Slug"; // e.g., "acinelli"
+  const COL_SLUG = "Slug"; // optional - if absent, we compute from ShapeName
   const COL_SYNONYMS = "Synonyms"; // optional; semicolon-separated list
 
   const entries = [];
-  const aliasToSlug = {}; // maps normalized alias -> canonical slug
+  const aliasToSlug = {};
 
   for (const r of rows) {
     const name = r[COL_NAME];
-    const slug = r[COL_SLUG];
+    if (!name) continue;
 
-    if (!name || !slug) continue;
+    // Use Slug column if present, otherwise compute from name (matches your /pasta/{{ ShapeName | slug }}/)
+    const slug =
+      (r[COL_SLUG] && r[COL_SLUG].trim()) ||
+      (r.slug && r.slug.trim()) ||
+      slugify(name);
+
+    if (!slug) continue;
 
     const url = `/pasta/${slug}/`;
     const synonyms = splitSynonyms(r[COL_SYNONYMS]);
 
     const allAliases = [name, ...synonyms];
 
-    // Store canonical entry
     entries.push({
       name,
       slug,
       url,
       synonyms,
-      // room for later: category, geometry, ridged, hollow, etc.
     });
 
-    // Build alias map
     for (const a of allAliases) {
       const key = normalize(a);
       if (!key) continue;
-
-      // first win holds - avoids overwriting if duplicates exist
       if (!aliasToSlug[key]) aliasToSlug[key] = slug;
     }
   }
 
-  // Helpful for fuzzy suggestions later
   const normalizedNames = entries.map((e) => ({
     slug: e.slug,
     url: e.url,
