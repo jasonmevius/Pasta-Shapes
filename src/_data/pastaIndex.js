@@ -77,6 +77,26 @@ function splitSynonyms(value) {
     .filter(Boolean);
 }
 
+// Best-effort pick of a "description" column
+function pickDescription(row) {
+  // Add/adjust these as your CSV evolves - this is just a safe default set.
+  const candidates = [
+    "Description",
+    "ShortDescription",
+    "Summary",
+    "Definition",
+    "Notes",
+    "Blurb",
+    "Desc",
+  ];
+
+  for (const key of candidates) {
+    if (row[key] && String(row[key]).trim()) return String(row[key]).trim();
+  }
+
+  return "";
+}
+
 module.exports = () => {
   // Common patterns:
   // - src/_data/pasta.csv
@@ -110,7 +130,7 @@ module.exports = () => {
     const name = r[COL_NAME];
     if (!name) continue;
 
-    // Use Slug column if present, otherwise compute from name (matches your /pasta/{{ ShapeName | slug }}/)
+    // Use Slug column if present, otherwise compute from name
     const slug =
       (r[COL_SLUG] && r[COL_SLUG].trim()) ||
       (r.slug && r.slug.trim()) ||
@@ -120,6 +140,7 @@ module.exports = () => {
 
     const url = `/pasta/${slug}/`;
     const synonyms = splitSynonyms(r[COL_SYNONYMS]);
+    const description = pickDescription(r);
 
     const allAliases = [name, ...synonyms];
 
@@ -128,6 +149,7 @@ module.exports = () => {
       slug,
       url,
       synonyms,
+      description, // NEW: used by the UI to show helpful text in suggestions
     });
 
     for (const a of allAliases) {
