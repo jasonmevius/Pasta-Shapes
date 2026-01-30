@@ -35,7 +35,7 @@ title: "{{ item.ShapeName }}"
   {% if item.SourceLink %}
     <li>
       <strong>Source:</strong>
-      <a href="{{ item.SourceLink }}">Linked URL</a>
+      <a href="{{ item.SourceLink }}">{{ item.SourceLink }}</a>
     </li>
   {% endif %}
 </ul>
