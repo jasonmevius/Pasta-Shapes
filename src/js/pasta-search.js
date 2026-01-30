@@ -25,7 +25,7 @@
   }
 
   function setStatusText(text) {
-    status.textContent = text;
+    status.textContent = text || "";
   }
 
   function setMatchStatus(match) {
@@ -39,15 +39,16 @@
     status.appendChild(span);
   }
 
-  // Track what we last rendered so submit can act intelligently
-  let lastRendered = []; // [{ url, label, ... }]
-  let lastRenderedType = ""; // "suggest" | "dym" | ""
+  function displayLabel(entry) {
+    // Add your special-case hint without calling anything "canonical".
+    // This is intentionally minimal and only for Capellini.
+    const key = normalize(entry?.name || "");
+    if (key === "capellini") return "Capellini (commonly known as: angel hair)";
+    return entry?.name || "";
+  }
 
-  function renderSuggestions(items, { type = "suggest" } = {}) {
+  function renderSuggestions(items) {
     clearSuggestions();
-
-    lastRendered = Array.isArray(items) ? items.slice() : [];
-    lastRenderedType = type || "";
 
     for (const it of items) {
       const li = document.createElement("li");
@@ -93,11 +94,7 @@
 
       for (let j = 1; j <= bl; j++) {
         const cost = ai === b.charCodeAt(j - 1) ? 0 : 1;
-        const val = Math.min(
-          prev[j] + 1, // deletion
-          cur[j - 1] + 1, // insertion
-          prev[j - 1] + cost // substitution
-        );
+        const val = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
         cur[j] = val;
         if (val < rowMin) rowMin = val;
       }
@@ -115,8 +112,7 @@
   function computeDidYouMean(queryKey, aliasKeys, limit = 5) {
     if (!queryKey || queryKey.length < 3) return [];
 
-    // Slightly more tolerant for longer inputs
-    const maxDist = Math.min(4, Math.max(2, Math.floor(queryKey.length / 6) + 2));
+    const maxDist = Math.min(3, Math.floor(queryKey.length / 6) + 1);
 
     const scored = [];
     for (const k of aliasKeys) {
@@ -130,9 +126,10 @@
 
   let indexCache = null;
 
+  // Built once per page-load for suggestion + fuzzy matching
   let slugToEntry = null;
   let aliasList = null; // [{ key, slug, url, label }]
-  let aliasKeys = null; // [key...]
+  let aliasKeys = null; // [key, key, key...]
 
   function buildLookupStructures(idx) {
     if (slugToEntry && aliasList && aliasKeys) return;
@@ -149,13 +146,17 @@
     for (const [aliasKey, slug] of Object.entries(aliasToSlug)) {
       const entry = slugToEntry.get(slug);
       const url = entry?.url || `/pasta/${slug}/`;
-      const label = entry?.name || slug;
 
       const dedupeKey = `${aliasKey}::${slug}`;
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
 
-      aliasList.push({ key: aliasKey, slug, url, label });
+      aliasList.push({
+        key: aliasKey,
+        slug,
+        url,
+        label: entry?.name || slug,
+      });
       aliasKeys.push(aliasKey);
     }
   }
@@ -177,7 +178,7 @@
     }
   }
 
-  function findMatch(idx, query) {
+  function findExactMatch(idx, query) {
     const key = normalize(query);
     if (!key) return null;
 
@@ -188,7 +189,7 @@
     return entry || { slug, url: `/pasta/${slug}/`, name: slug };
   }
 
-  function suggest(idx, query, limit = 10) {
+  function suggestFromAliases(query, limit = 10) {
     const q = normalize(query);
     if (!q) return [];
 
@@ -211,9 +212,10 @@
       usedSlugs.add(a.slug);
 
       const entry = slugToEntry?.get(a.slug);
+
       out.push({
         url: a.url,
-        label: a.label,
+        label: displayLabel(entry) || a.label,
         description: entry?.description || "",
       });
 
@@ -223,7 +225,10 @@
     return out;
   }
 
-  function showDidYouMean(keys) {
+  function didYouMeanSuggestions(query, limit = 5) {
+    const qKey = normalize(query);
+    const keys = computeDidYouMean(qKey, aliasKeys || [], limit);
+
     const suggestions = [];
     const usedSlugs = new Set();
 
@@ -237,104 +242,94 @@
 
       suggestions.push({
         url,
-        label: entry?.name || slug,
+        label: displayLabel(entry) || entry?.name || slug,
         description: entry?.description || "",
       });
     }
 
-    if (!suggestions.length) return false;
-
-    setStatusText("No exact match. Did you mean:");
-    renderSuggestions(suggestions, { type: "dym" });
-    return true;
+    return suggestions;
   }
 
-  async function runSearch(
-    query,
-    { redirectIfFound } = { redirectIfFound: true }
-  ) {
+  // Returns a structured result so submit handler can decide what to do.
+  async function runSearch(query, { redirectIfFound } = { redirectIfFound: false }) {
     const idx = await getIndex();
-    if (!idx) return { redirected: false, suggestions: [] };
+    if (!idx) return { match: null, suggestions: [], redirected: false };
 
-    const trimmed = (query || "").trim();
-    if (!trimmed) {
+    const raw = (query || "").trim();
+    if (!raw) {
       setStatusText("");
       clearSuggestions();
-      lastRendered = [];
-      lastRenderedType = "";
-      return { redirected: false, suggestions: [] };
+      return { match: null, suggestions: [], redirected: false };
     }
 
-    // Exact match -> optionally redirect
-    const match = findMatch(idx, query);
+    // 1) Exact match (including exact synonym)
+    const match = findExactMatch(idx, raw);
     if (match && match.url) {
       setMatchStatus({ name: match.name, url: match.url });
       clearSuggestions();
-      lastRendered = [];
-      lastRenderedType = "";
-      if (redirectIfFound) window.location.href = match.url;
-      return { redirected: !!redirectIfFound, suggestions: [] };
+      if (redirectIfFound) {
+        window.location.href = match.url;
+        return { match, suggestions: [], redirected: true };
+      }
+      return { match, suggestions: [], redirected: false };
     }
 
-    // Partial suggestions
-    const s = suggest(idx, query);
-
-    if (s.length) {
+    // 2) Normal suggestions (prefix/includes)
+    const s1 = suggestFromAliases(raw, 10);
+    if (s1.length) {
       setStatusText("No exact match. Suggestions:");
-      renderSuggestions(s, { type: "suggest" });
-      return { redirected: false, suggestions: s };
+      renderSuggestions(s1);
+      return { match: null, suggestions: s1, redirected: false };
     }
 
-    // Fuzzy suggestions
-    const qKey = normalize(query);
-    const dym = computeDidYouMean(qKey, aliasKeys, 5);
-    if (dym.length && showDidYouMean(dym)) {
-      return { redirected: false, suggestions: lastRendered };
+    // 3) Fuzzy fallback
+    const s2 = didYouMeanSuggestions(raw, 5);
+    if (s2.length) {
+      setStatusText("No exact match. Did you mean:");
+      renderSuggestions(s2);
+      return { match: null, suggestions: s2, redirected: false };
     }
 
-    // Nothing
+    // 4) Nothing
     setStatusText("No match found.");
     clearSuggestions();
-    lastRendered = [];
-    lastRenderedType = "";
-    return { redirected: false, suggestions: [] };
+    return { match: null, suggestions: [], redirected: false };
   }
 
-  // Live suggestions while typing (never auto-redirect)
+  // Live suggestions while typing (no redirect)
   input.addEventListener("input", () => {
     runSearch(input.value, { redirectIfFound: false });
   });
 
-  // Submit: if exact match, redirect. If not:
-  // - 1 suggestion -> redirect to it
-  // - multiple -> keep page, prompt user to click
+  // Submit behavior:
+  // - Exact match redirects (already handled in runSearch)
+  // - If ONE suggestion remains, redirect to it
+  // - If MULTIPLE suggestions, do not guess - force the user to choose
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const result = await runSearch(input.value, { redirectIfFound: true });
     if (result.redirected) return;
 
-    // No exact match - if we have exactly one suggestion, take the user there
-    if (result.suggestions && result.suggestions.length === 1) {
+    const count = (result.suggestions || []).length;
+
+    if (count === 1) {
       window.location.href = result.suggestions[0].url;
       return;
     }
 
-    // Multiple suggestions - prompt user to click one (don’t guess)
-    if (result.suggestions && result.suggestions.length > 1) {
-      setStatusText(
-        lastRenderedType === "dym"
-          ? "No exact match. Did you mean:"
-          : "No exact match. Suggestions:"
-      );
-
-      // Move focus to the first suggestion link (nice UX)
+    if (count > 1) {
+      setStatusText("Multiple matches - please choose one:");
       const firstLink = list.querySelector("a");
       if (firstLink) firstLink.focus();
+      return;
     }
+
+    // No suggestions at all
+    setStatusText("No match found.");
   });
 
-  // Handle /?q=... links
+  // Handle /?q=... (shared links)
   (function handleQueryParamOnLoad() {
     const params = new URLSearchParams(window.location.search);
     const q = params.get("q");
@@ -342,6 +337,22 @@
 
     input.value = q;
     window.history.replaceState({}, "", window.location.pathname);
-    runSearch(q, { redirectIfFound: true });
+
+    // Use the same semantics as submit: redirect only if exact or single unambiguous result.
+    (async () => {
+      const result = await runSearch(q, { redirectIfFound: true });
+      if (result.redirected) return;
+
+      const count = (result.suggestions || []).length;
+      if (count === 1) {
+        window.location.href = result.suggestions[0].url;
+        return;
+      }
+      if (count > 1) {
+        setStatusText("Multiple matches - please choose one:");
+        const firstLink = list.querySelector("a");
+        if (firstLink) firstLink.focus();
+      }
+    })();
   })();
 })();
