@@ -6,15 +6,12 @@ title: Pasta Shapes
 {% if pasta and pasta.length %}
   <p>Loaded {{ pasta.length }} pasta shapes from pasta.csv.</p>
 
-  <h2>First 10 entries</h2>
-  <ol>
-    {% for item in pasta | slice(0, 10) %}
-      <li>
-        {# Try a few common column names - adjust once we know yours #}
-        {{ item.name or item.shape or item.pasta or item.title or item[0] }}
-      </li>
+  <h2>First entry - columns detected</h2>
+  <ul>
+    {% for key, value in pasta[0] %}
+      <li><strong>{{ key }}:</strong> {{ value }}</li>
     {% endfor %}
-  </ol>
+  </ul>
 {% else %}
-  <p><strong>CSV not loaded.</strong> Check that the file is at <code>src/_data/pasta.csv</code>.</p>
+  <p><strong>CSV not loaded.</strong></p>
 {% endif %}
