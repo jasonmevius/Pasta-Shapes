@@ -98,8 +98,8 @@
       for (let j = 1; j <= bl; j++) {
         const cost = ai === b.charCodeAt(j - 1) ? 0 : 1;
         const val = Math.min(
-          prev[j] + 1,       // deletion
-          cur[j - 1] + 1,    // insertion
+          prev[j] + 1, // deletion
+          cur[j - 1] + 1, // insertion
           prev[j - 1] + cost // substitution
         );
         cur[j] = val;
@@ -117,12 +117,13 @@
     return prev[bl];
   }
 
-  function computeDidYouMean(queryKey, aliasKeys, limit = 3) {
+  // NEW: Slightly more tolerant fuzzy matching for longer queries
+  function computeDidYouMean(queryKey, aliasKeys, limit = 5) {
     if (!queryKey || queryKey.length < 3) return [];
 
-    // Threshold scales a bit with length, but stays small
-    // Example: "cappelli d angelo" can still find "capelli d angelo"
-    const maxDist = Math.min(3, Math.floor(queryKey.length / 6) + 1);
+    // Allow slightly more tolerance for longer multi-word inputs.
+    // Example: "cappeli d ange" should still catch "capelli d angelo".
+    const maxDist = Math.min(4, Math.max(2, Math.floor(queryKey.length / 6) + 2));
 
     const scored = [];
     for (const k of aliasKeys) {
@@ -138,8 +139,8 @@
 
   // Built once per page-load for suggestion + fuzzy matching
   let slugToEntry = null;
-  let aliasList = null;     // [{ key, slug, url, label, reason }]
-  let aliasKeys = null;     // [key, key, key...]
+  let aliasList = null; // [{ key, slug, url, label, reason }]
+  let aliasKeys = null; // [key, key, key...]
 
   function buildLookupStructures(idx) {
     if (slugToEntry && aliasList && aliasKeys) return;
@@ -296,7 +297,7 @@
 
     // Otherwise, try fuzzy "did you mean"
     const qKey = normalize(query);
-    const dym = computeDidYouMean(qKey, aliasKeys, 3);
+    const dym = computeDidYouMean(qKey, aliasKeys, 5);
     if (dym.length && showDidYouMean(dym)) return;
 
     // Nothing found at all
