@@ -1,0 +1,32 @@
+---
+pagination:
+  data: pasta
+  size: 1
+  alias: item
+permalink: "pasta/{{ item.ShapeName | slug }}/index.html"
+layout: layout.njk
+title: "{{ item.ShapeName }}"
+---
+
+<h1>{{ item.ShapeName }}</h1>
+
+{% if item.Synonyms %}
+  <p><strong>Synonyms:</strong> {{ item.Synonyms }}</p>
+{% endif %}
+
+<p><strong>Category:</strong> {{ item.Category }}</p>
+
+{% if item.Description %}
+  <p>{{ item.Description }}</p>
+{% endif %}
+
+<ul>
+  <li><strong>Primary geometry:</strong> {{ item.PrimaryGeometry }}</li>
+  <li><strong>Key discriminators:</strong> {{ item.KeyDiscriminators }}</li>
+  <li><strong>City/Region:</strong> {{ item.CityOrRegionMostAssociated }}</li>
+  <li><strong>Earliest attested mention:</strong> {{ item.EarliestAttestedMention }}</li>
+</ul>
+
+{% if item.SourceLink %}
+  <p><a href="{{ item.SourceLink }}">Source</a></p>
+{% endif %}
