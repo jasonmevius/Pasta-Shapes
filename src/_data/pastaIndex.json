@@ -1,0 +1,116 @@
+// src/_data/pastaIndex.js
+const fs = require("fs");
+const path = require("path");
+
+// Lightweight CSV parser without extra deps
+function parseCSV(text) {
+  const lines = text.split(/\r?\n/).filter(Boolean);
+  const headers = splitCSVLine(lines.shift()).map(h => h.trim());
+  return lines.map(line => {
+    const cells = splitCSVLine(line);
+    const row = {};
+    headers.forEach((h, i) => (row[h] = (cells[i] ?? "").trim()));
+    return row;
+  });
+}
+
+function splitCSVLine(line) {
+  // Handles quoted fields with commas
+  const out = [];
+  let cur = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+
+    if (ch === '"' && line[i + 1] === '"') {
+      cur += '"';
+      i++;
+      continue;
+    }
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+      continue;
+    }
+    if (ch === "," && !inQuotes) {
+      out.push(cur);
+      cur = "";
+      continue;
+    }
+    cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+function normalize(s) {
+  return (s || "")
+    .toLowerCase()
+    .normalize("NFD")                 // separate accent marks
+    .replace(/[\u0300-\u036f]/g, "")  // remove accent marks
+    .replace(/&/g, "and")
+    .replace(/[^a-z0-9\s-]/g, " ")    // drop punctuation
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function splitSynonyms(value) {
+  // Expecting something like: "macaroni; maccheroni; elbow macaroni"
+  // If you don't have this column yet, leave blank - it still works.
+  return (value || "")
+    .split(";")
+    .map(s => s.trim())
+    .filter(Boolean);
+}
+
+module.exports = () => {
+  // Update to your CSV location.
+  // Common patterns:
+  // - src/_data/pasta.csv
+  // - src/pasta.csv
+  const csvPathCandidates = [
+    path.join(process.cwd(), "src", "_data", "pasta.csv"),
+    path.join(process.cwd(), "src", "pasta.csv"),
+    path.join(process.cwd(), "pasta.csv"),
+  ];
+
+  const csvPath = csvPathCandidates.find(p => fs.existsSync(p));
+  if (!csvPath) {
+    throw new Error(
+      `pastaIndex.js could not find pasta.csv. Tried:\n${csvPathCandidates.join("\n")}`
+    );
+  }
+
+  const csvText = fs.readFileSync(csvPath, "utf8");
+  const rows = parseCSV(csvText);
+
+  // You can rename these to match your actual CSV columns.
+  // Minimum needed: ShapeName + Slug (or URL).
+  const COL_NAME = "ShapeName";
+  const COL_SLUG = "Slug"; // e.g., "acinelli"
+  const COL_SYNONYMS = "Synonyms"; // optional; semicolon-separated list
+
+  const entries = [];
+  const aliasToSlug = {}; // maps normalized alias -> canonical slug
+
+  for (const r of rows) {
+    const name = r[COL_NAME];
+    const slug = r[COL_SLUG];
+
+    if (!name || !slug) continue;
+
+    const url = `/pasta/${slug}/`;
+    const synonyms = splitSynonyms(r[COL_SYNONYMS]);
+
+    const allAliases = [name, ...synonyms];
+
+    // Store canonical entry
+    entries.push({
+      name,
+      slug,
+      url,
+      synonyms,
+      // room for later: category, geometry, ridged, hollow, etc.
+    });
+
+    // Build alias m
