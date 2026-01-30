@@ -39,12 +39,12 @@
     status.appendChild(span);
   }
 
-  function displayLabel(entry) {
-    // Add your special-case hint without calling anything "canonical".
-    // This is intentionally minimal and only for Capellini.
-    const key = normalize(entry?.name || "");
-    if (key === "capellini") return "Capellini (commonly known as: angel hair)";
-    return entry?.name || "";
+  function formatLabel(entryName, aliasDisplay) {
+    // Only show the suffix if aliasDisplay is meaningful and not the same as the name.
+    const n1 = normalize(entryName);
+    const n2 = normalize(aliasDisplay);
+    if (!aliasDisplay || !n2 || n1 === n2) return entryName;
+    return `${entryName} (commonly known as: ${aliasDisplay})`;
   }
 
   function renderSuggestions(items) {
@@ -58,7 +58,6 @@
       a.textContent = it.label;
       li.appendChild(a);
 
-      // Optional: description (if present)
       if (it.description) {
         const div = document.createElement("div");
         div.style.marginTop = "0.15rem";
@@ -126,16 +125,36 @@
 
   let indexCache = null;
 
-  // Built once per page-load for suggestion + fuzzy matching
+  // Built once per page-load
   let slugToEntry = null;
-  let aliasList = null; // [{ key, slug, url, label }]
-  let aliasKeys = null; // [key, key, key...]
+
+  // aliasList holds all aliases (including canonical names), normalized
+  // { key, slug, url, aliasDisplay }
+  let aliasList = null;
+  let aliasKeys = null;
+
+  // Map normalized alias -> human display string (best effort)
+  // Includes canonical names and synonyms from entries (so we can show "angel hair", etc.)
+  let aliasKeyToDisplay = null;
 
   function buildLookupStructures(idx) {
-    if (slugToEntry && aliasList && aliasKeys) return;
+    if (slugToEntry && aliasList && aliasKeys && aliasKeyToDisplay) return;
 
     slugToEntry = new Map();
     for (const e of idx.entries || []) slugToEntry.set(e.slug, e);
+
+    aliasKeyToDisplay = new Map();
+
+    // Seed display map with canonical names and synonyms straight from entries
+    for (const e of idx.entries || []) {
+      const nameKey = normalize(e.name);
+      if (nameKey && !aliasKeyToDisplay.has(nameKey)) aliasKeyToDisplay.set(nameKey, e.name);
+
+      for (const syn of e.synonyms || []) {
+        const synKey = normalize(syn);
+        if (synKey && !aliasKeyToDisplay.has(synKey)) aliasKeyToDisplay.set(synKey, syn);
+      }
+    }
 
     aliasList = [];
     aliasKeys = [];
@@ -151,12 +170,12 @@
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
 
-      aliasList.push({
-        key: aliasKey,
-        slug,
-        url,
-        label: entry?.name || slug,
-      });
+      const aliasDisplay =
+        aliasKeyToDisplay.get(aliasKey) ||
+        // Fallback - "re-title case" isn't safe; just show the normalized alias as-is
+        aliasKey;
+
+      aliasList.push({ key: aliasKey, slug, url, aliasDisplay });
       aliasKeys.push(aliasKey);
     }
   }
@@ -212,10 +231,11 @@
       usedSlugs.add(a.slug);
 
       const entry = slugToEntry?.get(a.slug);
+      const name = entry?.name || a.slug;
 
       out.push({
         url: a.url,
-        label: displayLabel(entry) || a.label,
+        label: formatLabel(name, a.aliasDisplay),
         description: entry?.description || "",
       });
 
@@ -239,10 +259,13 @@
 
       const entry = slugToEntry?.get(slug);
       const url = entry?.url || `/pasta/${slug}/`;
+      const name = entry?.name || slug;
+
+      const aliasDisplay = aliasKeyToDisplay?.get(k) || k;
 
       suggestions.push({
         url,
-        label: displayLabel(entry) || entry?.name || slug,
+        label: formatLabel(name, aliasDisplay),
         description: entry?.description || "",
       });
     }
@@ -325,7 +348,6 @@
       return;
     }
 
-    // No suggestions at all
     setStatusText("No match found.");
   });
 
@@ -338,7 +360,6 @@
     input.value = q;
     window.history.replaceState({}, "", window.location.pathname);
 
-    // Use the same semantics as submit: redirect only if exact or single unambiguous result.
     (async () => {
       const result = await runSearch(q, { redirectIfFound: true });
       if (result.redirected) return;
