@@ -221,6 +221,12 @@
     return n;
   }
 
+  /**
+   * Key behavior change:
+   * - After Type, we prefer structural questions.
+   * - Size is a tie-breaker and is NOT eligible until >= 2 structural questions are answered.
+   * - If no structural question is useful, we stop asking (return null) instead of defaulting to Size.
+   */
   function pickNextQuestion(candidateEntries, answeredKeys) {
     if (candidateEntries.length <= 1) return null;
 
@@ -231,33 +237,43 @@
       (s) => s.key !== "type" && !answeredKeys.has(s.key)
     );
 
-    const scored = [];
+    const structuralScored = [];
+    const sizeScored = [];
+
     for (const s of candidates) {
       const sc = scoreQuestion(candidateEntries, s.key);
-      if (sc > 0) scored.push({ step: s, score: sc });
+      if (sc <= 0) continue;
+
+      if (s.kind === "structural") structuralScored.push({ step: s, score: sc });
+      else if (s.kind === "size") sizeScored.push({ step: s, score: sc });
     }
 
-    if (!scored.length) return null;
+    structuralScored.sort((a, b) => b.score - a.score);
+    sizeScored.sort((a, b) => b.score - a.score);
 
-    scored.sort((a, b) => b.score - a.score);
+    const bestStructural = structuralScored.length ? structuralScored[0] : null;
+    const bestSize = sizeScored.length ? sizeScored[0] : null;
 
-    const bestOverall = scored[0];
-    const structural = scored.filter((x) => x.step.kind === "structural");
-    const bestStructural = structural.length ? structural[0] : null;
-
-    // Size is a tie-breaker: avoid showing it early unless clearly dominant.
-    if (bestOverall.step.kind === "size") {
-      const MARGIN = 0.35; // tweakable
-      const sizeWinsHard =
-        !bestStructural || bestOverall.score >= bestStructural.score + MARGIN;
-
-      if (answeredStructural >= 2 || sizeWinsHard) return bestOverall.step;
-
+    // Rule 1: until we have 2 structural answers, only ask structural follow-ups
+    if (answeredStructural < 2) {
       if (bestStructural) return bestStructural.step;
-      return bestOverall.step;
+
+      // No useful structural question - stop (do NOT default to size)
+      return null;
     }
 
-    return bestOverall.step;
+    // Rule 2: after 2 structural answers, allow best overall among remaining,
+    // but still prefer a strong structural split if it’s clearly better.
+    if (bestStructural && bestSize) {
+      const MARGIN = 0.15;
+      if (bestStructural.score >= bestSize.score + MARGIN) return bestStructural.step;
+      return bestSize.step;
+    }
+
+    if (bestStructural) return bestStructural.step;
+    if (bestSize) return bestSize.step;
+
+    return null;
   }
 
   // ----- UI: wrap each question into a "step card", sequential layout -----
@@ -292,15 +308,12 @@
       .id-step__desc { margin: 0.25rem 0 0; font-size: 0.95em; opacity: 0.85; }
 
       .id-step__control { margin-top: 0.65rem; }
-      .id-step__control label { display: none !important; } /* we render our own title */
+      .id-step__control label { display: none !important; }
       .id-step__control select { width: 100%; max-width: 420px; }
-
-      .id-step__hint { margin-top: 0.5rem; font-size: 0.9em; opacity: 0.8; }
     `;
     document.head.appendChild(style);
   }
 
-  // Create a step card wrapper and move the existing label+select into it.
   function buildStepCard(step) {
     const selectEl = step.el;
     const labelEl = getLabelFor(selectEl);
@@ -335,8 +348,6 @@
     const control = document.createElement("div");
     control.className = "id-step__control";
 
-    // Move label+select (or just select) into the control block.
-    // If label wraps the select, move the label (contains both).
     if (labelEl && labelEl.contains(selectEl)) {
       control.appendChild(labelEl);
     } else {
@@ -350,14 +361,12 @@
     return card;
   }
 
-  // Replace the free-floating controls with an ordered steps container.
   let stepsContainer = null;
   let stepCardByKey = new Map();
 
   function buildStepsUI() {
     injectIdentifyStylesOnce();
 
-    // If we already built it (hot reload or nav), don’t rebuild.
     if (root.querySelector(".id-steps")) {
       stepsContainer = root.querySelector(".id-steps");
       stepCardByKey = new Map();
@@ -370,14 +379,12 @@
     stepsContainer = document.createElement("div");
     stepsContainer.className = "id-steps";
 
-    // Build in fixed sequential order.
     for (const step of STEPS) {
       const card = buildStepCard(step);
       stepsContainer.appendChild(card);
       stepCardByKey.set(step.key, card);
     }
 
-    // Insert steps before status (or at end of root if not found)
     if (elStatus && elStatus.parentNode) {
       elStatus.parentNode.insertBefore(stepsContainer, elStatus);
     } else {
@@ -437,8 +444,8 @@
     const opts = Array.from(elType.options || []);
     for (const opt of opts) {
       const v = normVal(opt.value);
-      if (!v) continue; // keep placeholder
-      if (!typeCounts.get(v)) opt.remove(); // remove empty types, e.g. Other if blank
+      if (!v) continue;
+      if (!typeCounts.get(v)) opt.remove(); // removes "Other" if blank, etc.
     }
   }
 
@@ -447,7 +454,6 @@
 
     const filters = getFilterState();
 
-    // Type first
     if (!filters.type) {
       hideAllStepsExceptType();
       setStatus(`Choose a Type to start narrowing down from ${entries.length} shapes.`);
@@ -460,8 +466,6 @@
     if (!results.length) {
       setStatus("No matches with those answers. Try changing your last selection.");
       clearResults();
-
-      // Still show the answered steps (so the user can back out), but no new step
       showAnsweredAndNextStep(null);
       return;
     }
@@ -500,7 +504,6 @@
       entries = Array.isArray(json.entries) ? json.entries : [];
       loaded = true;
 
-      // Remove empty type options like "Other" if it has no entries
       removeBlankTypeOptions();
 
       setStatus(`Choose a Type to start narrowing down from ${entries.length} shapes.`);
