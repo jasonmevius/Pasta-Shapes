@@ -5,8 +5,8 @@ const path = require("path");
 // Lightweight CSV parser without extra deps
 function parseCSV(text) {
   const lines = text.split(/\r?\n/).filter(Boolean);
-  const headers = splitCSVLine(lines.shift()).map(h => h.trim());
-  return lines.map(line => {
+  const headers = splitCSVLine(lines.shift()).map((h) => h.trim());
+  return lines.map((line) => {
     const cells = splitCSVLine(line);
     const row = {};
     headers.forEach((h, i) => (row[h] = (cells[i] ?? "").trim()));
@@ -23,22 +23,29 @@ function splitCSVLine(line) {
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
 
+    // Escaped quote inside a quoted field
     if (ch === '"' && line[i + 1] === '"') {
       cur += '"';
       i++;
       continue;
     }
+
+    // Toggle quoted mode
     if (ch === '"') {
       inQuotes = !inQuotes;
       continue;
     }
+
+    // Comma delimiter (only when not inside quotes)
     if (ch === "," && !inQuotes) {
       out.push(cur);
       cur = "";
       continue;
     }
+
     cur += ch;
   }
+
   out.push(cur);
   return out;
 }
@@ -46,10 +53,10 @@ function splitCSVLine(line) {
 function normalize(s) {
   return (s || "")
     .toLowerCase()
-    .normalize("NFD")                 // separate accent marks
-    .replace(/[\u0300-\u036f]/g, "")  // remove accent marks
+    .normalize("NFD") // separate accent marks
+    .replace(/[\u0300-\u036f]/g, "") // remove accent marks
     .replace(/&/g, "and")
-    .replace(/[^a-z0-9\s-]/g, " ")    // drop punctuation
+    .replace(/[^a-z0-9\s-]/g, " ") // drop punctuation
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -59,7 +66,7 @@ function splitSynonyms(value) {
   // If you don't have this column yet, leave blank - it still works.
   return (value || "")
     .split(";")
-    .map(s => s.trim())
+    .map((s) => s.trim())
     .filter(Boolean);
 }
 
@@ -68,13 +75,14 @@ module.exports = () => {
   // Common patterns:
   // - src/_data/pasta.csv
   // - src/pasta.csv
+  // - pasta.csv
   const csvPathCandidates = [
     path.join(process.cwd(), "src", "_data", "pasta.csv"),
     path.join(process.cwd(), "src", "pasta.csv"),
     path.join(process.cwd(), "pasta.csv"),
   ];
 
-  const csvPath = csvPathCandidates.find(p => fs.existsSync(p));
+  const csvPath = csvPathCandidates.find((p) => fs.existsSync(p));
   if (!csvPath) {
     throw new Error(
       `pastaIndex.js could not find pasta.csv. Tried:\n${csvPathCandidates.join("\n")}`
@@ -84,7 +92,7 @@ module.exports = () => {
   const csvText = fs.readFileSync(csvPath, "utf8");
   const rows = parseCSV(csvText);
 
-  // You can rename these to match your actual CSV columns.
+  // Rename these to match your actual CSV columns.
   // Minimum needed: ShapeName + Slug (or URL).
   const COL_NAME = "ShapeName";
   const COL_SLUG = "Slug"; // e.g., "acinelli"
@@ -113,4 +121,29 @@ module.exports = () => {
       // room for later: category, geometry, ridged, hollow, etc.
     });
 
-    // Build alias m
+    // Build alias map
+    for (const a of allAliases) {
+      const key = normalize(a);
+      if (!key) continue;
+
+      // first win holds - avoids overwriting if duplicates exist
+      if (!aliasToSlug[key]) aliasToSlug[key] = slug;
+    }
+  }
+
+  // Helpful for fuzzy suggestions later
+  const normalizedNames = entries.map((e) => ({
+    slug: e.slug,
+    url: e.url,
+    name: e.name,
+    key: normalize(e.name),
+  }));
+
+  return {
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    entries,
+    aliasToSlug,
+    normalizedNames,
+  };
+};
