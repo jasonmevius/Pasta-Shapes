@@ -5,8 +5,11 @@ pagination:
   alias: item
 permalink: "pasta/{{ item.ShapeName | slug }}/index.html"
 layout: layout.njk
-title: "Pasta Shapes: {{ item.ShapeName }}"
+
+eleventyComputed:
+  title: "Pasta Shapes: {{ item.ShapeName }}"
 ---
+
 
 
 <h1>{{ item.ShapeName }}</h1>
