@@ -23,10 +23,19 @@ title: "{{ item.ShapeName }}"
 <ul>
   <li><strong>Primary geometry:</strong> {{ item.PrimaryGeometry }}</li>
   <li><strong>Key discriminators:</strong> {{ item.KeyDiscriminators }}</li>
-  <li><strong>City/Region:</strong> {{ item.CityOrRegionMostAssociated }}</li>
-  <li><strong>Earliest attested mention:</strong> {{ item.EarliestAttestedMention }}</li>
-</ul>
 
-{% if item.SourceLink %}
-  <p><a href="{{ item.SourceLink }}">Source</a></p>
-{% endif %}
+  {% if item.CityOrRegionMostAssociated and item.CityOrRegionMostAssociated != "Unknown" %}
+    <li><strong>City/Region:</strong> {{ item.CityOrRegionMostAssociated }}</li>
+  {% endif %}
+
+  {% if item.EarliestAttestedMention and item.EarliestAttestedMention != "Unknown" %}
+    <li><strong>Earliest attested mention:</strong> {{ item.EarliestAttestedMention }}</li>
+  {% endif %}
+
+  {% if item.SourceLink %}
+    <li>
+      <strong>Source:</strong>
+      <a href="{{ item.SourceLink }}">Linked URL</a>
+    </li>
+  {% endif %}
+</ul>
