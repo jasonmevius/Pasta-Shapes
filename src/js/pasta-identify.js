@@ -30,14 +30,13 @@
 
   const MAX_SHOW = 30;
 
-  // Order matters: Type is fixed first, then we will pick the next best dynamically from these.
-  // The "key" is the JSON field name.
+  // Prefer “structural” questions first; Size is a tie-breaker.
   const QUESTION_DEFS = [
-    { key: "isHollow", el: elHollow, label: "Hollow" },
-    { key: "isRidged", el: elRidged, label: "Ridged" },
-    { key: "isTwisted", el: elTwisted, label: "Twisted" },
-    { key: "isCurved", el: elCurved, label: "Curved" },
-    { key: "sizeClass", el: elSize, label: "Size" },
+    { key: "isHollow", el: elHollow, label: "Hollow", kind: "structural" },
+    { key: "isRidged", el: elRidged, label: "Ridged", kind: "structural" },
+    { key: "isTwisted", el: elTwisted, label: "Twisted", kind: "structural" },
+    { key: "isCurved", el: elCurved, label: "Curved", kind: "structural" },
+    { key: "sizeClass", el: elSize, label: "Size", kind: "size" },
   ];
 
   function normVal(v) {
@@ -45,7 +44,6 @@
   }
 
   function getLabelEl(selectEl) {
-    // Prefer labels inside the component root, but fall back to document if needed
     return (
       root.querySelector(`label[for="${selectEl.id}"]`) ||
       document.querySelector(`label[for="${selectEl.id}"]`)
@@ -55,7 +53,7 @@
   function setFieldVisible(selectEl, visible) {
     const label = getLabelEl(selectEl);
 
-    // If the label wraps the select, hiding label hides both cleanly.
+    // If the label wraps the select, hiding the label hides both.
     if (label && label.contains(selectEl)) {
       label.style.display = visible ? "" : "none";
       return;
@@ -104,7 +102,6 @@
     }
   }
 
-  // Filter matching for yes/no/unknown fields.
   function matchesFilter(entry, key, selected) {
     if (!selected) return true; // Any
     const val = normVal(entry[key]);
@@ -131,7 +128,7 @@
       if (!matchesFilter(e, "isTwisted", filters.isTwisted)) return false;
       if (!matchesFilter(e, "isCurved", filters.isCurved)) return false;
 
-      // sizeClass is special: allow blank values when selecting unknown
+      // sizeClass: allow blank values when selecting unknown
       if (filters.sizeClass) {
         const v = normVal(e.sizeClass);
         if (v !== filters.sizeClass) {
@@ -143,10 +140,9 @@
     });
   }
 
-  // --- Picking the next best question ---
+  // ---------- scoring / next-question selection ----------
 
   function entropyFromCounts(counts) {
-    // counts: number[]
     const total = counts.reduce((a, b) => a + b, 0);
     if (!total) return 0;
     let h = 0;
@@ -164,19 +160,12 @@
   }
 
   function scoreQuestion(candidateEntries, key) {
-    // Score is information gain-ish: H(before) - sum(p_i * H(after_i))
-    // But here "after" groups are terminal (no further split), so we just want a balanced split.
-    // Using entropy of the distribution itself works well:
-    // - If all entries share one value -> entropy 0 (bad question)
-    // - If entries split across values -> higher entropy (good question)
     const buckets = new Map();
     for (const e of candidateEntries) {
       const b = getValueBucket(e, key);
       buckets.set(b, (buckets.get(b) || 0) + 1);
     }
 
-    // Remove buckets that don't help (all unknown is not helpful)
-    // But if there is a mix of known + unknown, unknown can still be informative.
     const counts = Array.from(buckets.values());
     const total = counts.reduce((a, b) => a + b, 0);
     if (!total) return -1;
@@ -184,48 +173,19 @@
     // If everything is unknown, don't ask this.
     if (buckets.size === 1 && buckets.has("unknown")) return -1;
 
-    // If essentially constant (one bucket dominates), treat as low value.
+    // If essentially constant, very low value.
     const maxCount = Math.max(...counts);
-    const dominance = maxCount / total; // 1.0 means constant
-    if (dominance >= 0.92) return 0; // near-useless in this subset
+    const dominance = maxCount / total;
+    if (dominance >= 0.92) return 0;
 
-    // Entropy prefers more even splits
     const h = entropyFromCounts(counts);
 
-    // Slight penalty for questions with too many categories (not likely here),
-    // and for heavy "unknown" since it tends to frustrate users.
+    // Penalize unknown-heavy splits
     const unknownFrac = (buckets.get("unknown") || 0) / total;
     const penalty = unknownFrac * 0.35 + Math.max(0, buckets.size - 3) * 0.1;
 
     return h - penalty;
   }
-
-  function pickNextQuestion(candidateEntries, answeredKeys) {
-    // Stop if we are already very narrow
-    if (candidateEntries.length <= 1) return null;
-
-    let best = null;
-    let bestScore = -1;
-
-    for (const q of QUESTION_DEFS) {
-      if (answeredKeys.has(q.key)) continue;
-
-      // If user hasn't chosen a Type, don't pick anything (Type is always first)
-      // (Handled outside, but keeping it safe)
-      const s = scoreQuestion(candidateEntries, q.key);
-      if (s > bestScore) {
-        bestScore = s;
-        best = q;
-      }
-    }
-
-    // If nothing has a meaningful score, don't show additional questions
-    if (!best || bestScore <= 0) return null;
-
-    return best;
-  }
-
-  // --- Progressive reveal logic ---
 
   function getAnsweredKeys() {
     const answered = new Set();
@@ -235,6 +195,63 @@
     return answered;
   }
 
+  function countAnsweredStructural(answeredKeys) {
+    let n = 0;
+    for (const q of QUESTION_DEFS) {
+      if (q.kind === "structural" && answeredKeys.has(q.key)) n++;
+    }
+    return n;
+  }
+
+  function pickNextQuestion(candidateEntries, answeredKeys) {
+    if (candidateEntries.length <= 1) return null;
+
+    const answeredStructural = countAnsweredStructural(answeredKeys);
+
+    // Compute scores for all unanswered questions.
+    const scored = [];
+    for (const q of QUESTION_DEFS) {
+      if (answeredKeys.has(q.key)) continue;
+      const s = scoreQuestion(candidateEntries, q.key);
+      if (s > 0) scored.push({ q, s });
+    }
+
+    if (!scored.length) return null;
+
+    scored.sort((a, b) => b.s - a.s);
+
+    // Strong UX rule: do not show Size as the next question early unless it is clearly dominant.
+    // - If we have <2 structural answers, we strongly prefer a structural question.
+    // - Size is allowed if it beats the best structural by a margin, or if no structural is viable.
+    const bestOverall = scored[0];
+
+    const structural = scored.filter((x) => x.q.kind === "structural");
+    const bestStructural = structural.length ? structural[0] : null;
+
+    // If size is best, decide if we should still pick structural.
+    if (bestOverall.q.kind === "size") {
+      // Allow size if:
+      // - user already answered 2+ structural questions, OR
+      // - there is no structural option with positive score, OR
+      // - size beats best structural by a clear margin.
+      const MARGIN = 0.35; // tweakable
+      const sizeWinsHard =
+        !bestStructural || bestOverall.s >= bestStructural.s + MARGIN;
+
+      if (answeredStructural >= 2 || sizeWinsHard) return bestOverall.q;
+
+      // Otherwise choose the best structural if available.
+      if (bestStructural) return bestStructural.q;
+
+      return bestOverall.q;
+    }
+
+    // If a structural question is best overall, use it.
+    return bestOverall.q;
+  }
+
+  // ---------- progressive reveal logic ----------
+
   function hideAllNonTypeFields() {
     for (const q of QUESTION_DEFS) setFieldVisible(q.el, false);
   }
@@ -242,18 +259,15 @@
   function showAnsweredAndNext(nextQ) {
     const answered = getAnsweredKeys();
 
-    // Show answered ones so user can revise
     for (const q of QUESTION_DEFS) {
       if (answered.has(q.key)) setFieldVisible(q.el, true);
       else setFieldVisible(q.el, false);
     }
 
-    // Show the next recommended question
     if (nextQ) setFieldVisible(nextQ.el, true);
   }
 
   function clearFieldsAfter(changedEl) {
-    // If the user changes an earlier answer, clear everything after it
     const all = [elType, ...QUESTION_DEFS.map((q) => q.el)];
     const idx = all.indexOf(changedEl);
     if (idx === -1) return;
@@ -263,40 +277,54 @@
     }
   }
 
-  function updateUI(fromEl) {
+  function removeBlankTypeOptions() {
+    // Removes options that have no matching entries (e.g., "Other" if empty)
+    const typeCounts = new Map();
+    for (const e of entries) {
+      const t = normVal(e.type);
+      if (!t) continue;
+      typeCounts.set(t, (typeCounts.get(t) || 0) + 1);
+    }
+
+    const opts = Array.from(elType.options || []);
+    for (const opt of opts) {
+      const v = normVal(opt.value);
+      if (!v) continue; // keep placeholder
+      if (!typeCounts.get(v)) {
+        // remove empty category option
+        opt.remove();
+      }
+    }
+  }
+
+  function updateUI() {
     if (!loaded) return;
 
-    // Enforce: Type first
     const filters = getFilterState();
 
+    // Enforce: Type first
     if (!filters.type) {
-      // No type selected yet: hide everything else and clear results
       hideAllNonTypeFields();
       setStatus(`Choose a Type to start narrowing down from ${entries.length} shapes.`);
       clearResults();
       return;
     }
 
-    // Apply filters (including any answered fields)
     const results = applyAllFilters(entries, filters);
 
     if (!results.length) {
       setStatus("No matches with those answers. Try changing your last selection.");
       clearResults();
-      // Still show answered fields so user can back out
       showAnsweredAndNext(null);
       return;
     }
 
-    // Determine next question based on the current remaining results
     const answeredKeys = getAnsweredKeys();
     const nextQ = pickNextQuestion(results, answeredKeys);
 
-    // Status and results
     setStatus(`${results.length} match${results.length === 1 ? "" : "es"}.`);
     render(results);
 
-    // Progressive reveal: show already-answered questions + the single next best question
     showAnsweredAndNext(nextQ);
   }
 
@@ -320,6 +348,9 @@
       entries = Array.isArray(json.entries) ? json.entries : [];
       loaded = true;
 
+      // Remove empty Type options like "Other" (if it has no entries)
+      removeBlankTypeOptions();
+
       setStatus(`Choose a Type to start narrowing down from ${entries.length} shapes.`);
     } catch (e) {
       setStatus("Identify-by-shape is unavailable right now.");
@@ -330,13 +361,13 @@
   // Events
   elType.addEventListener("change", () => {
     clearFieldsAfter(elType);
-    updateUI(elType);
+    updateUI();
   });
 
   for (const q of QUESTION_DEFS) {
     q.el.addEventListener("change", () => {
       clearFieldsAfter(q.el);
-      updateUI(q.el);
+      updateUI();
     });
   }
 
