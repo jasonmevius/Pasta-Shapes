@@ -28,6 +28,13 @@
   let entries = [];
   let loaded = false;
 
+  // Tuneables
+  const MAX_SHOW = 30;
+
+  // "Size is relative" - hide/disable size until it would actually help.
+  // If we still have > this many matches after other filters, enable size.
+  const ENABLE_SIZE_WHEN_MATCHES_GT = 25;
+
   function normVal(v) {
     return String(v || "").trim().toLowerCase();
   }
@@ -35,7 +42,7 @@
   function matchesFilter(entry, key, selected) {
     if (!selected) return true; // Any
     const val = normVal(entry[key]);
-    if (!val) return selected === "unknown"; // if data blank, treat as unknown
+    if (!val) return selected === "unknown"; // blank data treated as unknown
     return val === selected;
   }
 
@@ -50,8 +57,7 @@
   function render(results) {
     clearResults();
 
-    const maxShow = 30;
-    const show = results.slice(0, maxShow);
+    const show = results.slice(0, MAX_SHOW);
 
     for (const r of show) {
       const li = document.createElement("li");
@@ -61,18 +67,8 @@
       a.textContent = r.name;
       li.appendChild(a);
 
-      // Optional details to help scanning
-      const meta = [];
-      if (r.category) meta.push(r.category);
-      if (r.primaryGeometry) meta.push(r.primaryGeometry);
-
-      if (meta.length) {
-        const small = document.createElement("small");
-        small.style.marginLeft = "0.5rem";
-        small.textContent = `(${meta.join(" - ")})`;
-        li.appendChild(small);
-      }
-
+      // Removed meta line entirely (category/geometry/type repeats what the user filtered by)
+      // Keep description for scanability
       if (r.description) {
         const div = document.createElement("div");
         div.style.marginTop = "0.2rem";
@@ -84,17 +80,15 @@
       elResults.appendChild(li);
     }
 
-    if (results.length > maxShow) {
+    if (results.length > MAX_SHOW) {
       const li = document.createElement("li");
-      li.textContent = `Showing ${maxShow} of ${results.length}. Add more answers to narrow it down.`;
+      li.textContent = `Showing ${MAX_SHOW} of ${results.length}. Add more answers to narrow it down.`;
       elResults.appendChild(li);
     }
   }
 
-  function applyFilters() {
-    if (!loaded) return;
-
-    const f = {
+  function getFilterState() {
+    return {
       type: normVal(elType.value),
       isHollow: normVal(elHollow.value),
       isRidged: normVal(elRidged.value),
@@ -102,33 +96,83 @@
       isCurved: normVal(elCurved.value),
       sizeClass: normVal(elSize.value),
     };
+  }
 
-    const results = entries.filter((e) => {
+  function isAnyFilterSelected(f) {
+    return !!(f.type || f.isHollow || f.isRidged || f.isTwisted || f.isCurved || f.sizeClass);
+  }
+
+  function applyFilters({ fromEvent = "" } = {}) {
+    if (!loaded) return;
+
+    const f = getFilterState();
+
+    // First pass: apply everything EXCEPT size, so we can decide whether size is useful.
+    const resultsNoSize = entries.filter((e) => {
       if (f.type && normVal(e.type) !== f.type) return false;
       if (!matchesFilter(e, "isHollow", f.isHollow)) return false;
       if (!matchesFilter(e, "isRidged", f.isRidged)) return false;
       if (!matchesFilter(e, "isTwisted", f.isTwisted)) return false;
       if (!matchesFilter(e, "isCurved", f.isCurved)) return false;
+      return true;
+    });
+
+    // Decide whether to enable Size
+    // - If user already picked a size, keep it enabled
+    // - Else, enable only when there are still a lot of matches
+    const shouldEnableSize = !!f.sizeClass || resultsNoSize.length > ENABLE_SIZE_WHEN_MATCHES_GT;
+
+    // If size isn't useful right now, disable it and clear selection (unless user explicitly changed size)
+    if (!shouldEnableSize) {
+      elSize.disabled = true;
+
+      // Only clear size if the change didn't originate from size itself
+      if (fromEvent !== "size" && elSize.value) elSize.value = "";
+    } else {
+      elSize.disabled = false;
+    }
+
+    // Now apply size too (if selected)
+    const results = resultsNoSize.filter((e) => {
       if (f.sizeClass && normVal(e.sizeClass) !== f.sizeClass) {
-        // Allow unknown selection to include blank
+        // allow "unknown" to include blank
         if (!(f.sizeClass === "unknown" && !normVal(e.sizeClass))) return false;
       }
       return true;
     });
 
-    if (!f.type && !f.isHollow && !f.isRidged && !f.isTwisted && !f.isCurved && !f.sizeClass) {
+    // No filters at all
+    if (!isAnyFilterSelected(f)) {
       setStatus(`Choose a few options to narrow down from ${entries.length} shapes.`);
       clearResults();
       return;
     }
 
+    // No matches
     if (!results.length) {
-      setStatus("No matches with those filters. Try loosening one option.");
+      // If size is selected and seems to be the culprit, make that obvious
+      if (f.sizeClass) {
+        setStatus("No matches. Try changing Size back to Any (or loosening another option).");
+      } else {
+        setStatus("No matches with those filters. Try loosening one option.");
+      }
       clearResults();
       return;
     }
 
-    setStatus(`${results.length} match${results.length === 1 ? "" : "es"}.`);
+    // Matches found
+    let statusText = `${results.length} match${results.length === 1 ? "" : "es"}.`;
+
+    // Gentle hint about size only when it's disabled and results are still large
+    if (elSize.disabled && resultsNoSize.length > ENABLE_SIZE_WHEN_MATCHES_GT) {
+      // This situation shouldn't happen because we enable size in that case,
+      // but leaving this as a safe fallback.
+      statusText += " Size may help narrow this down.";
+    } else if (!elSize.disabled && !f.sizeClass && resultsNoSize.length > ENABLE_SIZE_WHEN_MATCHES_GT) {
+      statusText += " Tip: Size can help narrow this down.";
+    }
+
+    setStatus(statusText);
     render(results);
   }
 
@@ -139,7 +183,8 @@
     elTwisted.value = "";
     elCurved.value = "";
     elSize.value = "";
-    applyFilters();
+    elSize.disabled = true;
+    applyFilters({ fromEvent: "reset" });
   }
 
   async function init() {
@@ -152,6 +197,9 @@
       entries = Array.isArray(json.entries) ? json.entries : [];
       loaded = true;
 
+      // Start with size disabled (since it's the trickiest input)
+      elSize.disabled = true;
+
       setStatus(`Choose a few options to narrow down from ${entries.length} shapes.`);
     } catch (e) {
       setStatus("Identify-by-shape is unavailable right now.");
@@ -160,12 +208,12 @@
   }
 
   // Events
-  elType.addEventListener("change", applyFilters);
-  elHollow.addEventListener("change", applyFilters);
-  elRidged.addEventListener("change", applyFilters);
-  elTwisted.addEventListener("change", applyFilters);
-  elCurved.addEventListener("change", applyFilters);
-  elSize.addEventListener("change", applyFilters);
+  elType.addEventListener("change", () => applyFilters({ fromEvent: "type" }));
+  elHollow.addEventListener("change", () => applyFilters({ fromEvent: "hollow" }));
+  elRidged.addEventListener("change", () => applyFilters({ fromEvent: "ridged" }));
+  elTwisted.addEventListener("change", () => applyFilters({ fromEvent: "twisted" }));
+  elCurved.addEventListener("change", () => applyFilters({ fromEvent: "curved" }));
+  elSize.addEventListener("change", () => applyFilters({ fromEvent: "size" }));
   elReset.addEventListener("click", reset);
 
   init();
