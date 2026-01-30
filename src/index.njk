@@ -6,35 +6,123 @@ layout: layout.njk
 <h1>Pasta Shapes</h1>
 <p>Loaded {{ pasta.length }} pasta shapes.</p>
 
-<section aria-labelledby="search-title">
-  <h2 id="search-title">Search by name</h2>
+<section aria-labelledby="search-by-name">
+  <h2 id="search-by-name">Search by name</h2>
 
-  <form id="pasta-search-form" action="/" method="get" autocomplete="off">
-    <label for="pasta-q">Pasta name</label><br>
+  <form id="pasta-search-form" action="/" method="GET" novalidate>
+    <label for="pasta-q">Type a pasta name</label><br />
     <input
       id="pasta-q"
       name="q"
       type="search"
-      placeholder="e.g., capellini, angel hair, bucatini"
-      spellcheck="false"
-      autocapitalize="none"
+      placeholder="e.g., capellini, angel hair, plin"
       autocomplete="off"
       inputmode="search"
-    >
-    <button type="submit">Search</button>
+      style="max-width: 32rem; width: 100%; padding: 0.5rem; margin-top: 0.25rem;"
+    />
+    <div style="margin-top: 0.5rem;">
+      <button type="submit">Search</button>
+    </div>
   </form>
 
-  <p id="pasta-search-status" aria-live="polite" style="min-height: 1.2em; margin-top: 0.5rem;"></p>
-
-  <ul id="pasta-search-suggestions" aria-label="Search suggestions"></ul>
+  <p id="pasta-search-status" aria-live="polite" style="margin-top: 0.75rem;"></p>
+  <ul id="pasta-search-suggestions" style="margin-top: 0.5rem;"></ul>
 </section>
 
-<hr>
+<hr style="margin: 2rem 0;" />
 
-<p><a href="/identify/">Or identify by shape</a></p>
+<section aria-labelledby="identify-by-shape">
+  <h2 id="identify-by-shape">Identify by shape</h2>
+  <p>Answer a few quick questions to narrow down the possibilities.</p>
+
+  <div id="pasta-identify" style="max-width: 46rem;">
+    <div style="display: grid; grid-template-columns: 1fr; gap: 0.75rem;">
+      <div>
+        <label for="id-type"><strong>Type</strong></label><br />
+        <select id="id-type" style="width: 100%; padding: 0.5rem;">
+          <option value="">Any</option>
+          <option value="strand">Strand</option>
+          <option value="tube">Tube</option>
+          <option value="ribbon">Ribbon</option>
+          <option value="sheet">Sheet</option>
+          <option value="short">Short cut</option>
+          <option value="stuffed">Stuffed</option>
+          <option value="soup">Soup / pastina</option>
+          <option value="ring">Ring / wheel</option>
+          <option value="dumpling">Dumpling / pasta-like</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+        <div>
+          <label for="id-hollow"><strong>Hollow?</strong></label><br />
+          <select id="id-hollow" style="width: 100%; padding: 0.5rem;">
+            <option value="">Any</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="id-ridged"><strong>Ridged?</strong></label><br />
+          <select id="id-ridged" style="width: 100%; padding: 0.5rem;">
+            <option value="">Any</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+        <div>
+          <label for="id-twisted"><strong>Twisted?</strong></label><br />
+          <select id="id-twisted" style="width: 100%; padding: 0.5rem;">
+            <option value="">Any</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="id-curved"><strong>Curved / ring-like?</strong></label><br />
+          <select id="id-curved" style="width: 100%; padding: 0.5rem;">
+            <option value="">Any</option>
+            <option value="yes">Yes</option>
+            <option value="no">No</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <label for="id-size"><strong>Size</strong></label><br />
+        <select id="id-size" style="width: 100%; padding: 0.5rem;">
+          <option value="">Any</option>
+          <option value="small">Small</option>
+          <option value="medium">Medium</option>
+          <option value="large">Large</option>
+          <option value="unknown">Unknown</option>
+        </select>
+      </div>
+
+      <div style="display:flex; gap: 0.75rem; align-items:center; flex-wrap: wrap;">
+        <button type="button" id="id-reset">Reset</button>
+        <span id="id-status" aria-live="polite"></span>
+      </div>
+    </div>
+
+    <ol id="id-results" style="margin-top: 1rem;"></ol>
+  </div>
+</section>
+
+<hr style="margin: 2rem 0;" />
 
 <details>
-  <summary>Browse all pasta shapes (A-Z)</summary>
+  <summary>Browse full list (alphabetical)</summary>
   <ul>
     {% for item in pasta %}
       <li>
@@ -44,3 +132,5 @@ layout: layout.njk
     {% endfor %}
   </ul>
 </details>
+
+<script src="/js/pasta-identify.js" defer></script>
