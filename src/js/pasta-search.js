@@ -14,7 +14,10 @@
       .normalize("NFD")
       .replace(/[\u0300-\u036f]/g, "")
       .replace(/&/g, "and")
-      .replace(/['"]/g, "") // important for d'angelo
+      // IMPORTANT: apostrophes should become spaces (not removed),
+      // so "d'angelo" becomes "d angelo" to match pastaIndex.js normalization.
+      .replace(/[’']/g, " ")
+      .replace(/["]/g, " ")
       .replace(/[^a-z0-9\s-]/g, " ")
       .replace(/\s+/g, " ")
       .trim();
@@ -34,6 +37,18 @@
       li.appendChild(a);
       list.appendChild(li);
     }
+  }
+
+  function setMatchStatus(match) {
+    // Make the match clickable (nice UX) while still redirecting on submit
+    status.innerHTML = "";
+    const span = document.createElement("span");
+    span.append("Match: ");
+    const a = document.createElement("a");
+    a.href = match.url;
+    a.textContent = match.name;
+    span.appendChild(a);
+    status.appendChild(span);
   }
 
   let indexCache = null;
@@ -90,7 +105,7 @@
 
     const match = findMatch(idx, query);
     if (match && match.url) {
-      status.textContent = `Match: ${match.name}`;
+      setMatchStatus(match);
       clearSuggestions();
       if (redirectIfFound) window.location.href = match.url;
       return;
@@ -107,7 +122,7 @@
     renderSuggestions(s);
   }
 
-  // Live suggestions while typing
+  // Live suggestions while typing (no redirect)
   input.addEventListener("input", () => {
     runSearch(input.value, { redirectIfFound: false });
   });
@@ -126,8 +141,7 @@
 
     input.value = q;
 
-    // Clean URL immediately (optional, keeps things tidy)
-    // This keeps the user on / while we redirect, and avoids re-trigger on back button.
+    // Keep URL tidy and prevent re-trigger on back button
     window.history.replaceState({}, "", window.location.pathname);
 
     runSearch(q, { redirectIfFound: true });
