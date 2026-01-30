@@ -3,66 +3,44 @@ title: Pasta Shapes
 layout: layout.njk
 ---
 
-<main id="main">
-  <header class="home-hero">
-    <h1>Pasta Shapes</h1>
-    <p>Search by name, or identify a shape by answering a few simple questions.</p>
-  </header>
+<h1>Pasta Shapes</h1>
+<p>Loaded {{ pasta.length }} pasta shapes.</p>
 
-  <section class="home-actions" aria-label="Pasta actions">
-    <!-- Card 1: Search by name -->
-    <section class="card home-search" aria-labelledby="search-title">
-      <h2 id="search-title">Search by pasta name</h2>
+<section aria-labelledby="search-title">
+  <h2 id="search-title">Search by name</h2>
 
-      <form id="pasta-search-form" class="search-form" autocomplete="off">
-        <label for="pasta-q" class="sr-only">Pasta name</label>
-        <input
-          id="pasta-q"
-          name="q"
-          type="search"
-          inputmode="search"
-          autocapitalize="none"
-          autocomplete="off"
-          spellcheck="false"
-          placeholder="Type a pasta name (e.g., rigatoni, orecchiette)"
-        />
-        <button type="submit">Search</button>
-      </form>
+  <form id="pasta-search-form" action="/" method="get" autocomplete="off">
+    <label for="pasta-q">Pasta name</label><br>
+    <input
+      id="pasta-q"
+      name="q"
+      type="search"
+      placeholder="e.g., capellini, angel hair, bucatini"
+      spellcheck="false"
+      autocapitalize="none"
+      autocomplete="off"
+      inputmode="search"
+    >
+    <button type="submit">Search</button>
+  </form>
 
-      <div id="pasta-search-status" class="search-status" role="status" aria-live="polite"></div>
-      <ul id="pasta-search-suggestions" class="search-suggestions" aria-label="Search suggestions"></ul>
+  <p id="pasta-search-status" aria-live="polite" style="min-height: 1.2em; margin-top: 0.5rem;"></p>
 
-      <p class="help-text">
-        Tip: try singular/plural or a different spelling. If we don’t recognize it, we’ll log it for later research.
-      </p>
-    </section>
+  <ul id="pasta-search-suggestions" aria-label="Search suggestions"></ul>
+</section>
 
-    <!-- Card 2: Identify by questions (placeholder for the next phase) -->
-    <section class="card home-identify" aria-labelledby="identify-title">
-      <h2 id="identify-title">Identify by shape</h2>
-      <p>Have the pasta in front of you? Answer a few simple questions to narrow it down.</p>
+<hr>
 
-      {# If you don’t have /identify/ yet, you can change this href to "#browse-title" #}
-      <a class="button" href="/identify/">Start identifying</a>
+<p><a href="/identify/">Or identify by shape</a></p>
 
-      <p class="help-text">
-        Coming soon: a quick wizard that narrows to a single match, or a short list of close candidates.
-      </p>
-    </section>
-  </section>
-
-  <!-- Browse fallback (keeps your existing list for now) -->
-  <section class="home-browse" aria-labelledby="browse-title">
-    <h2 id="browse-title">Browse A - Z</h2>
-    <p class="help-text">Loaded {{ pasta.length }} pasta shapes.</p>
-
-    <ul class="browse-list">
-      {% for item in pasta %}
-        <li>
-          <a href="/pasta/{{ item.ShapeName | slug }}/">{{ item.ShapeName }}</a>
-          {% if item.Category %} - <em>{{ item.Category }}</em>{% endif %}
-        </li>
-      {% endfor %}
-    </ul>
-  </section>
-</main>
+<details>
+  <summary>Browse all pasta shapes (A-Z)</summary>
+  <ul>
+    {% for item in pasta %}
+      <li>
+        <a href="/pasta/{{ item.ShapeName | slug }}/">{{ item.ShapeName }}</a>
+        {% if item.Category %} - <em>{{ item.Category }}</em>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</details>
