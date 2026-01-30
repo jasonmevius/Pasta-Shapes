@@ -1,17 +1,16 @@
 ---
 title: Pasta Shapes
+layout: layout.njk
 ---
+
 <h1>Pasta Shapes</h1>
+<p>Loaded {{ pasta.length }} pasta shapes.</p>
 
-{% if pasta and pasta.length %}
-  <p>Loaded {{ pasta.length }} pasta shapes from pasta.csv.</p>
-
-  <h2>First entry - columns detected</h2>
-  <ul>
-    {% for key, value in pasta[0] %}
-      <li><strong>{{ key }}:</strong> {{ value }}</li>
-    {% endfor %}
-  </ul>
-{% else %}
-  <p><strong>CSV not loaded.</strong></p>
-{% endif %}
+<ul>
+  {% for item in pasta %}
+    <li>
+      <a href="/pasta/{{ item.ShapeName | slug }}/">{{ item.ShapeName }}</a>
+      {% if item.Category %} - <em>{{ item.Category }}</em>{% endif %}
+    </li>
+  {% endfor %}
+</ul>
