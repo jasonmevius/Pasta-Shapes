@@ -29,6 +29,7 @@
   let loaded = false;
 
   const MAX_SHOW = 30;
+  const SIZE_ONLY_IF_MORE_THAN = 25;
 
   // Fixed sequential order in the UI (always displayed in this order)
   const STEPS = [
@@ -70,7 +71,7 @@
       key: "sizeClass",
       el: elSize,
       title: "Size",
-      desc: "A rough bucket - small / medium / large. Helpful as a tie-breaker, but subjective.",
+      desc: "A rough bucket - small / medium / large. Helpful as a last step, but subjective.",
       kind: "size",
     },
   ];
@@ -213,66 +214,46 @@
     return answered;
   }
 
-  function countAnsweredStructural(answeredKeys) {
-    let n = 0;
-    for (const s of STEPS) {
-      if (s.kind === "structural" && answeredKeys.has(s.key)) n++;
-    }
-    return n;
-  }
-
   /**
-   * Key behavior change:
-   * - After Type, we prefer structural questions.
-   * - Size is a tie-breaker and is NOT eligible until >= 2 structural questions are answered.
-   * - If no structural question is useful, we stop asking (return null) instead of defaulting to Size.
+   * Behavior:
+   * - Always pick the best remaining structural question first (if useful).
+   * - Only offer Size when:
+   *    - there are no useful structural questions left, AND
+   *    - results.length > 25, AND
+   *    - size is not already answered.
+   * - Otherwise stop asking and just show results.
    */
   function pickNextQuestion(candidateEntries, answeredKeys) {
     if (candidateEntries.length <= 1) return null;
 
-    const answeredStructural = countAnsweredStructural(answeredKeys);
+    const remaining = STEPS.filter((s) => s.key !== "type" && !answeredKeys.has(s.key));
 
-    // Candidate questions are the non-type ones not yet answered.
-    const candidates = STEPS.filter(
-      (s) => s.key !== "type" && !answeredKeys.has(s.key)
-    );
+    const structural = [];
+    let sizeCandidate = null;
 
-    const structuralScored = [];
-    const sizeScored = [];
-
-    for (const s of candidates) {
+    for (const s of remaining) {
       const sc = scoreQuestion(candidateEntries, s.key);
       if (sc <= 0) continue;
 
-      if (s.kind === "structural") structuralScored.push({ step: s, score: sc });
-      else if (s.kind === "size") sizeScored.push({ step: s, score: sc });
+      if (s.kind === "structural") structural.push({ step: s, score: sc });
+      else if (s.kind === "size") sizeCandidate = { step: s, score: sc };
     }
 
-    structuralScored.sort((a, b) => b.score - a.score);
-    sizeScored.sort((a, b) => b.score - a.score);
+    structural.sort((a, b) => b.score - a.score);
 
-    const bestStructural = structuralScored.length ? structuralScored[0] : null;
-    const bestSize = sizeScored.length ? sizeScored[0] : null;
+    // 1) Structural questions first, if any are useful
+    if (structural.length) return structural[0].step;
 
-    // Rule 1: until we have 2 structural answers, only ask structural follow-ups
-    if (answeredStructural < 2) {
-      if (bestStructural) return bestStructural.step;
-
-      // No useful structural question - stop (do NOT default to size)
-      return null;
+    // 2) Size only as the last question, and only if results are still big
+    if (
+      sizeCandidate &&
+      candidateEntries.length > SIZE_ONLY_IF_MORE_THAN &&
+      !answeredKeys.has("sizeClass")
+    ) {
+      return sizeCandidate.step;
     }
 
-    // Rule 2: after 2 structural answers, allow best overall among remaining,
-    // but still prefer a strong structural split if it’s clearly better.
-    if (bestStructural && bestSize) {
-      const MARGIN = 0.15;
-      if (bestStructural.score >= bestSize.score + MARGIN) return bestStructural.step;
-      return bestSize.step;
-    }
-
-    if (bestStructural) return bestStructural.step;
-    if (bestSize) return bestSize.step;
-
+    // 3) Nothing else worth asking
     return null;
   }
 
