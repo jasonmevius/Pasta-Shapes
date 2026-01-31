@@ -3,24 +3,49 @@ pagination:
   data: pasta
   size: 1
   alias: item
-permalink: "pasta/{{ item.ShapeName | slug }}/index.html"
+permalink: "pasta/{{ item.Slug }}/index.html"
 layout: layout.njk
 
 eleventyComputed:
   title: "Pasta Shapes: {{ item.ShapeName }}"
+  description: "{% if item.Synonyms %}Aliases: {{ item.Synonyms | truncate(140) }}{% else %}What {{ item.ShapeName }} looks like, plus key shape attributes.{% endif %}"
 ---
 
-<h1>{{ item.ShapeName }}</h1>
+{% set thumb = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") %}
+{% set photo = (item.PhotoImage or "") | replace("<ImageKitPath>", "") %}
+{% set hero = photo or thumb %}
+
+<nav class="breadcrumbs">
+  <a href="/">← Back to search</a>
+</nav>
+
+<header class="stack tight">
+  <h1 class="h1">{{ item.ShapeName }}</h1>
+  {% if item.Category %}
+    <p class="muted">{{ item.Category }}</p>
+  {% endif %}
+</header>
+
+{% if hero %}
+  <figure class="card hero">
+    <img
+      src="{{ hero }}"
+      alt="{{ item.ShapeName }}"
+      width="1200"
+      height="1200"
+      loading="eager"
+      decoding="async"
+    />
+  </figure>
+{% endif %}
 
 {% if item.Synonyms %}
-  <p><strong>Synonyms:</strong> {{ item.Synonyms }}</p>
+  <section class="card stack">
+    <h2 class="h2">Also known as</h2>
+    <p class="muted">{{ item.Synonyms }}</p>
+  </section>
 {% endif %}
 
-{% if item.Category %}
-  <p><strong>Category:</strong> {{ item.Category }}</p>
-{% endif %}
-
-{# Prefer Description for display; fall back to KeyDiscriminators if Description is empty #}
 {% set desc = "" %}
 {% if item.Description %}
   {% set desc = item.Description %}
@@ -28,44 +53,41 @@ eleventyComputed:
   {% set desc = item.KeyDiscriminators %}
 {% endif %}
 
-{# Key discriminators line: prefer KeyDiscriminators; fall back to Description; else hide #}
-{% set kd = "" %}
-{% if item.KeyDiscriminators %}
-  {% set kd = item.KeyDiscriminators %}
-{% elseif item.Description %}
-  {% set kd = item.Description %}
-{% endif %}
-
 {% if desc %}
-  <p>{{ desc }}</p>
+  <section class="card stack">
+    <h2 class="h2">Description</h2>
+    <p class="muted">{{ desc }}</p>
+  </section>
 {% endif %}
 
-<ul>
-  {% if item.PrimaryGeometry %}
-    <li><strong>Primary geometry:</strong> {{ item.PrimaryGeometry }}</li>
-  {% endif %}
+<section class="card stack">
+  <h2 class="h2">Shape attributes</h2>
 
-  {# NEW: Description bullet (below primary geometry), using same desc fallback #}
-  {% if desc %}
-    <li><strong>Description:</strong> {{ desc }}</li>
-  {% endif %}
+  <ul class="attr-list">
+    {% if item.Type %}<li><strong>Type:</strong> {{ item.Type }}</li>{% endif %}
+    {% if item.PrimaryGeometry %}<li><strong>Primary geometry:</strong> {{ item.PrimaryGeometry }}</li>{% endif %}
+    {% if item.SizeClass %}<li><strong>Size:</strong> {{ item.SizeClass }}</li>{% endif %}
 
-  {% if kd %}
-    <li><strong>Key discriminators:</strong> {{ kd }}</li>
-  {% endif %}
+    {% if item.IsHollow %}<li><strong>Hollow:</strong> {{ item.IsHollow }}</li>{% endif %}
+    {% if item.IsRidged %}<li><strong>Ridged:</strong> {{ item.IsRidged }}</li>{% endif %}
+    {% if item.IsTwisted %}<li><strong>Twisted:</strong> {{ item.IsTwisted }}</li>{% endif %}
+    {% if item.IsCurved %}<li><strong>Curved:</strong> {{ item.IsCurved }}</li>{% endif %}
+    {% if item.IsStuffed %}<li><strong>Stuffed:</strong> {{ item.IsStuffed }}</li>{% endif %}
 
-  {% if item.CityOrRegionMostAssociated and item.CityOrRegionMostAssociated != "Unknown" %}
-    <li><strong>City/Region:</strong> {{ item.CityOrRegionMostAssociated }}</li>
-  {% endif %}
+    {% if item.CityOrRegionMostAssociated and item.CityOrRegionMostAssociated != "Unknown" %}
+      <li><strong>City/Region:</strong> {{ item.CityOrRegionMostAssociated }}</li>
+    {% endif %}
 
-  {% if item.EarliestAttestedMention and item.EarliestAttestedMention != "Unknown" %}
-    <li><strong>Earliest attested mention:</strong> {{ item.EarliestAttestedMention }}</li>
-  {% endif %}
+    {% if item.EarliestAttestedMention and item.EarliestAttestedMention != "Unknown" %}
+      <li><strong>Earliest attested mention:</strong> {{ item.EarliestAttestedMention }}</li>
+    {% endif %}
 
-  {% if item.SourceLink %}
-    <li>
-      <strong>Source:</strong>
-      <a href="{{ item.SourceLink }}">{{ item.SourceLink }}</a>
-    </li>
-  {% endif %}
-</ul>
+    {% if item.SourceLink %}
+      <li><strong>Source:</strong> <a href="{{ item.SourceLink }}">{{ item.SourceLink }}</a></li>
+    {% endif %}
+  </ul>
+
+  <div class="actions">
+    <a class="btn secondary" href="/identify/">Identify by questions</a>
+  </div>
+</section>
