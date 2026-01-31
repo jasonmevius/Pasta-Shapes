@@ -1,34 +1,53 @@
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
 
-  // --- Recently viewed helpers ---
+  // =============================================================================
+  // Recently viewed helpers
+  // =============================================================================
+
   function readRecents() {
-    try { return JSON.parse(localStorage.getItem("pasta:recent") || "[]"); }
-    catch (e) { return []; }
+    try {
+      return JSON.parse(localStorage.getItem("pasta:recent") || "[]");
+    } catch (e) {
+      return [];
+    }
   }
 
   function writeRecents(arr) {
-    try { localStorage.setItem("pasta:recent", JSON.stringify(arr.slice(0, 12))); }
-    catch (e) {}
+    try {
+      localStorage.setItem("pasta:recent", JSON.stringify(arr.slice(0, 12)));
+    } catch (e) {}
   }
 
   function addRecent(slug) {
     if (!slug) return;
-    const cur = readRecents().filter(x => x !== slug);
+    const cur = readRecents().filter((x) => x !== slug);
     cur.unshift(slug);
     writeRecents(cur);
   }
 
-  // --- Search page behavior ---
+  // =============================================================================
+  // Search page behavior
+  // =============================================================================
+
   function initSearchPage() {
     const input = $("#pasta-q");
     const status = $("#pasta-search-status");
     const list = $("#pasta-results");
+
+    // Only run on the search page
     if (!input || !status || !list) return;
 
     const cards = Array.from(list.querySelectorAll("[data-search]"));
     const recentWrap = $("#recently-viewed-wrap");
     const recentList = $("#recently-viewed");
+
+    const note = $("#pasta-results-note");
+    const toggleBtn = $("#pasta-toggle-all");
+
+    const TOP_N = 20;
+    let showAll = false;
+
     const norm = (s) => (s || "").toLowerCase().trim();
 
     function setStatus(visibleCount, totalCount, q) {
@@ -39,18 +58,66 @@
       status.textContent = `${visibleCount} of ${totalCount} matches`;
     }
 
+    function setNoteAndToggle({ q, total, limitedVisible }) {
+      if (!note || !toggleBtn) return;
+
+      // While searching, hide "show more"
+      if (q) {
+        note.textContent = "";
+        toggleBtn.hidden = true;
+        return;
+      }
+
+      if (total <= TOP_N) {
+        note.textContent = `Showing ${total} of ${total}`;
+        toggleBtn.hidden = true;
+        return;
+      }
+
+      if (!showAll) {
+        const remaining = total - limitedVisible;
+        note.textContent = `Showing ${limitedVisible} of ${total} - ${remaining} more`;
+        toggleBtn.textContent = `Show all (${remaining} more)`;
+        toggleBtn.hidden = false;
+        return;
+      }
+
+      note.textContent = `Showing ${total} of ${total}`;
+      toggleBtn.textContent = `Show top ${TOP_N}`;
+      toggleBtn.hidden = false;
+    }
+
     function filter() {
       const q = norm(input.value);
       const total = cards.length;
-      let visible = 0;
 
-      for (const card of cards) {
+      const limitActive = !q && !showAll;
+
+      let visibleMatches = 0;
+      let visibleShown = 0;
+
+      // Note: "Top 20" is based on current order of the DOM (CSV order).
+      cards.forEach((card, idx) => {
         const blob = norm(card.getAttribute("data-search"));
-        const show = !q || blob.includes(q);
+        const matches = !q || blob.includes(q);
+
+        let show = matches;
+
+        if (limitActive && matches) {
+          show = idx < TOP_N;
+        }
+
         card.style.display = show ? "" : "none";
-        if (show) visible++;
-      }
-      setStatus(visible, total, q);
+
+        if (matches) visibleMatches++;
+        if (show) visibleShown++;
+      });
+
+      // Status: if searching, show matches; if limited, show shown count
+      setStatus(limitActive ? visibleShown : visibleMatches, total, q);
+
+      // "Showing 20 of 179 - 159 more"
+      setNoteAndToggle({ q, total, limitedVisible: visibleShown });
     }
 
     function renderRecents() {
@@ -62,16 +129,24 @@
         return;
       }
 
-      const bySlug = new Map(cards.map(c => [c.getAttribute("data-slug"), c]));
-      const items = slugs.map(s => bySlug.get(s)).filter(Boolean).slice(0, 8);
+      const bySlug = new Map(cards.map((c) => [c.getAttribute("data-slug"), c]));
+      const items = slugs
+        .map((s) => bySlug.get(s))
+        .filter(Boolean)
+        .slice(0, 8);
 
       if (!items.length) {
         recentWrap.hidden = true;
         return;
       }
 
-      recentList.innerHTML = "";
-      for (const card of items) {
+      recentlyFillList(recentList, items);
+      recentWrap.hidden = false;
+    }
+
+    function recentlyFillList(targetUl, cardItems) {
+      targetUl.innerHTML = "";
+      for (const card of cardItems) {
         const link = card.querySelector("a[href]");
         const name = card.querySelector(".result-name");
         if (!link) continue;
@@ -81,10 +156,8 @@
         a.href = link.getAttribute("href");
         a.textContent = name ? name.textContent : a.href;
         li.appendChild(a);
-        recentList.appendChild(li);
+        targetUl.appendChild(li);
       }
-
-      recentWrap.hidden = false;
     }
 
     // Record recents on click
@@ -97,20 +170,43 @@
       if (m && m[1]) addRecent(m[1]);
     });
 
+    // Toggle show all / show top N
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", () => {
+        showAll = !showAll;
+        filter();
+      });
+    }
+
     // Optional: support ?q= prefill
     try {
       const url = new URL(window.location.href);
       const q = url.searchParams.get("q");
-      if (q) input.value = q;
+      if (q) {
+        input.value = q;
+        // Not strictly needed while searching, but prevents odd jumps after clearing.
+        showAll = true;
+      }
     } catch (e) {}
 
-    input.addEventListener("input", filter, { passive: true });
+    input.addEventListener(
+      "input",
+      () => {
+        // When they clear the search, go back to collapsed mode
+        if (!norm(input.value)) showAll = false;
+        filter();
+      },
+      { passive: true }
+    );
 
     filter();
     renderRecents();
   }
 
-  // --- Detail page behavior (store recent on load) ---
+  // =============================================================================
+  // Detail page behavior (store recent on load)
+  // =============================================================================
+
   function initDetailPage() {
     const path = window.location.pathname || "";
     const m = path.match(/^\/pasta\/([^\/]+)\/?$/);
@@ -127,8 +223,11 @@
     if (!app || !dataEl) return;
 
     let items = [];
-    try { items = JSON.parse(dataEl.textContent || "[]"); }
-    catch (e) { items = []; }
+    try {
+      items = JSON.parse(dataEl.textContent || "[]");
+    } catch (e) {
+      items = [];
+    }
 
     const kicker = $("#identify-kicker");
     const title = $("#identify-title");
@@ -144,43 +243,31 @@
     const resultsCount = $("#identify-results-count");
     const resultsList = $("#identify-results-list");
 
+    if (
+      !kicker ||
+      !title ||
+      !help ||
+      !answers ||
+      !count ||
+      !btnBack ||
+      !btnReset ||
+      !btnView ||
+      !resultsWrap ||
+      !resultsCount ||
+      !resultsList
+    ) {
+      return;
+    }
+
     const QUESTION_ORDER = [
-      "type",      // forced first
+      "type", // forced first
       "hollow",
       "stuffed",
       "ridged",
       "twisted",
       "curved",
-      "size"
+      "size",
     ];
-
-    const QUESTION_META = {
-      type: {
-        label: "What type is it?",
-        help: "Pick the overall shape family.",
-        pretty: (v) => ({
-          strand: "Strand",
-          tube: "Tube",
-          ribbon: "Ribbon",
-          sheet: "Sheet",
-          short: "Short cut",
-          stuffed: "Stuffed",
-          soup: "Soup / pastina",
-          ring: "Ring / wheel",
-          dumpling: "Dumpling / pasta-like"
-        }[v] || v)
-      },
-      hollow: { label: "Is it hollow?", help: "Does it have a hole or tunnel through it?", pretty: ynPretty },
-      stuffed: { label: "Is it stuffed?", help: "Is there a filling inside?", pretty: ynPretty },
-      ridged: { label: "Does it have ridges?", help: "Look for grooves or ruffles on the surface.", pretty: ynPretty },
-      twisted: { label: "Is it twisted?", help: "Does it spiral or corkscrew?", pretty: ynPretty },
-      curved: { label: "Is it curved?", help: "Is the shape bent or arched?", pretty: ynPretty },
-      size: {
-        label: "What size is it?",
-        help: "Pick the closest size bucket.",
-        pretty: (v) => v
-      }
-    };
 
     function ynPretty(v) {
       const s = (v || "").toLowerCase();
@@ -190,6 +277,57 @@
       return v;
     }
 
+    const QUESTION_META = {
+      type: {
+        label: "What type is it?",
+        help: "Pick the overall shape family.",
+        pretty: (v) =>
+          (
+            {
+              strand: "Strand",
+              tube: "Tube",
+              ribbon: "Ribbon",
+              sheet: "Sheet",
+              short: "Short cut",
+              stuffed: "Stuffed",
+              soup: "Soup / pastina",
+              ring: "Ring / wheel",
+              dumpling: "Dumpling / pasta-like",
+            }[v] || v
+          ),
+      },
+      hollow: {
+        label: "Is it hollow?",
+        help: "Does it have a hole or tunnel through it?",
+        pretty: ynPretty,
+      },
+      stuffed: {
+        label: "Is it stuffed?",
+        help: "Is there a filling inside?",
+        pretty: ynPretty,
+      },
+      ridged: {
+        label: "Does it have ridges?",
+        help: "Look for grooves or ruffles on the surface.",
+        pretty: ynPretty,
+      },
+      twisted: {
+        label: "Is it twisted?",
+        help: "Does it spiral or corkscrew?",
+        pretty: ynPretty,
+      },
+      curved: {
+        label: "Is it curved?",
+        help: "Is the shape bent or arched?",
+        pretty: ynPretty,
+      },
+      size: {
+        label: "What size is it?",
+        help: "Pick the closest size bucket.",
+        pretty: (v) => v,
+      },
+    };
+
     function normVal(v) {
       const s = (v || "").toString().trim().toLowerCase();
       if (!s) return "unknown";
@@ -197,27 +335,37 @@
     }
 
     function itemVal(item, key) {
-      if (key === "type") return normVal(item.type);
-      if (key === "size") return normVal(item.size);
-      if (key === "hollow") return normVal(item.hollow);
-      if (key === "ridged") return normVal(item.ridged);
-      if (key === "twisted") return normVal(item.twisted);
-      if (key === "curved") return normVal(item.curved);
-      if (key === "stuffed") return normVal(item.stuffed);
-      return "unknown";
+      switch (key) {
+        case "type":
+          return normVal(item.type);
+        case "size":
+          return normVal(item.size);
+        case "hollow":
+          return normVal(item.hollow);
+        case "ridged":
+          return normVal(item.ridged);
+        case "twisted":
+          return normVal(item.twisted);
+        case "curved":
+          return normVal(item.curved);
+        case "stuffed":
+          return normVal(item.stuffed);
+        default:
+          return "unknown";
+      }
     }
 
     const state = {
-      selections: {},   // key -> value
-      history: [],      // stack of { key, value }
-      showResults: false
+      selections: {}, // key -> value
+      history: [], // stack of { key, value }
+      showResults: false,
     };
 
     function applyFilters() {
       const keys = Object.keys(state.selections);
       if (!keys.length) return items.slice();
 
-      return items.filter(it => {
+      return items.filter((it) => {
         for (const k of keys) {
           const want = state.selections[k];
           const got = itemVal(it, k);
@@ -229,7 +377,7 @@
     }
 
     function scoreQuestion(candidates, key) {
-      // Ignore questions already answered
+      // Ignore questions already answered (unless it was "__any__")
       if (state.selections[key] && state.selections[key] !== "__any__") return -1;
 
       const buckets = new Map();
@@ -238,22 +386,21 @@
         buckets.set(v, (buckets.get(v) || 0) + 1);
       }
 
-      // Need at least 2 meaningful options to ask
       if (buckets.size < 2) return -1;
 
-      // Score by how evenly it splits (Gini-like)
+      // Score by how evenly it splits (higher is better)
       const n = candidates.length || 1;
       let sumSq = 0;
       for (const c of buckets.values()) {
         const p = c / n;
         sumSq += p * p;
       }
-      const gini = 1 - sumSq; // higher is better split
+      const gini = 1 - sumSq;
       return gini;
     }
 
     function pickNextQuestion(candidates) {
-      // Force type first if not answered
+      // Force type first
       if (!state.selections.type) return "type";
 
       let bestKey = null;
@@ -268,7 +415,6 @@
         }
       }
 
-      // If nothing else splits, we end and show results
       return bestKey;
     }
 
@@ -279,19 +425,19 @@
         buckets.set(v, (buckets.get(v) || 0) + 1);
       }
 
-      // Sort options: common first, unknown last
+      // Sort: common first, unknown last
       const entries = Array.from(buckets.entries()).sort((a, b) => {
         if (a[0] === "unknown") return 1;
         if (b[0] === "unknown") return -1;
         return b[1] - a[1];
       });
 
-      // Turn into button models
       const pretty = QUESTION_META[key].pretty || ((x) => x);
+
       return entries.map(([value, n]) => ({
         value,
         label: pretty(value),
-        count: n
+        count: n,
       }));
     }
 
@@ -316,7 +462,7 @@
         answers.appendChild(btn);
       }
 
-      // Add Not sure (skip this question)
+      // Not sure (skip)
       const skip = document.createElement("button");
       skip.type = "button";
       skip.className = "btn secondary answer-btn";
@@ -324,6 +470,21 @@
       skip.setAttribute("data-v", "__any__");
       skip.innerHTML = `<span>Not sure</span><span class="answer-right">keep options</span>`;
       answers.appendChild(skip);
+    }
+
+    function compactDescriptor(it) {
+      const parts = [];
+      const size = normVal(it.size);
+      if (size !== "unknown") parts.push(size);
+
+      if (normVal(it.stuffed) === "yes") parts.push("stuffed");
+      if (normVal(it.ridged) === "yes") parts.push("ridged");
+      if (normVal(it.twisted) === "yes") parts.push("twisted");
+      if (normVal(it.hollow) === "yes") parts.push("hollow");
+      if (it.type) parts.push(it.type);
+      if (normVal(it.curved) === "yes") parts.push("(curved)");
+
+      return parts.join(" ").trim();
     }
 
     function setResultsUI(candidates) {
@@ -384,76 +545,46 @@
 
         a.appendChild(thumb);
         a.appendChild(body);
+
         li.appendChild(a);
         resultsList.appendChild(li);
       }
     }
 
-    function compactDescriptor(it) {
-      const parts = [];
-      const size = normVal(it.size);
-      if (size !== "unknown") parts.push(size);
-
-      if (normVal(it.stuffed) === "yes") parts.push("stuffed");
-      if (normVal(it.ridged) === "yes") parts.push("ridged");
-      if (normVal(it.twisted) === "yes") parts.push("twisted");
-      if (normVal(it.hollow) === "yes") parts.push("hollow");
-      if (it.type) parts.push(it.type);
-      if (normVal(it.curved) === "yes") parts.push("(curved)");
-
-      return parts.join(" ").trim();
-    }
-
     function render() {
       const candidates = applyFilters();
 
-      // Bottom bar labels
       count.textContent = `Matches: ${candidates.length}`;
       btnView.textContent = `View matches (${candidates.length})`;
       btnBack.disabled = state.history.length === 0;
 
-      // Results toggle
       resultsWrap.hidden = !state.showResults;
       if (state.showResults) {
         setResultsUI(candidates);
+        return;
       }
 
-      // Question view
-      if (!state.showResults) {
-        const nextQ = pickNextQuestion(candidates);
-        if (!nextQ) {
-          // No more useful questions - show results automatically
-          state.showResults = true;
-          render();
-          return;
-        }
-        setQuestionUI(nextQ, candidates);
-      }
-    }
-
-    function choose(key, value) {
-      // Handle skip
-      if (value === "__any__") {
-        state.selections[key] = "__any__";
-        state.history.push({ key, value: "__any__" });
-        state.showResults = false;
+      const nextQ = pickNextQuestion(candidates);
+      if (!nextQ) {
+        state.showResults = true;
         render();
         return;
       }
 
-      // Save selection
+      setQuestionUI(nextQ, candidates);
+    }
+
+    function choose(key, value) {
+      // Track choice
       state.selections[key] = value;
       state.history.push({ key, value });
       state.showResults = false;
 
-      // Zero-results protection: if this choice yields zero, undo and show message
+      // Zero-results guard - if it yields 0, undo and message
       const after = applyFilters();
       if (after.length === 0) {
-        // Undo
         state.history.pop();
         delete state.selections[key];
-
-        // Simple feedback in helper line
         help.textContent = "That combination produced 0 matches - try a different answer or tap Not sure.";
       }
 
@@ -464,8 +595,9 @@
       const last = state.history.pop();
       if (!last) return;
 
-      // Remove selection; if there are multiple entries for same key, reapply earlier one
       delete state.selections[last.key];
+
+      // Reapply earlier selection for same key if present
       for (let i = state.history.length - 1; i >= 0; i--) {
         if (state.history[i].key === last.key) {
           state.selections[last.key] = state.history[i].value;
@@ -510,7 +642,6 @@
       if (m && m[1]) addRecent(m[1]);
     });
 
-    // Initial render
     render();
   }
 
@@ -523,10 +654,17 @@
       .replaceAll("'", "&#039;");
   }
 
+  // =============================================================================
   // Init
-  document.addEventListener("DOMContentLoaded", () => {
-    initSearchPage();
-    initDetailPage();
-    initIdentifyPage();
-  }, { once: true });
+  // =============================================================================
+
+  document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+      initSearchPage();
+      initDetailPage();
+      initIdentifyPage();
+    },
+    { once: true }
+  );
 })();
