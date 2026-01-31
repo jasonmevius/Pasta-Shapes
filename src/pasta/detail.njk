@@ -16,12 +16,19 @@ eleventyComputed:
   <p><strong>Synonyms:</strong> {{ item.Synonyms }}</p>
 {% endif %}
 
-<p><strong>Category:</strong> {{ item.Category }}</p>
-
-{% if item.Description %}
-  <p>{{ item.Description }}</p>
+{% if item.Category %}
+  <p><strong>Category:</strong> {{ item.Category }}</p>
 {% endif %}
 
+{# Prefer Description for display; fall back to KeyDiscriminators if Description is empty #}
+{% set desc = "" %}
+{% if item.Description %}
+  {% set desc = item.Description %}
+{% elseif item.KeyDiscriminators %}
+  {% set desc = item.KeyDiscriminators %}
+{% endif %}
+
+{# Key discriminators line: prefer KeyDiscriminators; fall back to Description; else hide #}
 {% set kd = "" %}
 {% if item.KeyDiscriminators %}
   {% set kd = item.KeyDiscriminators %}
@@ -29,9 +36,18 @@ eleventyComputed:
   {% set kd = item.Description %}
 {% endif %}
 
+{% if desc %}
+  <p>{{ desc }}</p>
+{% endif %}
+
 <ul>
   {% if item.PrimaryGeometry %}
     <li><strong>Primary geometry:</strong> {{ item.PrimaryGeometry }}</li>
+  {% endif %}
+
+  {# NEW: Description bullet (below primary geometry), using same desc fallback #}
+  {% if desc %}
+    <li><strong>Description:</strong> {{ desc }}</li>
   {% endif %}
 
   {% if kd %}
