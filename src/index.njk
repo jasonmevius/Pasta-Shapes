@@ -121,10 +121,12 @@ layout: layout.njk
 
 <hr style="margin: 2rem 0;" />
 
+{% set pastaSorted = pasta | sort(false, false, "ShapeName") %}
+
 <details>
   <summary>Browse full list (alphabetical)</summary>
   <ul>
-    {% for item in pasta %}
+    {% for item in pastaSorted %}
       <li>
         <a href="/pasta/{{ item.ShapeName | slug }}/">{{ item.ShapeName }}</a>
         {% if item.Category %} - <em>{{ item.Category }}</em>{% endif %}
