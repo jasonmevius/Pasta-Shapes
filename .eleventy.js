@@ -9,9 +9,12 @@ module.exports = function (eleventyConfig) {
       .replace(/^-+|-+$/g, "");
   });
 
-  // Passthrough copy: publish static JS files
-  // src/js/pasta-search.js -> /js/pasta-search.js
+  // Passthrough copy: publish static JS and CSS files
+  // src/js/* -> /js/*
   eleventyConfig.addPassthroughCopy({ "src/js": "js" });
+
+  // src/css/* -> /css/*
+  eleventyConfig.addPassthroughCopy({ "src/css": "css" });
 
   return {
     dir: {
