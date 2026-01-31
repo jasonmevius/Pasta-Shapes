@@ -9,110 +9,10 @@
     <meta name="description" content="{{ description }}" />
   {% endif %}
 
-  <style>
-    :root{
-      --bg: #ffffff;
-      --fg: #111827;
-      --muted: #6b7280;
-      --card: #f9fafb;
-      --border: #e5e7eb;
-      --accent: #111827;
-
-      --radius: 14px;
-      --container: 56rem;
-      --pad: 1rem;
-      --gap: 0.75rem;
-    }
-
-    *{ box-sizing: border-box; }
-    html, body{ height: 100%; }
-    body{
-      margin: 0;
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
-      background: var(--bg);
-      color: var(--fg);
-      line-height: 1.45;
-      -webkit-font-smoothing: antialiased;
-      -moz-osx-font-smoothing: grayscale;
-    }
-    a{ color: inherit; text-decoration: none; }
-    a:hover{ text-decoration: underline; }
-
-    .skip{
-      position:absolute; left:-999px; top:auto; width:1px; height:1px; overflow:hidden;
-    }
-    .skip:focus{
-      left: 1rem; top: 1rem; width:auto; height:auto; padding: 0.5rem 0.75rem;
-      background: var(--fg); color: var(--bg); border-radius: 10px; z-index: 1000;
-    }
-
-    .topbar{
-      position: sticky;
-      top: 0;
-      z-index: 50;
-      background: rgba(255,255,255,0.92);
-      backdrop-filter: blur(10px);
-      border-bottom: 1px solid var(--border);
-    }
-    .topbar-inner{
-      max-width: var(--container);
-      margin: 0 auto;
-      padding: 0.75rem var(--pad);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: var(--gap);
-    }
-    .brand{
-      font-weight: 700;
-      letter-spacing: -0.01em;
-    }
-    .nav{
-      display: flex;
-      gap: 0.75rem;
-      align-items: center;
-      color: var(--muted);
-      font-size: 0.95rem;
-    }
-    .nav a[aria-current="page"]{
-      color: var(--fg);
-      font-weight: 600;
-    }
-
-    main{
-      max-width: var(--container);
-      margin: 0 auto;
-      padding: 1.25rem var(--pad) 3rem;
-    }
-
-    .btn{
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0.5rem;
-      padding: 0.7rem 0.9rem;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      background: var(--fg);
-      color: var(--bg);
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .btn.secondary{
-      background: var(--bg);
-      color: var(--fg);
-    }
-
-    .muted{ color: var(--muted); }
-    .stack{ display: grid; gap: var(--gap); }
-
-    .card{
-      border: 1px solid var(--border);
-      background: var(--card);
-      border-radius: var(--radius);
-    }
-  </style>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <script src="/js/scripts.js" defer></script>
 </head>
+
 <body>
   <a class="skip" href="#main">Skip to content</a>
 
@@ -126,7 +26,7 @@
     </div>
   </header>
 
-  <main id="main">
+  <main id="main" class="container">
     {{ content | safe }}
   </main>
 </body>
