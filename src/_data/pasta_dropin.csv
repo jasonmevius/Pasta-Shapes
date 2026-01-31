@@ -1,0 +1,180 @@
+ShapeName,Slug,Synonyms,Category,Description,CityOrRegionMostAssociated,EarliestAttestedMention,SourceLink,PrimaryGeometry,KeyDiscriminators,Type,IsHollow,IsRidged,IsTwisted,IsCurved,SizeClass,IsStuffed,ThumbnailImage,PhotoImage
+Bucatini,bucatini,perciatelli,Strand,,,,,strand,,strand,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/bucatini.png,<ImageKitPath>/pasta/full/bucatini.jpg
+Scialatelli,scialatelli,,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/scialatelli.png,<ImageKitPath>/pasta/full/scialatelli.jpg
+Tagliatelle,tagliatelle,,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/tagliatelle.png,<ImageKitPath>/pasta/full/tagliatelle.jpg
+Mafalde,mafalde,,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/mafalde.png,<ImageKitPath>/pasta/full/mafalde.jpg
+Spaghetti,spaghetti,spaghettini (thin); spaghettoni (thick); vermicelli (intermediate),Strand,,,,,strand,,strand,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/spaghetti.png,<ImageKitPath>/pasta/full/spaghetti.jpg
+Sagne Torte,sagne-torte,,Sheet,,,,,sheet,,sheet,no,no,no,yes,medium,no,<ImageKitPath>/pasta/thumb/sagne-torte.png,<ImageKitPath>/pasta/full/sagne-torte.jpg
+Linguine,linguine,,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/linguine.png,<ImageKitPath>/pasta/full/linguine.jpg
+Pici,pici,,Strand,,,,,strand,,strand,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/pici.png,<ImageKitPath>/pasta/full/pici.jpg
+Canule,canule,,Strand,,,,,strand,,strand,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/canule.png,<ImageKitPath>/pasta/full/canule.jpg
+Busiate,busiate,busiata trapanese; busiati,Short,,,,,short,,short,yes,no,yes,no,medium,no,<ImageKitPath>/pasta/thumb/busiate.png,<ImageKitPath>/pasta/full/busiate.jpg
+Bavette,bavette,,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/bavette.png,<ImageKitPath>/pasta/full/bavette.jpg
+Fettuccine,fettuccine,,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/fettuccine.png,<ImageKitPath>/pasta/full/fettuccine.jpg
+Fettuccelli,fettuccelli,,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/fettuccelli.png,<ImageKitPath>/pasta/full/fettuccelli.jpg
+Lasagne,lasagne,lasagna (sing. in some usage),Sheet,,,,,sheet,,sheet,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/lasagne.png,<ImageKitPath>/pasta/full/lasagne.jpg
+Lasagnette,lasagnette,,Sheet,,,,,sheet,,sheet,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/lasagnette.png,<ImageKitPath>/pasta/full/lasagnette.jpg
+Lasagne Ricce,lasagne-ricce,,Sheet,,,,,sheet,,sheet,no,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/lasagne-ricce.png,<ImageKitPath>/pasta/full/lasagne-ricce.jpg
+Linguettine,linguettine,,Short,,,,,short,,short,no,yes,no,yes,medium,no,<ImageKitPath>/pasta/thumb/linguettine.png,<ImageKitPath>/pasta/full/linguettine.jpg
+Mafaldine,mafaldine,reginette; mafalde,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/mafaldine.png,<ImageKitPath>/pasta/full/mafaldine.jpg
+Pappardelle,pappardelle,,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/pappardelle.png,<ImageKitPath>/pasta/full/pappardelle.jpg
+Pillus,pillus,,Strand,,,,,strand,,strand,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/pillus.png,<ImageKitPath>/pasta/full/pillus.jpg
+Tripoline,tripoline,,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/tripoline.png,<ImageKitPath>/pasta/full/tripoline.jpg
+Trenette,trenette,,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/trenette.png,<ImageKitPath>/pasta/full/trenette.jpg
+Spaghetti Alla Chitarra,spaghetti-alla-chitarra,maccheroni alla chitarra,Strand,,,,,strand,,strand,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/spaghetti-alla-chitarra.png,<ImageKitPath>/pasta/full/spaghetti-alla-chitarra.jpg
+Stringozzi,stringozzi,,Strand,,,,,strand,,strand,no,no,no,yes,medium,no,<ImageKitPath>/pasta/thumb/stringozzi.png,<ImageKitPath>/pasta/full/stringozzi.jpg
+Tagliolini,tagliolini,,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/tagliolini.png,<ImageKitPath>/pasta/full/tagliolini.jpg
+Bigoli,bigoli,bigoi,Strand,,,,,strand,,strand,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/bigoli.png,<ImageKitPath>/pasta/full/bigoli.jpg
+Capelli D'Angelo,capelli-dangelo,,Strand,,,,,strand,,strand,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/capelli-dangelo.png,<ImageKitPath>/pasta/full/capelli-dangelo.jpg
+Capellini,capellini,angel hair; angelhair; capelli d'angelo,Strand,,,,,strand,,strand,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/capellini.png,<ImageKitPath>/pasta/full/capellini.jpg
+Fedelini,fedelini,,Strand,,,,,strand,,strand,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/fedelini.png,<ImageKitPath>/pasta/full/fedelini.jpg
+Fusilli Bucati Lunghi,fusilli-bucati-lunghi,,Strand,,,,,strand,,strand,yes,no,yes,no,medium,no,<ImageKitPath>/pasta/thumb/fusilli-bucati-lunghi.png,<ImageKitPath>/pasta/full/fusilli-bucati-lunghi.jpg
+Maccheroncini,maccheroncini,,Tube,,,,,tube,,tube,yes,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/maccheroncini.png,<ImageKitPath>/pasta/full/maccheroncini.jpg
+Maccheroni Inferrati,maccheroni-inferrati,,Tube,,,,,tube,,tube,yes,no,no,yes,medium,no,<ImageKitPath>/pasta/thumb/maccheroni-inferrati.png,<ImageKitPath>/pasta/full/maccheroni-inferrati.jpg
+Matriciani,matriciani,,Strand,,,,,strand,,strand,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/matriciani.png,<ImageKitPath>/pasta/full/matriciani.jpg
+Pellizzoni,pellizzoni,,Strand,,,,,strand,,strand,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/pellizzoni.png,<ImageKitPath>/pasta/full/pellizzoni.jpg
+Perciatelli,perciatelli,,Short,,,,,short,,short,no,yes,no,yes,medium,no,<ImageKitPath>/pasta/thumb/perciatelli.png,<ImageKitPath>/pasta/full/perciatelli.jpg
+Spaghettini,spaghettini,,Strand,,,,,strand,,strand,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/spaghettini.png,<ImageKitPath>/pasta/full/spaghettini.jpg
+Spaghettoni,spaghettoni,,Strand,,,,,strand,,strand,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/spaghettoni.png,<ImageKitPath>/pasta/full/spaghettoni.jpg
+Vermicelli,vermicelli,,Strand,,,,,strand,,strand,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/vermicelli.png,<ImageKitPath>/pasta/full/vermicelli.jpg
+Vermicelloni,vermicelloni,,Strand,,,,,strand,,strand,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/vermicelloni.png,<ImageKitPath>/pasta/full/vermicelloni.jpg
+Ravioli,ravioli,raviolo (sing.); raviolini (small),Stuffed,,,,,stuffed,,stuffed,no,no,no,no,medium,yes,<ImageKitPath>/pasta/thumb/ravioli.png,<ImageKitPath>/pasta/full/ravioli.jpg
+Tortellini,tortellini,,Stuffed,,,,,stuffed,,stuffed,no,no,no,yes,small,yes,<ImageKitPath>/pasta/thumb/tortellini.png,<ImageKitPath>/pasta/full/tortellini.jpg
+Agnolotti,agnolotti,,Stuffed,,,,,stuffed,,stuffed,no,no,no,no,medium,yes,<ImageKitPath>/pasta/thumb/agnolotti.png,<ImageKitPath>/pasta/full/agnolotti.jpg
+Agnolotti Del Plin,agnolotti-del-plin,Agnolotti del plin (Langhe); Agnolotti del plin Langhe; plin,Stuffed,,,,,stuffed,,stuffed,no,no,no,no,medium,yes,<ImageKitPath>/pasta/thumb/agnolotti-del-plin.png,<ImageKitPath>/pasta/full/agnolotti-del-plin.jpg
+Cappelletti,cappelletti,cappelletti romagnoli,Stuffed,,,,,stuffed,,stuffed,no,no,no,no,small,yes,<ImageKitPath>/pasta/thumb/cappelletti.png,<ImageKitPath>/pasta/full/cappelletti.jpg
+Cappelletti Umbri,cappelletti-umbri,,Stuffed,,,,,stuffed,,stuffed,no,no,no,no,medium,yes,<ImageKitPath>/pasta/thumb/cappelletti-umbri.png,<ImageKitPath>/pasta/full/cappelletti-umbri.jpg
+Caramelle,caramelle,,Stuffed,,,,,stuffed,,stuffed,no,no,yes,no,medium,yes,<ImageKitPath>/pasta/thumb/caramelle.png,<ImageKitPath>/pasta/full/caramelle.jpg
+Conchiglioni,conchiglioni,jumbo shells,Short,,,,,short,,short,no,no,no,yes,large,no,<ImageKitPath>/pasta/thumb/conchiglioni.png,<ImageKitPath>/pasta/full/conchiglioni.jpg
+Mezzelune,mezzelune,,Stuffed,,,,,stuffed,,stuffed,no,no,no,no,medium,yes,<ImageKitPath>/pasta/thumb/mezzelune.png,<ImageKitPath>/pasta/full/mezzelune.jpg
+Casoncelli,casoncelli,casonsei,Stuffed,,,,,stuffed,,stuffed,no,no,no,no,medium,yes,<ImageKitPath>/pasta/thumb/casoncelli.png,<ImageKitPath>/pasta/full/casoncelli.jpg
+Pansotti,pansotti,,Stuffed,,,,,stuffed,,stuffed,no,no,no,no,medium,yes,<ImageKitPath>/pasta/thumb/pansotti.png,<ImageKitPath>/pasta/full/pansotti.jpg
+Ravioletti,ravioletti,,Stuffed,,,,,stuffed,,stuffed,no,no,no,no,medium,yes,<ImageKitPath>/pasta/thumb/ravioletti.png,<ImageKitPath>/pasta/full/ravioletti.jpg
+Sacchettoni,sacchettoni,,Stuffed,,,,,stuffed,,stuffed,no,no,no,no,medium,yes,<ImageKitPath>/pasta/thumb/sacchettoni.png,<ImageKitPath>/pasta/full/sacchettoni.jpg
+Tortelli,tortelli,,Stuffed,,,,,stuffed,,stuffed,no,no,no,no,medium,yes,<ImageKitPath>/pasta/thumb/tortelli.png,<ImageKitPath>/pasta/full/tortelli.jpg
+Tortelloni,tortelloni,,Stuffed,,,,,stuffed,,stuffed,no,no,no,yes,large,yes,<ImageKitPath>/pasta/thumb/tortelloni.png,<ImageKitPath>/pasta/full/tortelloni.jpg
+Fazzoletti Ripieni,fazzoletti-ripieni,,Stuffed,,,,,stuffed,,stuffed,no,no,no,no,medium,yes,<ImageKitPath>/pasta/thumb/fazzoletti-ripieni.png,<ImageKitPath>/pasta/full/fazzoletti-ripieni.jpg
+Manicotti,manicotti,,Tube,,,,,tube,,tube,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/manicotti.png,<ImageKitPath>/pasta/full/manicotti.jpg
+Abbotta Pezziende,abbotta-pezziende,,Short,,,,,short,,short,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/abbotta-pezziende.png,<ImageKitPath>/pasta/full/abbotta-pezziende.jpg
+Elicoidali,elicoidali,,Tube,,,,,tube,,tube,yes,yes,yes,no,medium,no,<ImageKitPath>/pasta/thumb/elicoidali.png,<ImageKitPath>/pasta/full/elicoidali.jpg
+Gemelli,gemelli,,Short,,,,,short,,short,no,no,yes,no,medium,no,<ImageKitPath>/pasta/thumb/gemelli.png,<ImageKitPath>/pasta/full/gemelli.jpg
+Dischi,dischi,,Short,,,,,short,,short,no,no,yes,no,medium,no,<ImageKitPath>/pasta/thumb/dischi.png,<ImageKitPath>/pasta/full/dischi.jpg
+Fiori,fiori,,Short,,,,,short,,short,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/fiori.png,<ImageKitPath>/pasta/full/fiori.jpg
+Gnocchetti,gnocchetti,,Dumpling / Pasta-Like,,,,,dumpling,,dumpling,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/gnocchetti.png,<ImageKitPath>/pasta/full/gnocchetti.jpg
+Creste Di Gallo,creste-di-gallo,,Short,,,,,short,,short,no,yes,no,yes,medium,no,<ImageKitPath>/pasta/thumb/creste-di-gallo.png,<ImageKitPath>/pasta/full/creste-di-gallo.jpg
+Gramigna,gramigna,,Tube,,,,,tube,,tube,yes,no,no,yes,medium,no,<ImageKitPath>/pasta/thumb/gramigna.png,<ImageKitPath>/pasta/full/gramigna.jpg
+Gomiti,gomiti,elbows; macaroni,Tube,,,,,tube,,tube,yes,yes,no,yes,medium,no,<ImageKitPath>/pasta/thumb/gomiti.png,<ImageKitPath>/pasta/full/gomiti.jpg
+Gramignoni,gramignoni,,Short,,,,,short,,short,no,no,no,yes,medium,no,<ImageKitPath>/pasta/thumb/gramignoni.png,<ImageKitPath>/pasta/full/gramignoni.jpg
+Lumache,lumache,lumaconi (large),Short,,,,,short,,short,no,no,yes,yes,medium,no,<ImageKitPath>/pasta/thumb/lumache.png,<ImageKitPath>/pasta/full/lumache.jpg
+Lumachine,lumachine,,Short,,,,,short,,short,no,yes,no,yes,small,no,<ImageKitPath>/pasta/thumb/lumachine.png,<ImageKitPath>/pasta/full/lumachine.jpg
+Lumaconi,lumaconi,,Short,,,,,short,,short,no,no,no,yes,large,no,<ImageKitPath>/pasta/thumb/lumaconi.png,<ImageKitPath>/pasta/full/lumaconi.jpg
+Marziani,marziani,,Short,,,,,short,,short,no,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/marziani.png,<ImageKitPath>/pasta/full/marziani.jpg
+Messinesi,messinesi,,Short,,,,,short,,short,yes,no,no,yes,medium,no,<ImageKitPath>/pasta/thumb/messinesi.png,<ImageKitPath>/pasta/full/messinesi.jpg
+Mandala,mandala,,Short,,,,,short,,short,yes,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/mandala.png,<ImageKitPath>/pasta/full/mandala.jpg
+Mezze Penne,mezze-penne,,Tube,,,,,tube,,tube,yes,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/mezze-penne.png,<ImageKitPath>/pasta/full/mezze-penne.jpg
+Margherita Messinese Lunga,margherita-messinese-lunga,,Short,,,,,short,,short,no,no,no,yes,medium,no,<ImageKitPath>/pasta/thumb/margherita-messinese-lunga.png,<ImageKitPath>/pasta/full/margherita-messinese-lunga.jpg
+Mostaccioli,mostaccioli,,Tube,,,,,tube,,tube,yes,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/mostaccioli.png,<ImageKitPath>/pasta/full/mostaccioli.jpg
+Pennette,pennette,,Tube,,,,,tube,,tube,yes,yes,no,no,small,no,<ImageKitPath>/pasta/thumb/pennette.png,<ImageKitPath>/pasta/full/pennette.jpg
+Ondule,ondule,,Short,,,,,short,,short,no,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/ondule.png,<ImageKitPath>/pasta/full/ondule.jpg
+Penne,penne,penne rigate,Tube,,,,,tube,,tube,yes,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/penne.png,<ImageKitPath>/pasta/full/penne.jpg
+Pipe,pipe,,Short,,,,,short,,short,no,yes,no,yes,medium,no,<ImageKitPath>/pasta/thumb/pipe.png,<ImageKitPath>/pasta/full/pipe.jpg
+Pantacce,pantacce,,Sheet,,,,,sheet,,sheet,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/pantacce.png,<ImageKitPath>/pasta/full/pantacce.jpg
+Quadrefiore,quadrefiore,,Short,,,,,short,,short,no,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/quadrefiore.png,<ImageKitPath>/pasta/full/quadrefiore.jpg
+Radiatori,radiatori,,Short,,,,,short,,short,no,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/radiatori.png,<ImageKitPath>/pasta/full/radiatori.jpg
+Ricciutelli,ricciutelli,,Short,,,,,short,,short,no,no,no,yes,medium,no,<ImageKitPath>/pasta/thumb/ricciutelli.png,<ImageKitPath>/pasta/full/ricciutelli.jpg
+Rigatoncini,rigatoncini,,Tube,,,,,tube,,tube,yes,yes,no,no,small,no,<ImageKitPath>/pasta/thumb/rigatoncini.png,<ImageKitPath>/pasta/full/rigatoncini.jpg
+Rocchetti,rocchetti,,Short,,,,,short,,short,no,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/rocchetti.png,<ImageKitPath>/pasta/full/rocchetti.jpg
+Sciviottini,sciviottini,,Tube,,,,,tube,,tube,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/sciviottini.png,<ImageKitPath>/pasta/full/sciviottini.jpg
+Rotini,rotini,,Short,,,,,short,,short,no,no,yes,no,small,no,<ImageKitPath>/pasta/thumb/rotini.png,<ImageKitPath>/pasta/full/rotini.jpg
+Sorprese,sorprese,,Short,,,,,short,,short,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/sorprese.png,<ImageKitPath>/pasta/full/sorprese.jpg
+Sorprese Lisce,sorprese-lisce,,Short,,,,,short,,short,no,yes,yes,no,medium,no,<ImageKitPath>/pasta/thumb/sorprese-lisce.png,<ImageKitPath>/pasta/full/sorprese-lisce.jpg
+Ruote,ruote,,Ring / Wheel,,,,,ring,,ring,yes,no,no,yes,medium,no,<ImageKitPath>/pasta/thumb/ruote.png,<ImageKitPath>/pasta/full/ruote.jpg
+Tufoli,tufoli,,Tube,,,,,tube,,tube,yes,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/tufoli.png,<ImageKitPath>/pasta/full/tufoli.jpg
+Fazzoletti,fazzoletti,fazzoletti di seta,Sheet,,,,,sheet,,sheet,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/fazzoletti.png,<ImageKitPath>/pasta/full/fazzoletti.jpg
+Trennette,trennette,,Short,,,,,short,,short,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/trennette.png,<ImageKitPath>/pasta/full/trennette.jpg
+Trenne,trenne,,Short,,,,,short,,short,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/trenne.png,<ImageKitPath>/pasta/full/trenne.jpg
+Ziti,ziti,zite,Tube,,,,,tube,,tube,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/ziti.png,<ImageKitPath>/pasta/full/ziti.jpg
+Trottole,trottole,,Short,,,,,short,,short,no,no,yes,no,medium,no,<ImageKitPath>/pasta/thumb/trottole.png,<ImageKitPath>/pasta/full/trottole.jpg
+Mparrettati,mparrettati,,Short,,,,,short,,short,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/mparrettati.png,<ImageKitPath>/pasta/full/mparrettati.jpg
+Passatelli,passatelli,,Dumpling / Pasta-Like,,,,,dumpling,,dumpling,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/passatelli.png,<ImageKitPath>/pasta/full/passatelli.jpg
+Foglie D'Ulivo,foglie-d-ulivo,,Short,,,,,short,,short,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/foglie-d-ulivo.png,<ImageKitPath>/pasta/full/foglie-d-ulivo.jpg
+Fusilli Bucati,fusilli-bucati,,Tube,,,,,tube,,tube,yes,no,yes,no,medium,no,<ImageKitPath>/pasta/thumb/fusilli-bucati.png,<ImageKitPath>/pasta/full/fusilli-bucati.jpg
+Strozzapreti,strozzapreti,,Short,,,,,short,,short,no,no,yes,no,medium,no,<ImageKitPath>/pasta/thumb/strozzapreti.png,<ImageKitPath>/pasta/full/strozzapreti.jpg
+Orecchiette,orecchiette,little ears,Short,,,,,short,,short,no,no,no,yes,small,no,<ImageKitPath>/pasta/thumb/orecchiette.png,<ImageKitPath>/pasta/full/orecchiette.jpg
+Fricelli,fricelli,,Short,,,,,short,,short,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/fricelli.png,<ImageKitPath>/pasta/full/fricelli.jpg
+Torchio,torchio,,Short,,,,,short,,short,no,yes,no,yes,medium,no,<ImageKitPath>/pasta/thumb/torchio.png,<ImageKitPath>/pasta/full/torchio.jpg
+Mezzi Bombardoni,mezzi-bombardoni,,Tube,,,,,tube,,tube,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/mezzi-bombardoni.png,<ImageKitPath>/pasta/full/mezzi-bombardoni.jpg
+Pasta Al Ceppo,pasta-al-ceppo,,Short,,,,,short,,short,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/pasta-al-ceppo.png,<ImageKitPath>/pasta/full/pasta-al-ceppo.jpg
+Caserecce,caserecce,,Tube,,,,,tube,,tube,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/caserecce.png,<ImageKitPath>/pasta/full/caserecce.jpg
+Paccheri,paccheri,,Tube,,,,,tube,,tube,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/paccheri.png,<ImageKitPath>/pasta/full/paccheri.jpg
+Tortiglioni,tortiglioni,,Tube,,,,,tube,,tube,yes,yes,yes,no,large,no,<ImageKitPath>/pasta/thumb/tortiglioni.png,<ImageKitPath>/pasta/full/tortiglioni.jpg
+Gnocchi,gnocchi,,Dumpling / Pasta-Like,,,,,dumpling,,dumpling,no,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/gnocchi.png,<ImageKitPath>/pasta/full/gnocchi.jpg
+Penne Rigate,penne-rigate,,Tube,,,,,tube,,tube,yes,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/penne-rigate.png,<ImageKitPath>/pasta/full/penne-rigate.jpg
+Gnocchetti Sardi,gnocchetti-sardi,,Dumpling / Pasta-Like,,,,,dumpling,,dumpling,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/gnocchetti-sardi.png,<ImageKitPath>/pasta/full/gnocchetti-sardi.jpg
+Capricci,capricci,,Short,,,,,short,,short,no,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/capricci.png,<ImageKitPath>/pasta/full/capricci.jpg
+Ditalini,ditalini,ditali; thimbles,Tube,,,,,tube,,tube,yes,no,no,no,small,no,<ImageKitPath>/pasta/thumb/ditalini.png,<ImageKitPath>/pasta/full/ditalini.jpg
+Farfalle,farfalle,bow tie pasta; bow-ties; bowties; farfalline (small); bow ties,Short,,,,,short,,short,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/farfalle.png,<ImageKitPath>/pasta/full/farfalle.jpg
+Maccheroni,maccheroni,Macaroni,Tube,,,,,tube,,tube,yes,yes,no,no,large,no,<ImageKitPath>/pasta/thumb/maccheroni.png,<ImageKitPath>/pasta/full/maccheroni.jpg
+Fusilli,fusilli,fusilli napoletani; fusilli calabresi,Short,,,,,short,,short,no,no,yes,no,medium,no,<ImageKitPath>/pasta/thumb/fusilli.png,<ImageKitPath>/pasta/full/fusilli.jpg
+Chiocciole,chiocciole,,Short,,,,,short,,short,no,yes,no,yes,medium,no,<ImageKitPath>/pasta/thumb/chiocciole.png,<ImageKitPath>/pasta/full/chiocciole.jpg
+Anelli,anelli,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/anelli.png,<ImageKitPath>/pasta/full/anelli.jpg
+Acini de Pepe,acini-de-pepe,Acini di pepe; peppercorn pasta; peppercorns,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/acini-de-pepe.png,<ImageKitPath>/pasta/full/acini-de-pepe.jpg
+Alfabeto,alfabeto,alphabet pasta,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/alfabeto.png,<ImageKitPath>/pasta/full/alfabeto.jpg
+Anchellini,anchellini,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/anchellini.png,<ImageKitPath>/pasta/full/anchellini.jpg
+Anellini,anellini,,Soup / Pastina,,,,,soup,,soup,no,no,no,yes,small,no,<ImageKitPath>/pasta/thumb/anellini.png,<ImageKitPath>/pasta/full/anellini.jpg
+Cocciolette,cocciolette,,Short,,,,,short,,short,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/cocciolette.png,<ImageKitPath>/pasta/full/cocciolette.jpg
+Gianduieta,gianduieta,Animal;,Short,,,,,short,,short,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/gianduieta.png,<ImageKitPath>/pasta/full/gianduieta.jpg
+Coralli,coralli,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/coralli.png,<ImageKitPath>/pasta/full/coralli.jpg
+Farfalline,farfalline,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/farfalline.png,<ImageKitPath>/pasta/full/farfalline.jpg
+Fregula,fregula,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/fregula.png,<ImageKitPath>/pasta/full/fregula.jpg
+Filini,filini,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/filini.png,<ImageKitPath>/pasta/full/filini.jpg
+Cuscus,cuscus,Cuscussu; Cous Cous,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/cuscus.png,<ImageKitPath>/pasta/full/cuscus.jpg
+Grano,grano,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/grano.png,<ImageKitPath>/pasta/full/grano.jpg
+Grattoni,grattoni,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/grattoni.png,<ImageKitPath>/pasta/full/grattoni.jpg
+Grattini,grattini,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/grattini.png,<ImageKitPath>/pasta/full/grattini.jpg
+Margheritine,margheritine,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/margheritine.png,<ImageKitPath>/pasta/full/margheritine.jpg
+Merletti,merletti,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/merletti.png,<ImageKitPath>/pasta/full/merletti.jpg
+Midolline,midolline,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/midolline.png,<ImageKitPath>/pasta/full/midolline.jpg
+Paternoster,paternoster,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/paternoster.png,<ImageKitPath>/pasta/full/paternoster.jpg
+Quadretti,quadretti,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/quadretti.png,<ImageKitPath>/pasta/full/quadretti.jpg
+Quadrucci,quadrucci,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/quadrucci.png,<ImageKitPath>/pasta/full/quadrucci.jpg
+Orzo,orzo,orzo pasta; risone; risoni; rice-shaped pasta,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/orzo.png,<ImageKitPath>/pasta/full/orzo.jpg
+Puntine,puntine,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/puntine.png,<ImageKitPath>/pasta/full/puntine.jpg
+Occhi Di Passero,occhi-di-passero,,Ring / Wheel,,,,,ring,,ring,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/occhi-di-passero.png,<ImageKitPath>/pasta/full/occhi-di-passero.jpg
+Tempesta,tempesta,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/tempesta.png,<ImageKitPath>/pasta/full/tempesta.jpg
+Stellette,stellette,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/stellette.png,<ImageKitPath>/pasta/full/stellette.jpg
+Tripolini,tripolini,,Short,,,,,short,,short,no,yes,no,yes,small,no,<ImageKitPath>/pasta/thumb/tripolini.png,<ImageKitPath>/pasta/full/tripolini.jpg
+Risi,risi,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/risi.png,<ImageKitPath>/pasta/full/risi.jpg
+Semi Di Melone,semi-di-melone,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/semi-di-melone.png,<ImageKitPath>/pasta/full/semi-di-melone.jpg
+Cavatelli,cavatelli,cavati; cavateddi,Short,,,,,short,,short,yes,yes,no,yes,medium,no,<ImageKitPath>/pasta/thumb/cavatelli.png,<ImageKitPath>/pasta/full/cavatelli.jpg
+Assabesi,assabesi,,Filled,,,,,short,,short,no,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/assabesi.png,<ImageKitPath>/pasta/full/assabesi.jpg
+Ballerine,ballerine,,Short,,,,,short,,short,no,yes,yes,no,medium,no,<ImageKitPath>/pasta/thumb/ballerine.png,<ImageKitPath>/pasta/full/ballerine.jpg
+Capunti,capunti,cappunti,Short,,,,,short,,short,yes,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/capunti.png,<ImageKitPath>/pasta/full/capunti.jpg
+Cencioni,cencioni,,Short,,,,,short,,short,no,yes,no,yes,large,no,<ImageKitPath>/pasta/thumb/cencioni.png,<ImageKitPath>/pasta/full/cencioni.jpg
+Francesine,francesine,,Short,,,,,short,,short,no,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/francesine.png,<ImageKitPath>/pasta/full/francesine.jpg
+Fisckariedd',fisckariedd,,Sheet,,,,,sheet,,sheet,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/fisckariedd.png,<ImageKitPath>/pasta/full/fisckariedd.jpg
+Ciocchetti,ciocchetti,,Short,,,,,short,,short,no,no,yes,no,medium,no,<ImageKitPath>/pasta/thumb/ciocchetti.png,<ImageKitPath>/pasta/full/ciocchetti.jpg
+Corzetti,corzetti,croxetti,Short,,,,,short,,short,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/corzetti.png,<ImageKitPath>/pasta/full/corzetti.jpg
+Cuzzetielle,cuzzetielle,,Short,,,,,short,,short,yes,no,no,yes,medium,no,<ImageKitPath>/pasta/thumb/cuzzetielle.png,<ImageKitPath>/pasta/full/cuzzetielle.jpg
+Sagnarelli,sagnarelli,,Sheet,,,,,sheet,,sheet,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/sagnarelli.png,<ImageKitPath>/pasta/full/sagnarelli.jpg
+Calamarata,calamarata,,Ring / Wheel,,,,,ring,,ring,yes,no,no,yes,medium,no,<ImageKitPath>/pasta/thumb/calamarata.png,<ImageKitPath>/pasta/full/calamarata.jpg
+Cannelloni,cannelloni,,Tube,,,,,tube,,tube,yes,no,no,no,large,no,<ImageKitPath>/pasta/thumb/cannelloni.png,<ImageKitPath>/pasta/full/cannelloni.jpg
+Troffiette,troffiette,,Short,,,,,short,,short,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/troffiette.png,<ImageKitPath>/pasta/full/troffiette.jpg
+Canneroni,canneroni,,Tube,,,,,tube,,tube,yes,yes,no,no,large,no,<ImageKitPath>/pasta/thumb/canneroni.png,<ImageKitPath>/pasta/full/canneroni.jpg
+Cannolocchi,cannolocchi,,Tube,,,,,tube,,tube,yes,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/cannolocchi.png,<ImageKitPath>/pasta/full/cannolocchi.jpg
+Cavatappi,cavatappi,cellentani; corkscrew pasta; corkscrews,Short,,,,,short,,short,yes,yes,yes,no,medium,no,<ImageKitPath>/pasta/thumb/cavatappi.png,<ImageKitPath>/pasta/full/cavatappi.jpg
+Conchiglie,conchiglie,shell pasta; shells,Short,,,,,short,,short,no,yes,no,yes,medium,no,<ImageKitPath>/pasta/thumb/conchiglie.png,<ImageKitPath>/pasta/full/conchiglie.jpg
+Conchigliette,conchigliette,,Short,,,,,short,,short,no,yes,no,yes,small,no,<ImageKitPath>/pasta/thumb/conchigliette.png,<ImageKitPath>/pasta/full/conchigliette.jpg
+Cappelli Napoletani,cappelli-napoletani,,Short,,,,,short,,short,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/cappelli-napoletani.png,<ImageKitPath>/pasta/full/cappelli-napoletani.jpg
+Chifferi Rigati,chifferi-rigati,,Tube,,,,,tube,,tube,yes,yes,no,no,medium,no,<ImageKitPath>/pasta/thumb/chifferi-rigati.png,<ImageKitPath>/pasta/full/chifferi-rigati.jpg
+Cannolocchi Medi,cannolocchi-medi,,Tube,,,,,tube,,tube,yes,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/cannolocchi-medi.png,<ImageKitPath>/pasta/full/cannolocchi-medi.jpg
+Garganelli,garganelli,,Tube,,,,,tube,,tube,yes,yes,no,yes,medium,no,<ImageKitPath>/pasta/thumb/garganelli.png,<ImageKitPath>/pasta/full/garganelli.jpg
+Funghetti,funghetti,,Short,,,,,short,,short,no,yes,yes,no,medium,no,<ImageKitPath>/pasta/thumb/funghetti.png,<ImageKitPath>/pasta/full/funghetti.jpg
+Lanterne,lanterne,,Short,,,,,short,,short,no,yes,no,yes,medium,no,<ImageKitPath>/pasta/thumb/lanterne.png,<ImageKitPath>/pasta/full/lanterne.jpg
+Gigli,gigli,,Short,,,,,short,,short,no,yes,no,yes,medium,no,<ImageKitPath>/pasta/thumb/gigli.png,<ImageKitPath>/pasta/full/gigli.jpg
+Margherite,margherite,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,<ImageKitPath>/pasta/thumb/margherite.png,<ImageKitPath>/pasta/full/margherite.jpg
+Rigatoni,rigatoni,,Tube,,,,,tube,,tube,yes,yes,no,no,large,no,<ImageKitPath>/pasta/thumb/rigatoni.png,<ImageKitPath>/pasta/full/rigatoni.jpg
+Nuvole,nuvole,,Sheet,,,,,sheet,,sheet,no,no,no,yes,medium,no,<ImageKitPath>/pasta/thumb/nuvole.png,<ImageKitPath>/pasta/full/nuvole.jpg
+Maltagliati,maltagliati,,Short,,,,,short,,short,no,no,no,no,medium,no,<ImageKitPath>/pasta/thumb/maltagliati.png,<ImageKitPath>/pasta/full/maltagliati.jpg
+Sagne 'Ncannulate,sagne-ncannulate,,Ribbon,,,,,ribbon,,ribbon,no,no,yes,no,medium,no,<ImageKitPath>/pasta/thumb/sagne-ncannulate.png,<ImageKitPath>/pasta/full/sagne-ncannulate.jpg
+Fusi Istriani,fusi-istriani,,Short,,,,,short,,short,yes,no,yes,no,medium,no,<ImageKitPath>/pasta/thumb/fusi-istriani.png,<ImageKitPath>/pasta/full/fusi-istriani.jpg
