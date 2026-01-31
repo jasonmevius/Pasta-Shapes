@@ -17,7 +17,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 } %}
 
 {% macro autoDescriptor(item) %}
-  {# Prefer a future Descriptor column if you add it #}
   {% if item.Descriptor %}
     {{ item.Descriptor }}
   {% else %}
@@ -74,7 +73,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       <span id="pasta-search-status" class="muted" aria-live="polite"></span>
     </div>
 
-    {# Keep for compatibility with any earlier JS experiments #}
     <ul id="pasta-search-suggestions" class="muted suggestions"></ul>
   </form>
 
@@ -82,6 +80,11 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
     <div class="results-head">
       <h2 class="h2">Results</h2>
       <p class="muted">Loaded {{ pasta.length }} shapes.</p>
+    </div>
+
+    <div class="results-tools">
+      <p class="muted results-note" id="pasta-results-note" aria-live="polite"></p>
+      <button class="btn secondary btn-small" type="button" id="pasta-toggle-all" hidden></button>
     </div>
 
     <div id="recently-viewed-wrap" class="recent-wrap" hidden>
