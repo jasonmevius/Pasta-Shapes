@@ -28,8 +28,8 @@
   let entries = [];
   let loaded = false;
 
-  const MAX_SHOW = 30;
-  const SIZE_ONLY_IF_MORE_THAN = 25;
+  const MAX_SHOW = 25;
+  const SIZE_ONLY_IF_MORE_THAN = 10;
 
   // Fixed sequential order in the UI (always displayed in this order)
   const STEPS = [
