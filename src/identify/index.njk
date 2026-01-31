@@ -1,0 +1,83 @@
+---
+title: Identify a pasta shape
+layout: layout.njk
+description: "Identify a pasta shape by answering a few quick questions. Search-first design, mobile-friendly."
+---
+
+{% set typeLabels = {
+  "strand": "Strand",
+  "tube": "Tube",
+  "ribbon": "Ribbon",
+  "sheet": "Sheet",
+  "short": "Short cut",
+  "stuffed": "Stuffed",
+  "soup": "Soup / pastina",
+  "ring": "Ring / wheel",
+  "dumpling": "Dumpling / pasta-like"
+} %}
+
+{% set identifyData = [] %}
+{% for item in pasta %}
+  {% set thumb = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") %}
+  {% set _ = identifyData.push({
+    slug: item.Slug,
+    name: item.ShapeName,
+    type: item.Type or "",
+    size: item.SizeClass or "",
+    hollow: item.IsHollow or "",
+    ridged: item.IsRidged or "",
+    twisted: item.IsTwisted or "",
+    curved: item.IsCurved or "",
+    stuffed: item.IsStuffed or "",
+    thumb: thumb
+  }) %}
+{% endfor %}
+
+<nav class="breadcrumbs">
+  <a href="/">← Back to search</a>
+</nav>
+
+<header class="stack tight">
+  <h1 class="h1">Identify a pasta shape</h1>
+  <p class="muted">Answer one question at a time. You can always tap “Not sure.”</p>
+</header>
+
+<section id="identify-app" class="identify">
+  <div class="card identify-card">
+    <div class="identify-header">
+      <div class="identify-illustration" aria-hidden="true">
+        <span class="muted">Image placeholder</span>
+      </div>
+
+      <div class="identify-question">
+        <p class="identify-kicker muted" id="identify-kicker">Question</p>
+        <h2 class="identify-title" id="identify-title">Loading…</h2>
+        <p class="identify-help muted" id="identify-help"></p>
+      </div>
+    </div>
+
+    <div class="identify-answers" id="identify-answers" aria-live="polite"></div>
+
+    <div class="identify-meta">
+      <span class="muted" id="identify-count"></span>
+    </div>
+  </div>
+
+  <div class="card identify-results" id="identify-results" hidden>
+    <div class="results-head">
+      <h2 class="h2">Matches</h2>
+      <p class="muted" id="identify-results-count"></p>
+    </div>
+    <ul class="results-list" id="identify-results-list"></ul>
+  </div>
+
+  <div class="identify-bottom-bar" role="navigation" aria-label="Identify controls">
+    <button class="btn secondary" type="button" id="identify-back" disabled>Back</button>
+    <button class="btn secondary" type="button" id="identify-reset">Reset</button>
+    <button class="btn" type="button" id="identify-view">View matches</button>
+  </div>
+</section>
+
+<script type="application/json" id="identify-data">
+{{ identifyData | dump | safe }}
+</script>
