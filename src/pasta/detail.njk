@@ -10,8 +10,6 @@ eleventyComputed:
   title: "Pasta Shapes: {{ item.ShapeName }}"
 ---
 
-
-
 <h1>{{ item.ShapeName }}</h1>
 
 {% if item.Synonyms %}
@@ -24,9 +22,21 @@ eleventyComputed:
   <p>{{ item.Description }}</p>
 {% endif %}
 
+{% set kd = "" %}
+{% if item.KeyDiscriminators %}
+  {% set kd = item.KeyDiscriminators %}
+{% elseif item.Description %}
+  {% set kd = item.Description %}
+{% endif %}
+
 <ul>
-  <li><strong>Primary geometry:</strong> {{ item.PrimaryGeometry }}</li>
-  <li><strong>Key discriminators:</strong> {{ item.KeyDiscriminators }}</li>
+  {% if item.PrimaryGeometry %}
+    <li><strong>Primary geometry:</strong> {{ item.PrimaryGeometry }}</li>
+  {% endif %}
+
+  {% if kd %}
+    <li><strong>Key discriminators:</strong> {{ kd }}</li>
+  {% endif %}
 
   {% if item.CityOrRegionMostAssociated and item.CityOrRegionMostAssociated != "Unknown" %}
     <li><strong>City/Region:</strong> {{ item.CityOrRegionMostAssociated }}</li>
