@@ -69,7 +69,7 @@ function slugify(s) {
     .replace(/^-|-$/g, "");
 }
 
-function splitSynonyms(value) {
+function splitList(value) {
   // Expecting something like: "macaroni; maccheroni; elbow macaroni"
   return (value || "")
     .split(";")
@@ -122,6 +122,7 @@ module.exports = () => {
   const COL_NAME = "ShapeName";
   const COL_SLUG = "Slug"; // optional - if absent, we compute from ShapeName
   const COL_SYNONYMS = "Synonyms"; // optional; semicolon-separated list
+  const COL_SEARCH_ALIASES = "SearchAliases"; // optional; semicolon-separated list (NEW)
 
   const entries = [];
   const aliasToSlug = {};
@@ -139,22 +140,37 @@ module.exports = () => {
     if (!slug) continue;
 
     const url = `/pasta/${slug}/`;
-    const synonyms = splitSynonyms(r[COL_SYNONYMS]);
+    const synonyms = splitList(r[COL_SYNONYMS]);
+    const searchAliases = splitList(r[COL_SEARCH_ALIASES]); // NEW
     const description = pickDescription(r);
 
-    const allAliases = [name, ...synonyms];
+    // Helpful: allow search by slug tokens too (people sometimes paste URLs or type hyphenated)
+    const slugAsTyped = slug;
+    const slugAsWords = slug.replace(/-/g, " ");
+
+    const allAliases = [
+      name,
+      ...synonyms,
+      ...searchAliases, // NEW
+      slugAsTyped,
+      slugAsWords,
+    ];
 
     entries.push({
       name,
       slug,
       url,
       synonyms,
-      description, // NEW: used by the UI to show helpful text in suggestions
+      searchAliases, // NEW: used by UI to show "commonly known as ..."
+      description,
     });
 
     for (const a of allAliases) {
       const key = normalize(a);
       if (!key) continue;
+
+      // First one wins. This is intentional to keep redirects stable.
+      // If you later want "many aliases -> many slugs", we can change this structure.
       if (!aliasToSlug[key]) aliasToSlug[key] = slug;
     }
   }
@@ -167,7 +183,7 @@ module.exports = () => {
   }));
 
   return {
-    version: 1,
+    version: 2, // bumped because schema changed (entries now include searchAliases)
     generatedAt: new Date().toISOString(),
     entries,
     aliasToSlug,
