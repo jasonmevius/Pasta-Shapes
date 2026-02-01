@@ -7,6 +7,41 @@
 
   if (!form || !input || !status || !list) return;
 
+  // Common Italian “connector” words that often appear in menu names but get omitted in searches.
+  // We only use this for a safe, secondary exact-match attempt (unique slug only).
+  const STOPWORDS = new Set([
+    "a",
+    "ad",
+    "al",
+    "alla",
+    "alle",
+    "allo",
+    "ai",
+    "agli",
+    "all",
+    "da",
+    "de",
+    "dei",
+    "degli",
+    "della",
+    "delle",
+    "del",
+    "di",
+    "e",
+    "ed",
+    "in",
+    "con",
+    "per",
+    "su",
+    "lo",
+    "la",
+    "le",
+    "il",
+    "un",
+    "una",
+    "uno",
+  ]);
+
   function normalize(s) {
     return (s || "")
       .toLowerCase()
@@ -18,6 +53,27 @@
       .replace(/[^a-z0-9\s-]/g, " ")
       .replace(/\s+/g, " ")
       .trim();
+  }
+
+  function stripStopwords(normalizedString) {
+    const parts = (normalizedString || "")
+      .split(" ")
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .filter((t) => !STOPWORDS.has(t));
+    return parts.join(" ").trim();
+  }
+
+  function toArray(v) {
+    if (!v) return [];
+    if (Array.isArray(v)) return v;
+    if (typeof v === "string") {
+      return v
+        .split(";")
+        .map((s) => (s || "").trim())
+        .filter(Boolean);
+    }
+    return [];
   }
 
   function clearSuggestions() {
@@ -40,7 +96,6 @@
   }
 
   function formatLabel(entryName, aliasDisplay) {
-    // Only show the suffix if aliasDisplay is meaningful and not the same as the name.
     const n1 = normalize(entryName);
     const n2 = normalize(aliasDisplay);
     if (!aliasDisplay || !n2 || n1 === n2) return entryName;
@@ -111,7 +166,8 @@
   function computeDidYouMean(queryKey, aliasKeys, limit = 5) {
     if (!queryKey || queryKey.length < 3) return [];
 
-    const maxDist = Math.min(3, Math.floor(queryKey.length / 6) + 1);
+    // Slightly larger cap helps multi-word phrases while still staying bounded.
+    const maxDist = Math.min(4, Math.floor(queryKey.length / 6) + 1);
 
     const scored = [];
     for (const k of aliasKeys) {
@@ -134,25 +190,35 @@
   let aliasKeys = null;
 
   // Map normalized alias -> human display string (best effort)
-  // Includes canonical names and synonyms from entries (so we can show "angel hair", etc.)
   let aliasKeyToDisplay = null;
 
+  // Stopword-stripped alias key -> Set of slugs that match it
+  // Used only for a safe, secondary exact match (unique slug only).
+  let stopKeyToSlugs = null;
+
   function buildLookupStructures(idx) {
-    if (slugToEntry && aliasList && aliasKeys && aliasKeyToDisplay) return;
+    if (slugToEntry && aliasList && aliasKeys && aliasKeyToDisplay && stopKeyToSlugs) return;
 
     slugToEntry = new Map();
     for (const e of idx.entries || []) slugToEntry.set(e.slug, e);
 
     aliasKeyToDisplay = new Map();
+    stopKeyToSlugs = new Map();
 
-    // Seed display map with canonical names and synonyms straight from entries
+    // Seed display map with canonical names, synonyms, and searchAliases
     for (const e of idx.entries || []) {
       const nameKey = normalize(e.name);
       if (nameKey && !aliasKeyToDisplay.has(nameKey)) aliasKeyToDisplay.set(nameKey, e.name);
 
-      for (const syn of e.synonyms || []) {
+      for (const syn of toArray(e.synonyms)) {
         const synKey = normalize(syn);
         if (synKey && !aliasKeyToDisplay.has(synKey)) aliasKeyToDisplay.set(synKey, syn);
+      }
+
+      // If your /api/pasta-index.json includes searchAliases, use them for nicer labels
+      for (const a of toArray(e.searchAliases || e.search_aliases || e.aliases)) {
+        const aKey = normalize(a);
+        if (aKey && !aliasKeyToDisplay.has(aKey)) aliasKeyToDisplay.set(aKey, a);
       }
     }
 
@@ -172,11 +238,18 @@
 
       const aliasDisplay =
         aliasKeyToDisplay.get(aliasKey) ||
-        // Fallback - "re-title case" isn't safe; just show the normalized alias as-is
+        // Fallback - show the normalized alias as-is
         aliasKey;
 
       aliasList.push({ key: aliasKey, slug, url, aliasDisplay });
       aliasKeys.push(aliasKey);
+
+      // Build stopword-stripped lookup
+      const stopKey = stripStopwords(aliasKey);
+      if (stopKey) {
+        if (!stopKeyToSlugs.has(stopKey)) stopKeyToSlugs.set(stopKey, new Set());
+        stopKeyToSlugs.get(stopKey).add(slug);
+      }
     }
   }
 
@@ -201,11 +274,25 @@
     const key = normalize(query);
     if (!key) return null;
 
-    const slug = idx.aliasToSlug?.[key];
-    if (!slug) return null;
+    // 1) Exact match against aliasToSlug (canonical, synonyms, searchAliases)
+    let slug = idx.aliasToSlug?.[key];
+    if (slug) {
+      const entry = slugToEntry?.get(slug);
+      return entry || { slug, url: `/pasta/${slug}/`, name: slug };
+    }
 
-    const entry = slugToEntry?.get(slug);
-    return entry || { slug, url: `/pasta/${slug}/`, name: slug };
+    // 2) Safe fallback: stopword-stripped exact match, but only if it resolves uniquely
+    const stopKey = stripStopwords(key);
+    if (stopKey && stopKeyToSlugs?.has(stopKey)) {
+      const slugs = stopKeyToSlugs.get(stopKey);
+      if (slugs && slugs.size === 1) {
+        slug = Array.from(slugs)[0];
+        const entry = slugToEntry?.get(slug);
+        return entry || { slug, url: `/pasta/${slug}/`, name: slug };
+      }
+    }
+
+    return null;
   }
 
   function suggestFromAliases(query, limit = 10) {
@@ -273,7 +360,6 @@
     return suggestions;
   }
 
-  // Returns a structured result so submit handler can decide what to do.
   async function runSearch(query, { redirectIfFound } = { redirectIfFound: false }) {
     const idx = await getIndex();
     if (!idx) return { match: null, suggestions: [], redirected: false };
@@ -285,7 +371,7 @@
       return { match: null, suggestions: [], redirected: false };
     }
 
-    // 1) Exact match (including exact synonym)
+    // 1) Exact match (canonical, synonyms, searchAliases, plus safe stopword-strip fallback)
     const match = findExactMatch(idx, raw);
     if (match && match.url) {
       setMatchStatus({ name: match.name, url: match.url });
@@ -325,7 +411,7 @@
   });
 
   // Submit behavior:
-  // - Exact match redirects (already handled in runSearch)
+  // - Exact match redirects (handled in runSearch)
   // - If ONE suggestion remains, redirect to it
   // - If MULTIPLE suggestions, do not guess - force the user to choose
   form.addEventListener("submit", async (e) => {
