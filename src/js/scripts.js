@@ -45,16 +45,188 @@
     const note = $("#pasta-results-note");
     const toggleBtn = $("#pasta-toggle-all");
 
-    const TOP_N = 20;
+    const TOP_N = 10;
     let showAll = false;
 
-    const norm = (s) => (s || "").toLowerCase().trim();
+    // -----------------------------------------------------------------------------
+    // Normalization (match what we do in pasta-search.js / pastaIndex.js)
+    // -----------------------------------------------------------------------------
+    const STOPWORDS = new Set([
+      "a",
+      "ad",
+      "al",
+      "alla",
+      "alle",
+      "allo",
+      "ai",
+      "agli",
+      "all",
+      "da",
+      "de",
+      "dei",
+      "degli",
+      "della",
+      "delle",
+      "del",
+      "di",
+      "e",
+      "ed",
+      "in",
+      "con",
+      "per",
+      "su",
+      "lo",
+      "la",
+      "le",
+      "il",
+      "un",
+      "una",
+      "uno",
+    ]);
 
-    function setStatus(visibleCount, totalCount, q) {
+    function normalize(s) {
+      return String(s || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/&/g, "and")
+        .replace(/[’']/g, " ")
+        .replace(/[^a-z0-9\s-]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function stripStopwords(normalizedString) {
+      const parts = (normalizedString || "")
+        .split(" ")
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .filter((t) => !STOPWORDS.has(t));
+      return parts.join(" ").trim();
+    }
+
+    // -----------------------------------------------------------------------------
+    // Optional fuzzy support for the "Results" list using /api/pasta-index.json
+    // This is what makes "spahetti" still funnel to "Spaghetti".
+    // -----------------------------------------------------------------------------
+    let indexLoaded = false;
+    let index = null; // { aliasToSlug, entries }
+    let aliasKeys = null; // normalized alias keys
+    let stopKeyToSlugs = null; // stopword-stripped key -> Set(slugs)
+    const cardBySlug = new Map(cards.map((c) => [c.getAttribute("data-slug"), c]));
+
+    async function loadIndexIfNeeded() {
+      if (indexLoaded) return index;
+      indexLoaded = true;
+
+      try {
+        const res = await fetch("/api/pasta-index.json", { cache: "force-cache" });
+        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+        index = await res.json();
+
+        const a2s = index.aliasToSlug || {};
+        aliasKeys = Object.keys(a2s);
+
+        stopKeyToSlugs = new Map();
+        for (const k of aliasKeys) {
+          const stopKey = stripStopwords(k);
+          if (!stopKey) continue;
+          const slug = a2s[k];
+          if (!slug) continue;
+          if (!stopKeyToSlugs.has(stopKey)) stopKeyToSlugs.set(stopKey, new Set());
+          stopKeyToSlugs.get(stopKey).add(slug);
+        }
+      } catch (e) {
+        index = null;
+        aliasKeys = null;
+        stopKeyToSlugs = null;
+      }
+
+      return index;
+    }
+
+    // Levenshtein distance with early exit (bounded)
+    function levenshtein(a, b, maxDist) {
+      if (a === b) return 0;
+      if (!a || !b) return Math.max(a.length, b.length);
+
+      const al = a.length;
+      const bl = b.length;
+
+      if (Math.abs(al - bl) > maxDist) return maxDist + 1;
+
+      let prev = new Array(bl + 1);
+      let cur = new Array(bl + 1);
+
+      for (let j = 0; j <= bl; j++) prev[j] = j;
+
+      for (let i = 1; i <= al; i++) {
+        cur[0] = i;
+
+        let rowMin = cur[0];
+        const ai = a.charCodeAt(i - 1);
+
+        for (let j = 1; j <= bl; j++) {
+          const cost = ai === b.charCodeAt(j - 1) ? 0 : 1;
+          const val = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+          cur[j] = val;
+          if (val < rowMin) rowMin = val;
+        }
+
+        if (rowMin > maxDist) return maxDist + 1;
+
+        const tmp = prev;
+        prev = cur;
+        cur = tmp;
+      }
+
+      return prev[bl];
+    }
+
+    function bestFuzzySlugs(qKey, limit = 10) {
+      if (!index || !aliasKeys || !qKey || qKey.length < 3) return [];
+
+      const a2s = index.aliasToSlug || {};
+
+      // Small cap: enough for 200ish shapes, still very fast
+      const maxDist = Math.min(3, Math.floor(qKey.length / 6) + 1);
+
+      const scored = [];
+      for (const k of aliasKeys) {
+        const d = levenshtein(qKey, k, maxDist);
+        if (d <= maxDist) scored.push({ k, d });
+      }
+
+      scored.sort((a, b) => a.d - b.d || a.k.length - b.k.length);
+
+      const out = [];
+      const used = new Set();
+
+      for (const s of scored) {
+        const slug = a2s[s.k];
+        if (!slug || used.has(slug)) continue;
+        used.add(slug);
+        out.push(slug);
+        if (out.length >= limit) break;
+      }
+
+      return out;
+    }
+
+    // -----------------------------------------------------------------------------
+    // UI helpers
+    // -----------------------------------------------------------------------------
+    function setStatus(visibleCount, totalCount, q, mode) {
       if (!q) {
         status.textContent = "Type to filter - aliases included.";
         return;
       }
+
+      if (mode === "fuzzy") {
+        status.textContent = `0 direct matches - showing closest results (${visibleCount})`;
+        return;
+      }
+
       status.textContent = `${visibleCount} of ${totalCount} matches`;
     }
 
@@ -87,18 +259,21 @@
       toggleBtn.hidden = false;
     }
 
-    function filter() {
-      const q = norm(input.value);
+    async function filter() {
+      const raw = input.value || "";
+      const q = normalize(raw);
       const total = cards.length;
 
       const limitActive = !q && !showAll;
 
+      // First-pass: direct substring match against each card's blob
       let visibleMatches = 0;
       let visibleShown = 0;
 
-      // Note: "Top 20" is based on current order of the DOM (CSV order).
+      let directFound = false;
+
       cards.forEach((card, idx) => {
-        const blob = norm(card.getAttribute("data-search"));
+        const blob = normalize(card.getAttribute("data-search"));
         const matches = !q || blob.includes(q);
 
         let show = matches;
@@ -111,12 +286,61 @@
 
         if (matches) visibleMatches++;
         if (show) visibleShown++;
+        if (q && matches) directFound = true;
       });
 
-      // Status: if searching, show matches; if limited, show shown count
-      setStatus(limitActive ? visibleShown : visibleMatches, total, q);
+      // If searching and we found direct matches, we're done
+      if (q && directFound) {
+        setStatus(visibleMatches, total, q, "direct");
+        setNoteAndToggle({ q, total, limitedVisible: visibleShown });
+        return;
+      }
 
-      // "Showing 20 of 179 - 159 more"
+      // If searching and we did NOT find direct matches, try fuzzy using pasta index
+      if (q) {
+        await loadIndexIfNeeded();
+
+        // Exact alias match first (includes SearchAliases)
+        let slugs = [];
+        if (index && index.aliasToSlug) {
+          const exactSlug = index.aliasToSlug[q];
+          if (exactSlug) slugs = [exactSlug];
+
+          // Stopword-stripped exact match (only if unique)
+          if (!slugs.length && stopKeyToSlugs) {
+            const stopKey = stripStopwords(q);
+            const set = stopKeyToSlugs.get(stopKey);
+            if (set && set.size === 1) slugs = [Array.from(set)[0]];
+          }
+        }
+
+        // If no exact slug, use fuzzy
+        if (!slugs.length) slugs = bestFuzzySlugs(q, 10);
+
+        if (slugs.length) {
+          const slugSet = new Set(slugs);
+
+          visibleShown = 0;
+          cards.forEach((card) => {
+            const slug = card.getAttribute("data-slug");
+            const show = slugSet.has(slug);
+            card.style.display = show ? "" : "none";
+            if (show) visibleShown++;
+          });
+
+          setStatus(visibleShown, total, q, "fuzzy");
+          setNoteAndToggle({ q, total, limitedVisible: visibleShown });
+          return;
+        }
+
+        // If still nothing, keep the list empty and say 0 matches
+        setStatus(0, total, q, "direct");
+        setNoteAndToggle({ q, total, limitedVisible: 0 });
+        return;
+      }
+
+      // No query: status + "Top N + X more"
+      setStatus(limitActive ? visibleShown : visibleMatches, total, q, "direct");
       setNoteAndToggle({ q, total, limitedVisible: visibleShown });
     }
 
@@ -193,10 +417,19 @@
       "input",
       () => {
         // When they clear the search, go back to collapsed mode
-        if (!norm(input.value)) showAll = false;
+        if (!normalize(input.value)) showAll = false;
         filter();
       },
       { passive: true }
+    );
+
+    // Warm the index in the background after first interaction (no blocking)
+    input.addEventListener(
+      "focus",
+      () => {
+        loadIndexIfNeeded();
+      },
+      { once: true, passive: true }
     );
 
     filter();
