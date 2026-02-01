@@ -139,6 +139,14 @@ a:hover{ text-decoration: underline; }
   background: #fff;
 }
 
+/* Focus styles (applies to inputs and suggestion links) */
+.search-input:focus,
+.btn:focus,
+a:focus{
+  outline: 2px solid rgba(17,24,39,0.18);
+  outline-offset: 2px;
+}
+
 .actions{
   display: flex;
   gap: 0.75rem;
@@ -146,9 +154,55 @@ a:hover{ text-decoration: underline; }
   flex-wrap: wrap;
 }
 
+/* Status line spacing so it doesn't feel glued to buttons */
+#pasta-search-status{
+  display: inline-block;
+  margin-left: 0.15rem;
+}
+
+/* Suggestions list - upgraded for tappable rows */
 .suggestions{
-  margin: 0.5rem 0 0;
-  padding-left: 1.1rem;
+  margin: 0.65rem 0 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* If the suggestions list is empty, keep it invisible without layout jump */
+.suggestions:empty{
+  display: none;
+}
+
+.suggestions li{
+  border-top: 1px solid var(--border);
+}
+.suggestions li:first-child{
+  border-top: 0;
+}
+
+.suggestions a{
+  display: block;
+  padding: 0.7rem 0.85rem;
+  text-decoration: none;
+  color: var(--fg);
+}
+.suggestions a:hover{
+  text-decoration: none;
+  background: rgba(17,24,39,0.03);
+}
+.suggestions a:focus{
+  text-decoration: none;
+  background: rgba(17,24,39,0.05);
+}
+
+.suggestions li > div{
+  padding: 0 0.85rem 0.7rem;
+  margin-top: -0.25rem;
+  font-size: 0.9em;
+  color: var(--muted);
 }
 
 /* Results list */
