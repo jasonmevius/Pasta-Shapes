@@ -11,9 +11,17 @@ eleventyComputed:
   description: "{% if item.Synonyms %}Aliases: {{ item.Synonyms | truncate(140) }}{% else %}What {{ item.ShapeName }} looks like, plus key shape attributes.{% endif %}"
 ---
 
-{% set thumb = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") %}
-{% set photo = (item.PhotoImage or "") | replace("<ImageKitPath>", "") %}
-{% set hero = photo or thumb %}
+{# ImageKit config (filenames are stored in CSV; templates build full URLs) #}
+{% set IK_BASE = "https://ik.imagekit.io/mevius" %}
+{% set IK_THUMBS = IK_BASE ~ "/pasta/thumbs/" %}
+{% set IK_FULL = IK_BASE ~ "/pasta/full/" %}
+{% set IK_PENDING = IK_BASE ~ "/pasta/pending.png" %}
+
+{% set thumbFile = (item.ThumbnailImage or "") %}
+{% set photoFile = (item.PhotoImage or "") %}
+{% set thumbUrl = (thumbFile ? (IK_THUMBS ~ thumbFile) : IK_PENDING) %}
+{% set photoUrl = (photoFile ? (IK_FULL ~ photoFile) : "") %}
+{% set heroUrl = (photoUrl or thumbUrl or IK_PENDING) %}
 
 <nav class="breadcrumbs">
   <a href="/">← Back to search</a>
@@ -26,18 +34,16 @@ eleventyComputed:
   {% endif %}
 </header>
 
-{% if hero %}
-  <figure class="card hero">
-    <img
-      src="{{ hero }}"
-      alt="{{ item.ShapeName }}"
-      width="1200"
-      height="1200"
-      loading="eager"
-      decoding="async"
-    />
-  </figure>
-{% endif %}
+<figure class="card hero">
+  <img
+    src="{{ heroUrl }}"
+    alt="{{ item.ShapeName }}"
+    width="1200"
+    height="1200"
+    loading="eager"
+    decoding="async"
+  />
+</figure>
 
 {% if item.Synonyms %}
   <section class="card stack">
@@ -79,15 +85,14 @@ eleventyComputed:
     {% endif %}
 
     {% if item.EarliestAttestedMention and item.EarliestAttestedMention != "Unknown" %}
-      <li><strong>Earliest attested mention:</strong> {{ item.EarliestAttestedMention }}</li>
+      <li><strong>Earliest mention:</strong> {{ item.EarliestAttestedMention }}</li>
     {% endif %}
 
     {% if item.SourceLink %}
-      <li><strong>Source:</strong> <a href="{{ item.SourceLink }}">{{ item.SourceLink }}</a></li>
+      <li>
+        <strong>Source:</strong>
+        <a href="{{ item.SourceLink }}" rel="noopener">Link</a>
+      </li>
     {% endif %}
   </ul>
-
-  <div class="actions">
-    <a class="btn secondary" href="/identify/">Identify by questions</a>
-  </div>
 </section>
