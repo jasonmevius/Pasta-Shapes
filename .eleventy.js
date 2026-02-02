@@ -1,3 +1,5 @@
+const fs = require("fs");
+
 module.exports = function (eleventyConfig) {
   // Existing slug filter (keep as-is)
   eleventyConfig.addFilter("slug", (value) => {
@@ -12,10 +14,11 @@ module.exports = function (eleventyConfig) {
   // -----------------------------------------------------------------------------
   // ImageKit helpers (CSV stores filenames only)
   // -----------------------------------------------------------------------------
-  // Single source of truth for ImageKit base URL:
-  // - local/dev fallback remains your current endpoint
-  // - set IMAGEKIT_BASE_URL in Netlify (or local env) to change globally
-  const IK_BASE = (process.env.IMAGEKIT_BASE_URL || "https://ik.imagekit.io/mevius").replace(/\/+$/, "");
+  const envIkBase = String(process.env.IMAGEKIT_BASE_URL || "").trim();
+
+  // Only accept a real absolute URL from env; ignore "/" or blank, etc.
+  const IK_BASE = (/^https?:\/\//i.test(envIkBase) ? envIkBase : "https://ik.imagekit.io/mevius")
+    .replace(/\/+$/, "");
 
   const IK_PASTA_BASE = `${IK_BASE}/pasta`;
   const IK_THUMBS = `${IK_PASTA_BASE}/thumbs/`;
@@ -25,19 +28,16 @@ module.exports = function (eleventyConfig) {
   const IK_PENDING_THUMB = `${IK_THUMBS}pending.png`;
   const IK_PENDING_PHOTO = `${IK_FULL}pending.jpg`;
 
-  // Thumb URL from filename (or blank -> pending thumb)
   eleventyConfig.addFilter("pastaThumbUrl", (filename) => {
     const f = String(filename || "").trim();
     return f ? (IK_THUMBS + f) : IK_PENDING_THUMB;
   });
 
-  // Photo URL from filename (or blank -> pending photo)
   eleventyConfig.addFilter("pastaPhotoUrl", (filename) => {
     const f = String(filename || "").trim();
     return f ? (IK_FULL + f) : IK_PENDING_PHOTO;
   });
 
-  // Hero URL (prefer photo, else thumb, else pending *photo*)
   eleventyConfig.addFilter("pastaHeroUrl", (thumbFilename, photoFilename) => {
     const p = String(photoFilename || "").trim();
     if (p) return IK_FULL + p;
@@ -49,28 +49,26 @@ module.exports = function (eleventyConfig) {
   });
 
   // -----------------------------------------------------------------------------
-  // Favicons / icons (so layout.njk can stay variable-driven)
+  // Favicons / icons
   // -----------------------------------------------------------------------------
-  // Local favicon (in repo)
   eleventyConfig.addFilter("faviconUrl", () => "/favicon.ico");
 
-  // Apple touch icon (served via ImageKit)
-  // (Image path stays stable; ImageKit base can change via env var)
   eleventyConfig.addFilter("appleTouchIconUrl", (w = 180) => {
     const size = Number(w) || 180;
     return `${IK_PASTA_BASE}/favicon.png?tr=w-${size},f-png,q-50`;
   });
 
+  // Ensure favicon.ico is actually published to /favicon.ico
+  // (works whether you put it in repo root or inside src/)
+  if (fs.existsSync("src/favicon.ico")) {
+    eleventyConfig.addPassthroughCopy({ "src/favicon.ico": "favicon.ico" });
+  } else if (fs.existsSync("favicon.ico")) {
+    eleventyConfig.addPassthroughCopy({ "favicon.ico": "favicon.ico" });
+  }
+
   // Passthrough copy: publish static JS and CSS files
-  // src/js/* -> /js/*
   eleventyConfig.addPassthroughCopy({ "src/js": "js" });
-
-  // src/css/* -> /css/*
   eleventyConfig.addPassthroughCopy({ "src/css": "css" });
-
-  // OPTIONAL (only if your favicon.ico is in src/):
-  // If your favicon.ico lives at src/favicon.ico, uncomment this so it ships to /favicon.ico
-  // eleventyConfig.addPassthroughCopy({ "src/favicon.ico": "favicon.ico" });
 
   return {
     dir: {
