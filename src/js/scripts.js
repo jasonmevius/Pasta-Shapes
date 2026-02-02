@@ -45,13 +45,13 @@
     const recentList = $("#recently-viewed");
 
     const note = $("#pasta-results-note");
-    const nextBtn = $("#pasta-toggle-all"); // reuse existing button - now "Next 10"
+    const nextBtn = $("#pasta-toggle-all"); // reused - now "Next 10"
 
     const PAGE_N = 10; // reveal size
     let visibleLimit = PAGE_N;
 
     // -----------------------------------------------------------------------------
-    // Normalization (match what we do in pasta-search.js / pastaIndex.js)
+    // Normalization
     // -----------------------------------------------------------------------------
     const STOPWORDS = new Set([
       "a",
@@ -102,7 +102,6 @@
     function normalizeQuery(s) {
       const q = normalize(s);
 
-      // spaced letters (IME/voice/assistive input)
       if (/^(?:[a-z0-9]\s+){2,}[a-z0-9]$/.test(q)) {
         return q.replace(/\s+/g, "");
       }
@@ -120,12 +119,12 @@
     }
 
     // -----------------------------------------------------------------------------
-    // Optional fuzzy support for the "Results" list using /api/pasta-index.json
+    // Optional fuzzy support using /api/pasta-index.json
     // -----------------------------------------------------------------------------
     let indexLoaded = false;
-    let index = null; // { aliasToSlug, entries }
-    let aliasKeys = null; // normalized alias keys
-    let stopKeyToSlugs = null; // stopword-stripped key -> Set(slugs)
+    let index = null;
+    let aliasKeys = null;
+    let stopKeyToSlugs = null;
     const cardBySlug = new Map(cards.map((c) => [c.getAttribute("data-slug"), c]));
 
     async function loadIndexIfNeeded() {
@@ -158,7 +157,6 @@
       return index;
     }
 
-    // Levenshtein distance with early exit (bounded)
     function levenshtein(a, b, maxDist) {
       if (a === b) return 0;
       if (!a || !b) return Math.max(a.length, b.length);
@@ -196,7 +194,7 @@
       return prev[bl];
     }
 
-    function bestFuzzySlugs(qKey, limit = 10) {
+    function bestFuzzySlugs(qKey, limit = 50) {
       if (!index || !aliasKeys || !qKey || qKey.length < 3) return [];
 
       const a2s = index.aliasToSlug || {};
@@ -225,7 +223,7 @@
     }
 
     // -----------------------------------------------------------------------------
-    // Ranking + ordering for direct matches
+    // Ranking helpers
     // -----------------------------------------------------------------------------
     function cardNameNorm(card) {
       const el = card.querySelector(".result-name");
@@ -245,7 +243,6 @@
       const slug = cardSlugNorm(card);
       const blob = cardBlobNorm(card);
 
-      // Ranking buckets - lower is better
       let bucket = 50;
 
       if (name && name.startsWith(q)) bucket = 0;
@@ -255,7 +252,6 @@
       else if (name && name.includes(q)) bucket = 4;
       else if (blob && blob.includes(q)) bucket = 5;
 
-      // Earlier position is better for "includes"
       let pos = 9999;
       if (bucket <= 3) pos = 0;
       else if (bucket === 4) pos = name.indexOf(q);
@@ -286,29 +282,36 @@
       status.textContent = `${shownCount} of ${matchCount} matches`;
     }
 
-    function setNoteAndNext({ matchCount, shownCount }) {
+    function countVisible(arr) {
+      let n = 0;
+      for (const el of arr) {
+        if (el.style.display !== "none") n++;
+      }
+      return n;
+    }
+
+    function setNoteAndNext(matchCount, shownCount) {
       if (!note || !nextBtn) return;
 
-      if (matchCount <= PAGE_N) {
+      const remaining = Math.max(0, matchCount - shownCount);
+
+      if (matchCount === 0) {
+        note.textContent = "";
+        nextBtn.hidden = true;
+        return;
+      }
+
+      if (remaining === 0) {
         note.textContent = `Showing ${shownCount} of ${matchCount}`;
         nextBtn.hidden = true;
         return;
       }
 
-      const remaining = Math.max(0, matchCount - shownCount);
+      note.textContent = `Showing ${shownCount} of ${matchCount} - ${remaining} more`;
 
-      note.textContent = remaining
-        ? `Showing ${shownCount} of ${matchCount} - ${remaining} more`
-        : `Showing ${shownCount} of ${matchCount}`;
-
-      if (remaining > 0) {
-        const nextChunk = Math.min(PAGE_N, remaining);
-        // Button acts as a link-like progressive reveal.
-        nextBtn.textContent = `Next ${nextChunk} (${remaining} more)`;
-        nextBtn.hidden = false;
-      } else {
-        nextBtn.hidden = true;
-      }
+      const nextChunk = Math.min(PAGE_N, remaining);
+      nextBtn.textContent = `Next ${nextChunk} (${remaining} more)`;
+      nextBtn.hidden = false;
     }
 
     function directMatchSets(q) {
@@ -329,20 +332,13 @@
       const q = normalizeQuery(raw);
       const total = cards.length;
 
-      // When query changes, reset progressive reveal
-      // (we also reset when query clears below)
-      // NOTE: this is handled in input event by resetting visibleLimit
-
       // -----------------------------------------------------------
-      // Query present - ranked, progressively revealed
+      // Query present
       // -----------------------------------------------------------
       if (q) {
-        // Direct matches
         let { matched, nonMatched } = directMatchSets(q);
 
-        // If no direct matches and query contains spaces, retry ignoring spaces.
-        // This fixes "spa ghe" -> "spaghe", without breaking legit multi-word queries
-        // because we only do it when the spaced version yields 0 matches.
+        // If no direct matches and query contains spaces, retry ignoring spaces
         let qUsed = q;
         if (!matched.length && q.includes(" ")) {
           const qNoSpaces = q.replace(/\s+/g, "");
@@ -356,6 +352,7 @@
           }
         }
 
+        // Direct matches
         if (matched.length) {
           const ranked = matched
             .map((c) => ({ c, s: scoreCard(c, qUsed) }))
@@ -369,15 +366,21 @@
 
           reorderCards(ranked.concat(nonMatched));
 
-          const shown = Math.min(visibleLimit, matched.length);
+          // Show up to visibleLimit (but we will compute actual shown after)
+          const requestedShown = Math.min(visibleLimit, matched.length);
 
           for (let i = 0; i < ranked.length; i++) {
-            ranked[i].style.display = i < shown ? "" : "none";
+            ranked[i].style.display = i < requestedShown ? "" : "none";
           }
           for (const c of nonMatched) c.style.display = "none";
 
-          setStatus(matched.length, shown, qUsed, "direct");
-          setNoteAndNext({ matchCount: matched.length, shownCount: shown });
+          const actualShown = countVisible(ranked);
+          setStatus(matched.length, actualShown, qUsed, "direct");
+          setNoteAndNext(matched.length, actualShown);
+
+          // Clamp visibleLimit so repeated clicks don't leave UI in a weird state
+          visibleLimit = Math.max(PAGE_N, Math.min(visibleLimit, matched.length || PAGE_N));
+
           return;
         }
 
@@ -416,7 +419,7 @@
 
         if (!slugs.length) {
           for (const cand of candidates) {
-            slugs = bestFuzzySlugs(cand, 50); // allow more so Next 10 is meaningful
+            slugs = bestFuzzySlugs(cand, 50);
             if (slugs.length) break;
           }
         }
@@ -433,15 +436,19 @@
           const remaining = originalOrder.filter((c) => !slugSet.has(c.getAttribute("data-slug")));
           reorderCards(ordered.concat(remaining));
 
-          const shown = Math.min(visibleLimit, ordered.length);
+          const requestedShown = Math.min(visibleLimit, ordered.length);
 
           for (let i = 0; i < ordered.length; i++) {
-            ordered[i].style.display = i < shown ? "" : "none";
+            ordered[i].style.display = i < requestedShown ? "" : "none";
           }
           for (const c of remaining) c.style.display = "none";
 
-          setStatus(ordered.length, shown, q, "fuzzy");
-          setNoteAndNext({ matchCount: ordered.length, shownCount: shown });
+          const actualShown = countVisible(ordered);
+          setStatus(ordered.length, actualShown, q, "fuzzy");
+          setNoteAndNext(ordered.length, actualShown);
+
+          visibleLimit = Math.max(PAGE_N, Math.min(visibleLimit, ordered.length || PAGE_N));
+
           return;
         }
 
@@ -449,23 +456,26 @@
         reorderCards(originalOrder);
         for (const c of cards) c.style.display = "none";
         setStatus(0, 0, q, "direct");
-        setNoteAndNext({ matchCount: 0, shownCount: 0 });
+        setNoteAndNext(0, 0);
         return;
       }
 
       // -----------------------------------------------------------
-      // No query - restore original order + progressive reveal
+      // No query - show top list, progressive reveal
       // -----------------------------------------------------------
       reorderCards(originalOrder);
 
-      const shown = Math.min(visibleLimit, total);
+      const requestedShown = Math.min(visibleLimit, total);
 
       for (let i = 0; i < originalOrder.length; i++) {
-        originalOrder[i].style.display = i < shown ? "" : "none";
+        originalOrder[i].style.display = i < requestedShown ? "" : "none";
       }
 
-      setStatus(total, shown, q, "direct");
-      setNoteAndNext({ matchCount: total, shownCount: shown });
+      const actualShown = countVisible(originalOrder);
+      setStatus(total, actualShown, q, "direct");
+      setNoteAndNext(total, actualShown);
+
+      visibleLimit = Math.max(PAGE_N, Math.min(visibleLimit, total || PAGE_N));
     }
 
     function renderRecents() {
@@ -521,7 +531,9 @@
     // Next 10 behavior
     if (nextBtn) {
       nextBtn.addEventListener("click", (e) => {
-        e.preventDefault?.();
+        // It's a button, but safe to keep this here
+        if (typeof e.preventDefault === "function") e.preventDefault();
+
         visibleLimit += PAGE_N;
         filter();
       });
@@ -574,7 +586,6 @@
 
   function initIdentifyPage() {
     // No changes required for this update.
-    // (Identify page logic lives elsewhere or is handled in its own script.)
   }
 
   // =============================================================================
