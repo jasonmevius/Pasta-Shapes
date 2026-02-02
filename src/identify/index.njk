@@ -45,80 +45,6 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
   <p class="muted">Answer one question at a time. You can always tap “Not sure.”</p>
 </header>
 
-<style>
-  .identify .identify-card { display: block; }
-  .identify .identify-question { margin-bottom: 12px; }
-  .identify .identify-kicker { margin: 0 0 6px; }
-  .identify .identify-title { margin: 0 0 6px; }
-  .identify .identify-help { margin: 0 0 10px; }
-
-  .identify .identify-answers { display: grid; gap: 10px; }
-  @media (min-width: 720px) {
-    .identify .identify-answers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
-
-  /* Answer options as “search-like” cards */
-  .identify .option-card {
-    width: 100%;
-    text-align: left;
-    border: 1px solid rgba(0,0,0,0.12);
-    border-radius: 12px;
-    padding: 10px;
-    background: #fff;
-    display: grid;
-    grid-template-columns: 44px 1fr;
-    gap: 10px;
-    align-items: center;
-    cursor: pointer;
-  }
-  .identify .option-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
-  .identify .option-thumb {
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
-    object-fit: contain;
-    background: rgba(0,0,0,0.03);
-  }
-  .identify .option-name { font-weight: 650; line-height: 1.1; margin: 0; }
-  .identify .option-desc { margin: 4px 0 0; font-size: 0.95rem; line-height: 1.25; opacity: 0.75; }
-
-  .identify .identify-meta { margin-top: 10px; }
-
-  /* Results: echo Search page hierarchy */
-  .identify .identify-results { margin-top: 14px; }
-  .identify .results-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-  .identify .results-list { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 10px; }
-
-  .identify .result-item { border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; background: #fff; }
-  .identify .result-link {
-    display: grid;
-    grid-template-columns: 44px 1fr;
-    gap: 10px;
-    align-items: center;
-    padding: 10px;
-    text-decoration: none;
-    color: inherit;
-  }
-  .identify .result-link:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
-
-  .identify .result-thumb {
-    width: 44px;
-    height: 44px;
-    border-radius: 10px;
-    object-fit: cover;
-    background: rgba(0,0,0,0.03);
-  }
-
-  .identify .result-text { min-width: 0; }
-  .identify .result-name { font-weight: 700; margin: 0; line-height: 1.15; }
-  .identify .result-type,
-  .identify .result-meta,
-  .identify .result-also { margin: 3px 0 0; font-size: 0.95rem; opacity: 0.75; }
-  .identify .result-type { margin-top: 4px; }
-
-  .identify .identify-bottom-bar { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
-</style>
-
 <section id="identify-app" class="identify">
   <div class="card identify-card">
     <div class="identify-question">
@@ -176,24 +102,27 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     dataScript: $("#identify-data"),
   };
 
-  // ImageKit bases (per your updated requirements)
+  // ImageKit bases (per your requirements)
   const IK_THUMBS_BASE = "https://ik.imagekit.io/mevius/pasta/thumbs/";
   const IK_IDENTIFY_BASE = "https://ik.imagekit.io/mevius/pasta/identify/";
   const FALLBACK_THUMB = "pending.png";
+
+  // Unambiguous boolean icon names
+  const BOOL_YES_ICON = "bool-yes.png";
+  const BOOL_NO_ICON = "bool-no.png";
+  const BOOL_UNKNOWN_ICON = "bool-unknown.png";
 
   const isUrl = (s) => /^https?:\/\//i.test(String(s || "").trim());
 
   const fileNameOnly = (s) => {
     const str = String(s || "").trim();
     if (!str) return "";
-    // strip query/hash, then keep last path segment
     const clean = str.split("#")[0].split("?")[0];
     const parts = clean.split("/");
     return parts[parts.length - 1] || "";
   };
 
   const thumbUrlFor = (thumbRaw) => {
-    // If full URL already, keep it
     if (isUrl(thumbRaw)) return String(thumbRaw).trim();
     const fn = fileNameOnly(thumbRaw);
     return IK_THUMBS_BASE + (fn || FALLBACK_THUMB);
@@ -323,7 +252,6 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
   const normalized = raw.map((p) => ({
     slug: p.slug,
     name: p.name,
-    // Normalize thumb to ImageKit thumbs base (or keep full URL if already)
     thumb: thumbUrlFor(p.thumb),
     type: normEnum(p.type),
     size: String(p.size || "").trim(),
@@ -431,7 +359,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     const notSure = value === "__ns__";
     if (notSure) {
       return {
-        icon: identifyIconUrlFor("not-sure.png"),
+        icon: identifyIconUrlFor(BOOL_UNKNOWN_ICON),
         name: "Not sure",
         desc: "Skip this question and keep narrowing with the next best one.",
       };
@@ -440,7 +368,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     if (q.kind === "bool") {
       const yes = value === "yes";
       return {
-        icon: identifyIconUrlFor(yes ? "yes.png" : "no.png"),
+        icon: identifyIconUrlFor(yes ? BOOL_YES_ICON : BOOL_NO_ICON),
         name: yes ? "Yes" : "No",
         desc: yes ? (q.descYes || "") : (q.descNo || ""),
       };
