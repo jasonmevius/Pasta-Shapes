@@ -47,8 +47,16 @@
     const note = $("#pasta-results-note");
     const nextBtn = $("#pasta-toggle-all"); // reused - now "Next 10"
 
-    const PAGE_N = 10; // reveal size
+    const PAGE_N = 10;
     let visibleLimit = PAGE_N;
+
+    function setControlVisible(el, isVisible) {
+      if (!el) return;
+      // Some CSS can override [hidden], so force display none as well.
+      el.hidden = !isVisible;
+      el.style.display = isVisible ? "" : "none";
+      el.setAttribute("aria-hidden", isVisible ? "false" : "true");
+    }
 
     // -----------------------------------------------------------------------------
     // Normalization
@@ -101,11 +109,7 @@
     // Collapses spaced-letter inputs like "p e n n e" -> "penne"
     function normalizeQuery(s) {
       const q = normalize(s);
-
-      if (/^(?:[a-z0-9]\s+){2,}[a-z0-9]$/.test(q)) {
-        return q.replace(/\s+/g, "");
-      }
-
+      if (/^(?:[a-z0-9]\s+){2,}[a-z0-9]$/.test(q)) return q.replace(/\s+/g, "");
       return q;
     }
 
@@ -297,13 +301,13 @@
 
       if (matchCount === 0) {
         note.textContent = "";
-        nextBtn.hidden = true;
+        setControlVisible(nextBtn, false);
         return;
       }
 
       if (remaining === 0) {
         note.textContent = `Showing ${shownCount} of ${matchCount}`;
-        nextBtn.hidden = true;
+        setControlVisible(nextBtn, false);
         return;
       }
 
@@ -311,7 +315,7 @@
 
       const nextChunk = Math.min(PAGE_N, remaining);
       nextBtn.textContent = `Next ${nextChunk} (${remaining} more)`;
-      nextBtn.hidden = false;
+      setControlVisible(nextBtn, true);
     }
 
     function directMatchSets(q) {
@@ -352,7 +356,6 @@
           }
         }
 
-        // Direct matches
         if (matched.length) {
           const ranked = matched
             .map((c) => ({ c, s: scoreCard(c, qUsed) }))
@@ -366,21 +369,18 @@
 
           reorderCards(ranked.concat(nonMatched));
 
-          // Show up to visibleLimit (but we will compute actual shown after)
-          const requestedShown = Math.min(visibleLimit, matched.length);
+          const requestedShown = Math.min(visibleLimit, ranked.length);
 
-          for (let i = 0; i < ranked.length; i++) {
-            ranked[i].style.display = i < requestedShown ? "" : "none";
-          }
+          for (let i = 0; i < ranked.length; i++) ranked[i].style.display = i < requestedShown ? "" : "none";
           for (const c of nonMatched) c.style.display = "none";
 
           const actualShown = countVisible(ranked);
-          setStatus(matched.length, actualShown, qUsed, "direct");
-          setNoteAndNext(matched.length, actualShown);
 
-          // Clamp visibleLimit so repeated clicks don't leave UI in a weird state
-          visibleLimit = Math.max(PAGE_N, Math.min(visibleLimit, matched.length || PAGE_N));
+          // clamp visibleLimit so it doesn't overshoot forever
+          visibleLimit = Math.max(PAGE_N, Math.min(visibleLimit, ranked.length || PAGE_N));
 
+          setStatus(ranked.length, actualShown, qUsed, "direct");
+          setNoteAndNext(ranked.length, actualShown);
           return;
         }
 
@@ -438,17 +438,15 @@
 
           const requestedShown = Math.min(visibleLimit, ordered.length);
 
-          for (let i = 0; i < ordered.length; i++) {
-            ordered[i].style.display = i < requestedShown ? "" : "none";
-          }
+          for (let i = 0; i < ordered.length; i++) ordered[i].style.display = i < requestedShown ? "" : "none";
           for (const c of remaining) c.style.display = "none";
 
           const actualShown = countVisible(ordered);
-          setStatus(ordered.length, actualShown, q, "fuzzy");
-          setNoteAndNext(ordered.length, actualShown);
 
           visibleLimit = Math.max(PAGE_N, Math.min(visibleLimit, ordered.length || PAGE_N));
 
+          setStatus(ordered.length, actualShown, q, "fuzzy");
+          setNoteAndNext(ordered.length, actualShown);
           return;
         }
 
@@ -461,7 +459,7 @@
       }
 
       // -----------------------------------------------------------
-      // No query - show top list, progressive reveal
+      // No query - restore original order + progressive reveal
       // -----------------------------------------------------------
       reorderCards(originalOrder);
 
@@ -472,10 +470,11 @@
       }
 
       const actualShown = countVisible(originalOrder);
-      setStatus(total, actualShown, q, "direct");
-      setNoteAndNext(total, actualShown);
 
       visibleLimit = Math.max(PAGE_N, Math.min(visibleLimit, total || PAGE_N));
+
+      setStatus(total, actualShown, q, "direct");
+      setNoteAndNext(total, actualShown);
     }
 
     function renderRecents() {
@@ -531,12 +530,13 @@
     // Next 10 behavior
     if (nextBtn) {
       nextBtn.addEventListener("click", (e) => {
-        // It's a button, but safe to keep this here
         if (typeof e.preventDefault === "function") e.preventDefault();
-
         visibleLimit += PAGE_N;
         filter();
       });
+
+      // Ensure initial state isn't stuck visible from CSS overrides
+      setControlVisible(nextBtn, false);
     }
 
     // Optional: support ?q= prefill
@@ -549,7 +549,6 @@
     input.addEventListener(
       "input",
       () => {
-        // On every new query, reset to Top 10
         visibleLimit = PAGE_N;
         filter();
       },
@@ -564,7 +563,6 @@
       { once: true, passive: true }
     );
 
-    // Initial render
     visibleLimit = PAGE_N;
     filter();
     renderRecents();
@@ -585,7 +583,7 @@
   // =============================================================================
 
   function initIdentifyPage() {
-    // No changes required for this update.
+    // unchanged
   }
 
   // =============================================================================
