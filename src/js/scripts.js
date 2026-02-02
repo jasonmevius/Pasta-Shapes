@@ -2,6 +2,49 @@
   const $ = (sel, root = document) => root.querySelector(sel);
 
   // =============================================================================
+  // ImageKit helpers (CSV stores filenames only)
+  // =============================================================================
+  const IK_BASE = "https://ik.imagekit.io/mevius";
+  const IK_THUMBS = `${IK_BASE}/pasta/thumbs/`;
+  const IK_PENDING_THUMB = `${IK_THUMBS}pending.png`;
+
+  function isAbsUrl(s) {
+    return /^https?:\/\//i.test(String(s || "").trim());
+  }
+
+  function toThumbUrl(v) {
+    const raw = String(v || "").trim();
+
+    // Treat common placeholders as "missing"
+    if (!raw) return IK_PENDING_THUMB;
+    if (raw.toLowerCase() === "n/a") return IK_PENDING_THUMB;
+    if (raw.toLowerCase() === "na") return IK_PENDING_THUMB;
+
+    // Already absolute - use as-is
+    if (isAbsUrl(raw)) return raw;
+
+    // Back-compat: "<ImageKitPath>/..." -> replace with IK_BASE
+    if (raw.includes("<ImageKitPath>")) {
+      return raw.replace("<ImageKitPath>", IK_BASE);
+    }
+
+    // If they somehow pass "/pasta/thumbs/x.png" or "pasta/thumbs/x.png"
+    if (raw.startsWith("/")) return IK_BASE + raw;
+    if (raw.startsWith("pasta/")) return `${IK_BASE}/${raw}`;
+
+    // If they pass "thumbs/x.png" or "pasta/thumbs/x.png" in some variant
+    if (raw.includes("/")) {
+      // If it already includes "pasta/thumb" somewhere, just prefix base.
+      if (raw.includes("pasta/thumb")) return `${IK_BASE}/${raw.replace(/^\/+/, "")}`;
+      // Otherwise assume it's relative to thumbs.
+      return IK_THUMBS + raw.split("/").pop();
+    }
+
+    // Otherwise - assume filename only
+    return IK_THUMBS + raw;
+  }
+
+  // =============================================================================
   // Recently viewed helpers
   // =============================================================================
 
@@ -107,7 +150,6 @@
 
     // -----------------------------------------------------------------------------
     // Optional fuzzy support for the "Results" list using /api/pasta-index.json
-    // This is what makes "spahetti" still funnel to "Spaghetti".
     // -----------------------------------------------------------------------------
     let indexLoaded = false;
     let index = null; // { aliasToSlug, entries }
@@ -187,8 +229,6 @@
       if (!index || !aliasKeys || !qKey || qKey.length < 3) return [];
 
       const a2s = index.aliasToSlug || {};
-
-      // Small cap: enough for 200ish shapes, still very fast
       const maxDist = Math.min(3, Math.floor(qKey.length / 6) + 1);
 
       const scored = [];
@@ -408,7 +448,6 @@
       const q = url.searchParams.get("q");
       if (q) {
         input.value = q;
-        // Not strictly needed while searching, but prevents odd jumps after clearing.
         showAll = true;
       }
     } catch (e) {}
@@ -416,14 +455,12 @@
     input.addEventListener(
       "input",
       () => {
-        // When they clear the search, go back to collapsed mode
         if (!normalize(input.value)) showAll = false;
         filter();
       },
       { passive: true }
     );
 
-    // Warm the index in the background after first interaction (no blocking)
     input.addEventListener(
       "focus",
       () => {
@@ -492,15 +529,7 @@
       return;
     }
 
-    const QUESTION_ORDER = [
-      "type", // forced first
-      "hollow",
-      "stuffed",
-      "ridged",
-      "twisted",
-      "curved",
-      "size",
-    ];
+    const QUESTION_ORDER = ["type", "hollow", "stuffed", "ridged", "twisted", "curved", "size"];
 
     function ynPretty(v) {
       const s = (v || "").toLowerCase();
@@ -529,36 +558,12 @@
             }[v] || v
           ),
       },
-      hollow: {
-        label: "Is it hollow?",
-        help: "Does it have a hole or tunnel through it?",
-        pretty: ynPretty,
-      },
-      stuffed: {
-        label: "Is it stuffed?",
-        help: "Is there a filling inside?",
-        pretty: ynPretty,
-      },
-      ridged: {
-        label: "Does it have ridges?",
-        help: "Look for grooves or ruffles on the surface.",
-        pretty: ynPretty,
-      },
-      twisted: {
-        label: "Is it twisted?",
-        help: "Does it spiral or corkscrew?",
-        pretty: ynPretty,
-      },
-      curved: {
-        label: "Is it curved?",
-        help: "Is the shape bent or arched?",
-        pretty: ynPretty,
-      },
-      size: {
-        label: "What size is it?",
-        help: "Pick the closest size bucket.",
-        pretty: (v) => v,
-      },
+      hollow: { label: "Is it hollow?", help: "Does it have a hole or tunnel through it?", pretty: ynPretty },
+      stuffed: { label: "Is it stuffed?", help: "Is there a filling inside?", pretty: ynPretty },
+      ridged: { label: "Does it have ridges?", help: "Look for grooves or ruffles on the surface.", pretty: ynPretty },
+      twisted: { label: "Is it twisted?", help: "Does it spiral or corkscrew?", pretty: ynPretty },
+      curved: { label: "Is it curved?", help: "Is the shape bent or arched?", pretty: ynPretty },
+      size: { label: "What size is it?", help: "Pick the closest size bucket.", pretty: (v) => v },
     };
 
     function normVal(v) {
@@ -589,8 +594,8 @@
     }
 
     const state = {
-      selections: {}, // key -> value
-      history: [], // stack of { key, value }
+      selections: {},
+      history: [],
       showResults: false,
     };
 
@@ -610,7 +615,6 @@
     }
 
     function scoreQuestion(candidates, key) {
-      // Ignore questions already answered (unless it was "__any__")
       if (state.selections[key] && state.selections[key] !== "__any__") return -1;
 
       const buckets = new Map();
@@ -621,7 +625,6 @@
 
       if (buckets.size < 2) return -1;
 
-      // Score by how evenly it splits (higher is better)
       const n = candidates.length || 1;
       let sumSq = 0;
       for (const c of buckets.values()) {
@@ -633,7 +636,6 @@
     }
 
     function pickNextQuestion(candidates) {
-      // Force type first
       if (!state.selections.type) return "type";
 
       let bestKey = null;
@@ -658,7 +660,6 @@
         buckets.set(v, (buckets.get(v) || 0) + 1);
       }
 
-      // Sort: common first, unknown last
       const entries = Array.from(buckets.entries()).sort((a, b) => {
         if (a[0] === "unknown") return 1;
         if (b[0] === "unknown") return -1;
@@ -695,7 +696,6 @@
         answers.appendChild(btn);
       }
 
-      // Not sure (skip)
       const skip = document.createElement("button");
       skip.type = "button";
       skip.className = "btn secondary answer-btn";
@@ -736,21 +736,15 @@
         const thumb = document.createElement("div");
         thumb.className = "thumb";
 
-        if (it.thumb) {
-          const img = document.createElement("img");
-          img.src = it.thumb;
-          img.alt = "";
-          img.width = 56;
-          img.height = 56;
-          img.loading = "lazy";
-          img.decoding = "async";
-          thumb.appendChild(img);
-        } else {
-          const span = document.createElement("span");
-          span.className = "thumb-na muted";
-          span.textContent = "N/A";
-          thumb.appendChild(span);
-        }
+        // Always show an image - if missing, use pending
+        const img = document.createElement("img");
+        img.src = toThumbUrl(it.thumb);
+        img.alt = "";
+        img.width = 56;
+        img.height = 56;
+        img.loading = "lazy";
+        img.decoding = "async";
+        thumb.appendChild(img);
 
         const body = document.createElement("div");
         body.className = "result-body";
@@ -808,12 +802,10 @@
     }
 
     function choose(key, value) {
-      // Track choice
       state.selections[key] = value;
       state.history.push({ key, value });
       state.showResults = false;
 
-      // Zero-results guard - if it yields 0, undo and message
       const after = applyFilters();
       if (after.length === 0) {
         state.history.pop();
@@ -830,7 +822,6 @@
 
       delete state.selections[last.key];
 
-      // Reapply earlier selection for same key if present
       for (let i = state.history.length - 1; i >= 0; i--) {
         if (state.history[i].key === last.key) {
           state.selections[last.key] = state.history[i].value;
@@ -854,7 +845,6 @@
       render();
     }
 
-    // Events
     answers.addEventListener("click", (e) => {
       const btn = e.target.closest("button[data-q][data-v]");
       if (!btn) return;
@@ -865,7 +855,6 @@
     btnReset.addEventListener("click", reset);
     btnView.addEventListener("click", toggleResults);
 
-    // Record recents from Identify results clicks
     resultsList.addEventListener("click", (e) => {
       const a = e.target.closest("a[data-recent]");
       if (!a) return;
