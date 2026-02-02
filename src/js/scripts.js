@@ -35,7 +35,6 @@
     const status = $("#pasta-search-status");
     const list = $("#pasta-results");
 
-    // Only run on the search page
     if (!input || !status || !list) return;
 
     const cards = Array.from(list.querySelectorAll("[data-search]"));
@@ -51,7 +50,7 @@
     let showAll = false;
 
     // -----------------------------------------------------------------------------
-    // Normalization (match what we do in pasta-search.js / pastaIndex.js)
+    // Normalization
     // -----------------------------------------------------------------------------
     const STOPWORDS = new Set([
       "a",
@@ -101,13 +100,7 @@
     // Collapses spaced-letter inputs like "p e n n e" -> "penne"
     function normalizeQuery(s) {
       const q = normalize(s);
-
-      // If the user input becomes spaced letters (IME/voice/assistive input),
-      // convert "p e n n e" into "penne".
-      if (/^(?:[a-z0-9]\s+){2,}[a-z0-9]$/.test(q)) {
-        return q.replace(/\s+/g, "");
-      }
-
+      if (/^(?:[a-z0-9]\s+){2,}[a-z0-9]$/.test(q)) return q.replace(/\s+/g, "");
       return q;
     }
 
@@ -121,12 +114,12 @@
     }
 
     // -----------------------------------------------------------------------------
-    // Optional fuzzy support for the "Results" list using /api/pasta-index.json
+    // Fuzzy index
     // -----------------------------------------------------------------------------
     let indexLoaded = false;
-    let index = null; // { aliasToSlug, entries }
-    let aliasKeys = null; // normalized alias keys
-    let stopKeyToSlugs = null; // stopword-stripped key -> Set(slugs)
+    let index = null;
+    let aliasKeys = null;
+    let stopKeyToSlugs = null;
     const cardBySlug = new Map(cards.map((c) => [c.getAttribute("data-slug"), c]));
 
     async function loadIndexIfNeeded() {
@@ -159,7 +152,6 @@
       return index;
     }
 
-    // Levenshtein distance with early exit (bounded)
     function levenshtein(a, b, maxDist) {
       if (a === b) return 0;
       if (!a || !b) return Math.max(a.length, b.length);
@@ -176,7 +168,6 @@
 
       for (let i = 1; i <= al; i++) {
         cur[0] = i;
-
         let rowMin = cur[0];
         const ai = a.charCodeAt(i - 1);
 
@@ -226,7 +217,7 @@
     }
 
     // -----------------------------------------------------------------------------
-    // Ranking + ordering for direct matches
+    // Ranking
     // -----------------------------------------------------------------------------
     function cardNameNorm(card) {
       const el = card.querySelector(".result-name");
@@ -246,7 +237,6 @@
       const slug = cardSlugNorm(card);
       const blob = cardBlobNorm(card);
 
-      // Ranking buckets - lower is better
       let bucket = 50;
 
       if (name && name.startsWith(q)) bucket = 0;
@@ -256,7 +246,6 @@
       else if (name && name.includes(q)) bucket = 4;
       else if (blob && blob.includes(q)) bucket = 5;
 
-      // Earlier position is better for "includes"
       let pos = 9999;
       if (bucket <= 3) pos = 0;
       else if (bucket === 4) pos = name.indexOf(q);
@@ -309,31 +298,49 @@
       toggleBtn.hidden = false;
     }
 
+    function directMatchesForQuery(q) {
+      const matched = [];
+      const nonMatched = [];
+
+      for (const card of originalOrder) {
+        const blob = cardBlobNorm(card);
+        if (blob.includes(q)) matched.push(card);
+        else nonMatched.push(card);
+      }
+
+      return { matched, nonMatched };
+    }
+
     async function filter() {
       const raw = input.value || "";
       const q = normalizeQuery(raw);
       const total = cards.length;
 
-      // When query changes, default back to Top 10
       if (!q) showAll = false;
 
-      // -----------------------------------------------------------
-      // Query present - ranked, limited
-      // -----------------------------------------------------------
       if (q) {
-        const matched = [];
-        const nonMatched = [];
+        // 1) Direct match using query as typed/normalized
+        let { matched, nonMatched } = directMatchesForQuery(q);
 
-        for (const card of originalOrder) {
-          const blob = cardBlobNorm(card);
-          if (blob.includes(q)) matched.push(card);
-          else nonMatched.push(card);
+        // 1b) If no direct matches and query contains spaces, retry ignoring spaces
+        // This fixes "spa ghe" -> "spaghe" style inputs, without breaking legit multi-word queries
+        // because we only do it when the spaced version yields 0 matches.
+        let qUsed = q;
+        if (!matched.length && q.includes(" ")) {
+          const qNoSpaces = q.replace(/\s+/g, "");
+          if (qNoSpaces && qNoSpaces !== q) {
+            const retry = directMatchesForQuery(qNoSpaces);
+            if (retry.matched.length) {
+              matched = retry.matched;
+              nonMatched = retry.nonMatched;
+              qUsed = qNoSpaces;
+            }
+          }
         }
 
-        // Direct matches - rank by starts-with, then contains
         if (matched.length) {
           const ranked = matched
-            .map((c) => ({ c, s: scoreCard(c, q) }))
+            .map((c) => ({ c, s: scoreCard(c, qUsed) }))
             .sort((a, b) => {
               if (a.s.bucket !== b.s.bucket) return a.s.bucket - b.s.bucket;
               if (a.s.pos !== b.s.pos) return a.s.pos - b.s.pos;
@@ -346,34 +353,52 @@
 
           const shown = showAll ? matched.length : Math.min(TOP_N, matched.length);
 
-          for (let i = 0; i < ranked.length; i++) {
-            ranked[i].style.display = i < shown ? "" : "none";
-          }
+          for (let i = 0; i < ranked.length; i++) ranked[i].style.display = i < shown ? "" : "none";
           for (const c of nonMatched) c.style.display = "none";
 
-          setStatus(matched.length, shown, q, "direct");
-          setNoteAndToggle({ q, matchCount: matched.length, shownCount: shown });
+          setStatus(matched.length, shown, qUsed, "direct");
+          setNoteAndToggle({ q: qUsed, matchCount: matched.length, shownCount: shown });
           return;
         }
 
-        // -----------------------------------------------------------
-        // Fuzzy fallback
-        // -----------------------------------------------------------
+        // Fuzzy fallback (use the normalized query, but also try a no-spaces version if applicable)
         await loadIndexIfNeeded();
+
+        const candidates = [];
+        candidates.push(q);
+        if (q.includes(" ")) {
+          const qNoSpaces = q.replace(/\s+/g, "");
+          if (qNoSpaces && qNoSpaces !== q) candidates.push(qNoSpaces);
+        }
 
         let slugs = [];
         if (index && index.aliasToSlug) {
-          const exactSlug = index.aliasToSlug[q];
-          if (exactSlug) slugs = [exactSlug];
+          for (const cand of candidates) {
+            const exactSlug = index.aliasToSlug[cand];
+            if (exactSlug) {
+              slugs = [exactSlug];
+              break;
+            }
+          }
 
           if (!slugs.length && stopKeyToSlugs) {
-            const stopKey = stripStopwords(q);
-            const set = stopKeyToSlugs.get(stopKey);
-            if (set && set.size === 1) slugs = [Array.from(set)[0]];
+            for (const cand of candidates) {
+              const stopKey = stripStopwords(cand);
+              const set = stopKeyToSlugs.get(stopKey);
+              if (set && set.size === 1) {
+                slugs = [Array.from(set)[0]];
+                break;
+              }
+            }
           }
         }
 
-        if (!slugs.length) slugs = bestFuzzySlugs(q, 10);
+        if (!slugs.length) {
+          for (const cand of candidates) {
+            slugs = bestFuzzySlugs(cand, 10);
+            if (slugs.length) break;
+          }
+        }
 
         if (slugs.length) {
           const slugSet = new Set(slugs);
@@ -389,9 +414,7 @@
 
           const shown = showAll ? ordered.length : Math.min(TOP_N, ordered.length);
 
-          for (let i = 0; i < ordered.length; i++) {
-            ordered[i].style.display = i < shown ? "" : "none";
-          }
+          for (let i = 0; i < ordered.length; i++) ordered[i].style.display = i < shown ? "" : "none";
           for (const c of remaining) c.style.display = "none";
 
           setStatus(ordered.length, shown, q, "fuzzy");
@@ -399,7 +422,6 @@
           return;
         }
 
-        // No matches
         reorderCards(originalOrder);
         for (const c of cards) c.style.display = "none";
         setStatus(0, 0, q, "direct");
@@ -407,9 +429,6 @@
         return;
       }
 
-      // -----------------------------------------------------------
-      // No query - restore original order + Top 10
-      // -----------------------------------------------------------
       reorderCards(originalOrder);
 
       const shown = showAll ? total : Math.min(TOP_N, total);
@@ -462,7 +481,6 @@
       }
     }
 
-    // Record recents on click
     list.addEventListener("click", (e) => {
       const a = e.target.closest("a[data-recent]");
       if (!a) return;
@@ -472,7 +490,6 @@
       if (m && m[1]) addRecent(m[1]);
     });
 
-    // Toggle show all / show top N (works for both "no query" and "query present")
     if (toggleBtn) {
       toggleBtn.addEventListener("click", () => {
         showAll = !showAll;
@@ -480,13 +497,10 @@
       });
     }
 
-    // Optional: support ?q= prefill
     try {
       const url = new URL(window.location.href);
       const qParam = url.searchParams.get("q");
-      if (qParam) {
-        input.value = qParam;
-      }
+      if (qParam) input.value = qParam;
     } catch (e) {}
 
     input.addEventListener(
@@ -510,28 +524,15 @@
     renderRecents();
   }
 
-  // =============================================================================
-  // Detail page behavior (store recent on load)
-  // =============================================================================
-
   function initDetailPage() {
     const path = window.location.pathname || "";
     const m = path.match(/^\/pasta\/([^\/]+)\/?$/);
     if (m && m[1]) addRecent(m[1]);
   }
 
-  // =============================================================================
-  // Identify page behavior
-  // =============================================================================
-
   function initIdentifyPage() {
-    // No changes here for this fix.
-    // (Kept exactly as-is to avoid regressions.)
+    // unchanged
   }
-
-  // =============================================================================
-  // Init
-  // =============================================================================
 
   document.addEventListener(
     "DOMContentLoaded",
