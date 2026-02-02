@@ -4,18 +4,6 @@ layout: layout.njk
 description: "Identify a pasta shape by answering a few quick questions. Search-first design, mobile-friendly."
 ---
 
-{% set typeLabels = {
-  "strand": "Strand",
-  "tube": "Tube",
-  "ribbon": "Ribbon",
-  "sheet": "Sheet",
-  "short": "Short cut",
-  "stuffed": "Stuffed",
-  "soup": "Soup / pastina",
-  "ring": "Ring / wheel",
-  "dumpling": "Dumpling / pasta-like"
-} %}
-
 {% set identifyData = [] %}
 {% for item in pasta %}
   {% set thumb = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") %}
@@ -42,18 +30,64 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
   <p class="muted">Answer one question at a time. You can always tap “Not sure.”</p>
 </header>
 
+{# Minimal styling to make option cards + results resemble search results.
+   If your global CSS already covers these classes, you can delete this <style> block later. #}
+<style>
+  .identify .identify-card { display: block; }
+  .identify .identify-question { margin-bottom: 12px; }
+  .identify .identify-kicker { margin: 0 0 6px; }
+  .identify .identify-title { margin: 0 0 6px; }
+  .identify .identify-help { margin: 0 0 10px; }
+
+  .identify .identify-answers { display: grid; gap: 10px; }
+  @media (min-width: 720px) {
+    .identify .identify-answers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  .identify .option-card {
+    width: 100%;
+    text-align: left;
+    border: 1px solid rgba(0,0,0,0.12);
+    border-radius: 12px;
+    padding: 10px;
+    background: #fff;
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 10px;
+    align-items: center;
+    cursor: pointer;
+  }
+  .identify .option-card:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+  .identify .option-thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    object-fit: contain;
+    background: rgba(0,0,0,0.03);
+  }
+  .identify .option-name { font-weight: 650; line-height: 1.1; margin: 0; }
+  .identify .option-desc { margin: 4px 0 0; font-size: 0.95rem; line-height: 1.25; opacity: 0.75; }
+
+  .identify .identify-meta { margin-top: 10px; }
+
+  .identify .identify-results { margin-top: 14px; }
+  .identify .results-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+  .identify .results-list { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 10px; }
+  .identify .result-item { border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; background: #fff; }
+  .identify .result-link { display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: center; padding: 10px; text-decoration: none; color: inherit; }
+  .identify .result-link:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
+  .identify .result-thumb { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: rgba(0,0,0,0.03); }
+  .identify .result-name { font-weight: 650; }
+
+  .identify .identify-bottom-bar { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
+</style>
+
 <section id="identify-app" class="identify">
   <div class="card identify-card">
-    <div class="identify-header">
-      <div class="identify-illustration" aria-hidden="true" id="identify-illustration">
-        <span class="muted">Image placeholder</span>
-      </div>
-
-      <div class="identify-question">
-        <p class="identify-kicker muted" id="identify-kicker">Question</p>
-        <h2 class="identify-title" id="identify-title">Loading…</h2>
-        <p class="identify-help muted" id="identify-help"></p>
-      </div>
+    <div class="identify-question">
+      <p class="identify-kicker muted" id="identify-kicker">Question</p>
+      <h2 class="identify-title" id="identify-title">Loading…</h2>
+      <p class="identify-help muted" id="identify-help"></p>
     </div>
 
     <div class="identify-answers" id="identify-answers" aria-live="polite"></div>
@@ -74,7 +108,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
   <div class="identify-bottom-bar" role="navigation" aria-label="Identify controls">
     <button class="btn secondary" type="button" id="identify-back" disabled>Back</button>
     <button class="btn secondary" type="button" id="identify-reset">Reset</button>
-    <button class="btn" type="button" id="identify-view">View matches</button>
+    <button class="btn" type="button" id="identify-toggle-results" hidden>Show all</button>
   </div>
 </section>
 
@@ -84,7 +118,6 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
 
 <script>
 (function () {
-  // Guard - avoid double init if you later re-add external identify JS
   if (window.__pastaIdentifyInit) return;
   window.__pastaIdentifyInit = true;
 
@@ -102,8 +135,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     resultsList: $("#identify-results-list"),
     btnBack: $("#identify-back"),
     btnReset: $("#identify-reset"),
-    btnView: $("#identify-view"),
-    illustration: $("#identify-illustration"),
+    btnToggleResults: $("#identify-toggle-results"),
     dataScript: $("#identify-data"),
   };
 
@@ -119,7 +151,6 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     return;
   }
 
-  // Labels (keep in sync with the Nunjucks mapping above)
   const TYPE_LABELS = {
     strand: "Strand",
     tube: "Tube",
@@ -132,6 +163,18 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     dumpling: "Dumpling / pasta-like",
   };
 
+  const TYPE_DESCS = {
+    strand: "Long, thin noodles (round or slightly flattened).",
+    tube: "Hollow pasta designed to hold sauce inside.",
+    ribbon: "Long, flat strips like fettuccine-style cuts.",
+    sheet: "Sheets used for layering or cutting (lasagna-style).",
+    short: "Short shapes that scoop, trap, or cling to sauce.",
+    stuffed: "Filled pasta (pockets, pillows, or sealed edges).",
+    soup: "Tiny pasta made for spoons and brothy soups.",
+    ring: "Rings and wheels that catch sauce in openings.",
+    dumpling: "Pasta-like dumplings (often irregular or rustic).",
+  };
+
   const QUESTION_DEFS = [
     {
       key: "type",
@@ -139,44 +182,58 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
       help: "Start broad - this narrows the list quickly.",
       kind: "enum",
       label: (v) => TYPE_LABELS[v] || v,
+      desc: (v) => TYPE_DESCS[v] || "",
+      icon: (v) => `/img/identify/${v}.png`,
     },
     {
       key: "stuffed",
       title: "Is it stuffed?",
       help: "Stuffed pasta includes filled shapes like ravioli-type forms.",
       kind: "bool",
+      descYes: "There’s a filling inside (cheese, meat, etc.).",
+      descNo: "No filling - it’s just pasta dough.",
     },
     {
       key: "hollow",
       title: "Is it hollow?",
       help: "Hollow pasta has a visible tube or cavity.",
       kind: "bool",
+      descYes: "You can see a tube or opening through the shape.",
+      descNo: "Solid pasta - no tube or cavity.",
     },
     {
       key: "ridged",
       title: "Does it have ridges?",
       help: "Ridges (rigate) help grip sauce.",
       kind: "bool",
+      descYes: "Noticeable grooves or ridges on the surface.",
+      descNo: "Mostly smooth surface.",
     },
     {
       key: "twisted",
       title: "Is it twisted?",
       help: "Twisted shapes include spirals and corkscrews.",
       kind: "bool",
+      descYes: "Spiraled or corkscrew-like geometry.",
+      descNo: "Not spiraled or twisted.",
     },
     {
       key: "curved",
       title: "Is it curved?",
       help: "Curved shapes include elbows, crescents, and arcs.",
       kind: "bool",
+      descYes: "Bent or arced rather than straight.",
+      descNo: "Mostly straight (or not defined by a curve).",
     },
     {
       key: "size",
       title: "What size class is it?",
-      help: "Size is best used later, after shape features.",
+      help: "Use size once you’ve narrowed the shape family.",
       kind: "enum",
       label: (v) => v,
-      deferUntilCountLTE: 25, // preference: keep size last if > 25 matches remain
+      desc: (v) => `Choose this if the pasta feels like “${v}”.`,
+      icon: (v) => `/img/identify/size.png`,
+      deferUntilCountLTE: 25,
     },
   ];
 
@@ -206,24 +263,24 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
   const state = {
     all: normalized,
     candidates: normalized.slice(),
-    answers: {},     // key -> selected value (or null for "not sure")
-    history: [],     // snapshots for Back
+    answers: {},
+    history: [],
     currentKey: null,
-    resultsOpen: false,
+    showAllResults: false, // Top 10 by default
   };
 
   const snapshot = () => ({
     candidates: state.candidates.slice(),
     answers: { ...state.answers },
     currentKey: state.currentKey,
-    resultsOpen: state.resultsOpen,
+    showAllResults: state.showAllResults,
   });
 
   const restore = (snap) => {
     state.candidates = snap.candidates.slice();
     state.answers = { ...snap.answers };
     state.currentKey = snap.currentKey;
-    state.resultsOpen = snap.resultsOpen;
+    state.showAllResults = snap.showAllResults;
   };
 
   function uniqueValues(key, items) {
@@ -236,8 +293,6 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
   }
 
   function scoreQuestion(key, items) {
-    // Prefer questions that split the remaining set well (Gini impurity),
-    // and penalize heavy blankness.
     const total = items.length || 1;
     const counts = new Map();
     let blanks = 0;
@@ -245,10 +300,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     for (const it of items) {
       const v = (it[key] ?? "");
       const s = String(v).trim();
-      if (!s) {
-        blanks += 1;
-        continue;
-      }
+      if (!s) { blanks += 1; continue; }
       counts.set(s, (counts.get(s) || 0) + 1);
     }
 
@@ -261,31 +313,25 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
       gini -= p * p;
     }
 
-    const blankPenalty = blanks / total; // 0..1
+    const blankPenalty = blanks / total;
     return gini - (0.35 * blankPenalty);
   }
 
   function nextQuestionKey() {
-    // Always ask type first if not answered
     if (state.answers.type === undefined) return "type";
 
     const remaining = state.candidates.length;
 
-    // Eligible questions not answered yet
     const eligible = QUESTION_DEFS
       .filter((q) => q.key !== "type")
       .filter((q) => state.answers[q.key] === undefined)
       .filter((q) => {
-        if (q.key === "size" && q.deferUntilCountLTE && remaining > q.deferUntilCountLTE) {
-          return false;
-        }
-        // Must have at least 2 different non-blank values to be useful
+        if (q.key === "size" && q.deferUntilCountLTE && remaining > q.deferUntilCountLTE) return false;
         const vals = uniqueValues(q.key, state.candidates);
         return vals.length >= 2;
       });
 
     if (!eligible.length) {
-      // If nothing left, allow size even if it doesn't split well, or stop.
       if (state.answers.size === undefined) {
         const vals = uniqueValues("size", state.candidates);
         if (vals.length >= 2) return "size";
@@ -293,15 +339,11 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
       return null;
     }
 
-    // Choose best scoring split
     let best = eligible[0];
     let bestScore = -999;
     for (const q of eligible) {
       const s = scoreQuestion(q.key, state.candidates);
-      if (s > bestScore) {
-        bestScore = s;
-        best = q;
-      }
+      if (s > bestScore) { bestScore = s; best = q; }
     }
     return best.key;
   }
@@ -310,49 +352,73 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     return QUESTION_DEFS.find((q) => q.key === key) || null;
   }
 
-  function buildOptions(q, items) {
+  function optionMeta(q, value) {
+    const notSure = value === "__ns__";
+    if (notSure) {
+      return {
+        icon: "/img/identify/not-sure.png",
+        name: "Not sure",
+        desc: "Skip this question and keep narrowing with the next best one.",
+      };
+    }
+
     if (q.kind === "bool") {
-      return [
-        { value: "yes", label: "Yes" },
-        { value: "no", label: "No" },
-        { value: "__ns__", label: "Not sure" },
-      ];
+      const yes = value === "yes";
+      return {
+        icon: yes ? "/img/identify/yes.png" : "/img/identify/no.png",
+        name: yes ? "Yes" : "No",
+        desc: yes ? (q.descYes || "") : (q.descNo || ""),
+      };
     }
 
     // enum
+    const label = q.label ? q.label(value) : String(value);
+    const desc = q.desc ? q.desc(value) : "";
+    const icon = q.icon ? q.icon(value) : "/img/identify/option.png";
+    return { icon, name: label, desc };
+  }
+
+  function buildOptions(q, items) {
+    if (q.kind === "bool") {
+      return [
+        { value: "yes" },
+        { value: "no" },
+        { value: "__ns__" },
+      ];
+    }
+
     const vals = uniqueValues(q.key, items);
 
-    // Keep Type ordering stable
     if (q.key === "type") {
       const preferredOrder = ["strand","tube","ribbon","sheet","short","stuffed","soup","ring","dumpling"];
-      const sorted = vals.sort((a,b) => preferredOrder.indexOf(a) - preferredOrder.indexOf(b));
-      return sorted.map((v) => ({ value: v, label: q.label ? q.label(v) : v })).concat([{ value: "__ns__", label: "Not sure" }]);
+      vals.sort((a,b) => preferredOrder.indexOf(a) - preferredOrder.indexOf(b));
+      return vals.map((v) => ({ value: v })).concat([{ value: "__ns__" }]);
     }
 
-    // Size ordering (if it matches common buckets)
     if (q.key === "size") {
       const order = ["Pastina","Tiny","Small","Medium","Large","Extra large","Jumbo"];
-      const sorted = vals.sort((a,b) => order.indexOf(a) - order.indexOf(b));
-      return sorted.map((v) => ({ value: v, label: q.label ? q.label(v) : v })).concat([{ value: "__ns__", label: "Not sure" }]);
+      vals.sort((a,b) => order.indexOf(a) - order.indexOf(b));
+      return vals.map((v) => ({ value: v })).concat([{ value: "__ns__" }]);
     }
 
-    // Default: alpha-ish, then Not sure
     vals.sort((a,b) => String(a).localeCompare(String(b)));
-    return vals.map((v) => ({ value: v, label: q.label ? q.label(v) : v })).concat([{ value: "__ns__", label: "Not sure" }]);
+    return vals.map((v) => ({ value: v })).concat([{ value: "__ns__" }]);
   }
 
   function applyAnswer(key, value) {
     state.history.push(snapshot());
 
+    const q = getQuestionDef(key);
+
     if (value === "__ns__") {
-      state.answers[key] = null; // explicitly skipped
+      state.answers[key] = null;
       // candidates unchanged
     } else {
       state.answers[key] = value;
 
       if (key === "type") {
         state.candidates = state.candidates.filter((p) => p.type === value);
-      } else if (getQuestionDef(key)?.kind === "bool") {
+      } else if (q && q.kind === "bool") {
         state.candidates = state.candidates.filter((p) => p[key] === value);
       } else {
         state.candidates = state.candidates.filter((p) => String(p[key] || "") === String(value));
@@ -360,6 +426,10 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     }
 
     state.currentKey = nextQuestionKey();
+
+    // If we meaningfully narrowed (vs Not sure), default to top 10 view
+    if (state.candidates.length < state.all.length) state.showAllResults = false;
+
     render();
   }
 
@@ -368,7 +438,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     state.answers = {};
     state.history = [];
     state.currentKey = nextQuestionKey();
-    state.resultsOpen = false;
+    state.showAllResults = false;
     render();
   }
 
@@ -384,11 +454,36 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     const options = buildOptions(q, state.candidates);
 
     for (const opt of options) {
+      const meta = optionMeta(q, opt.value);
+
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.className = "btn secondary";
-      btn.textContent = opt.label;
+      btn.className = "option-card";
       btn.addEventListener("click", () => applyAnswer(q.key, opt.value));
+
+      const img = document.createElement("img");
+      img.className = "option-thumb";
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.alt = "";
+      img.src = meta.icon;
+
+      const wrap = document.createElement("div");
+
+      const name = document.createElement("p");
+      name.className = "option-name";
+      name.textContent = meta.name;
+
+      const desc = document.createElement("p");
+      desc.className = "option-desc";
+      desc.textContent = meta.desc;
+
+      wrap.appendChild(name);
+      wrap.appendChild(desc);
+
+      btn.appendChild(img);
+      btn.appendChild(wrap);
+
       els.answers.appendChild(btn);
     }
   }
@@ -398,14 +493,19 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     els.count.textContent = (n === 1) ? "1 possible match" : `${n} possible matches`;
   }
 
-  function renderResults() {
-    const n = state.candidates.length;
-    els.resultsCount.textContent = (n === 1) ? "1 match" : `${n} matches`;
-    els.resultsList.innerHTML = "";
+  function shouldShowResults() {
+    // Show results automatically once we’ve actually narrowed from the initial full set
+    return state.candidates.length < state.all.length;
+  }
 
-    // Limit initial render for huge sets to keep things snappy
-    const max = 200;
-    const list = state.candidates.slice(0, max);
+  function renderResults() {
+    const total = state.candidates.length;
+    const limit = state.showAllResults ? total : 10;
+    const list = state.candidates.slice(0, limit);
+
+    els.resultsCount.textContent = (total === 1) ? "1 match" : `${total} matches`;
+
+    els.resultsList.innerHTML = "";
 
     for (const p of list) {
       const li = document.createElement("li");
@@ -415,7 +515,6 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
       a.href = `/pasta/${p.slug}/`;
       a.className = "result-link";
 
-      // Thumb (optional)
       if (p.thumb) {
         const img = document.createElement("img");
         img.loading = "lazy";
@@ -424,6 +523,11 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
         img.className = "result-thumb";
         img.src = p.thumb;
         a.appendChild(img);
+      } else {
+        // keep layout stable even without thumbs
+        const ph = document.createElement("div");
+        ph.className = "result-thumb";
+        a.appendChild(ph);
       }
 
       const name = document.createElement("span");
@@ -435,11 +539,18 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
       els.resultsList.appendChild(li);
     }
 
-    if (state.candidates.length > max) {
-      const li = document.createElement("li");
-      li.className = "result-item muted";
-      li.textContent = `Showing first ${max}. Narrow further to see fewer.`;
-      els.resultsList.appendChild(li);
+    // Toggle control text
+    if (total > 10) {
+      els.btnToggleResults.hidden = false;
+
+      if (state.showAllResults) {
+        els.btnToggleResults.textContent = "Show top 10";
+      } else {
+        const more = total - 10;
+        els.btnToggleResults.textContent = `Show all ${total} matches (${more} more)`;
+      }
+    } else {
+      els.btnToggleResults.hidden = true;
     }
   }
 
@@ -451,7 +562,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     if (!state.currentKey) {
       els.kicker.textContent = "Done";
       els.title.textContent = "Review your matches";
-      els.help.textContent = "Use View matches, or hit Reset to start over.";
+      els.help.textContent = "If you still have too many, use Back and pick a different answer.";
       els.answers.innerHTML = "";
       renderCount();
     } else {
@@ -463,18 +574,18 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
       renderCount();
     }
 
-    // Results visibility
-    els.resultsCard.hidden = !state.resultsOpen;
-    els.btnView.textContent = state.resultsOpen ? "Hide matches" : "View matches";
+    // Results - auto show once narrowed
+    const show = shouldShowResults();
+    els.resultsCard.hidden = !show;
 
-    if (state.resultsOpen) renderResults();
+    if (show) renderResults();
   }
 
   // Events
   els.btnReset.addEventListener("click", resetAll);
   els.btnBack.addEventListener("click", goBack);
-  els.btnView.addEventListener("click", () => {
-    state.resultsOpen = !state.resultsOpen;
+  els.btnToggleResults.addEventListener("click", () => {
+    state.showAllResults = !state.showAllResults;
     render();
   });
 
