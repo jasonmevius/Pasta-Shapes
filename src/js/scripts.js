@@ -35,6 +35,7 @@
     const status = $("#pasta-search-status");
     const list = $("#pasta-results");
 
+    // Only run on the search page
     if (!input || !status || !list) return;
 
     const cards = Array.from(list.querySelectorAll("[data-search]"));
@@ -44,13 +45,13 @@
     const recentList = $("#recently-viewed");
 
     const note = $("#pasta-results-note");
-    const toggleBtn = $("#pasta-toggle-all");
+    const nextBtn = $("#pasta-toggle-all"); // reuse existing button - now "Next 10"
 
-    const TOP_N = 10;
-    let showAll = false;
+    const PAGE_N = 10; // reveal size
+    let visibleLimit = PAGE_N;
 
     // -----------------------------------------------------------------------------
-    // Normalization
+    // Normalization (match what we do in pasta-search.js / pastaIndex.js)
     // -----------------------------------------------------------------------------
     const STOPWORDS = new Set([
       "a",
@@ -100,7 +101,12 @@
     // Collapses spaced-letter inputs like "p e n n e" -> "penne"
     function normalizeQuery(s) {
       const q = normalize(s);
-      if (/^(?:[a-z0-9]\s+){2,}[a-z0-9]$/.test(q)) return q.replace(/\s+/g, "");
+
+      // spaced letters (IME/voice/assistive input)
+      if (/^(?:[a-z0-9]\s+){2,}[a-z0-9]$/.test(q)) {
+        return q.replace(/\s+/g, "");
+      }
+
       return q;
     }
 
@@ -114,12 +120,12 @@
     }
 
     // -----------------------------------------------------------------------------
-    // Fuzzy index
+    // Optional fuzzy support for the "Results" list using /api/pasta-index.json
     // -----------------------------------------------------------------------------
     let indexLoaded = false;
-    let index = null;
-    let aliasKeys = null;
-    let stopKeyToSlugs = null;
+    let index = null; // { aliasToSlug, entries }
+    let aliasKeys = null; // normalized alias keys
+    let stopKeyToSlugs = null; // stopword-stripped key -> Set(slugs)
     const cardBySlug = new Map(cards.map((c) => [c.getAttribute("data-slug"), c]));
 
     async function loadIndexIfNeeded() {
@@ -152,6 +158,7 @@
       return index;
     }
 
+    // Levenshtein distance with early exit (bounded)
     function levenshtein(a, b, maxDist) {
       if (a === b) return 0;
       if (!a || !b) return Math.max(a.length, b.length);
@@ -168,6 +175,7 @@
 
       for (let i = 1; i <= al; i++) {
         cur[0] = i;
+
         let rowMin = cur[0];
         const ai = a.charCodeAt(i - 1);
 
@@ -217,7 +225,7 @@
     }
 
     // -----------------------------------------------------------------------------
-    // Ranking
+    // Ranking + ordering for direct matches
     // -----------------------------------------------------------------------------
     function cardNameNorm(card) {
       const el = card.querySelector(".result-name");
@@ -237,6 +245,7 @@
       const slug = cardSlugNorm(card);
       const blob = cardBlobNorm(card);
 
+      // Ranking buckets - lower is better
       let bucket = 50;
 
       if (name && name.startsWith(q)) bucket = 0;
@@ -246,6 +255,7 @@
       else if (name && name.includes(q)) bucket = 4;
       else if (blob && blob.includes(q)) bucket = 5;
 
+      // Earlier position is better for "includes"
       let pos = 9999;
       if (bucket <= 3) pos = 0;
       else if (bucket === 4) pos = name.indexOf(q);
@@ -276,29 +286,32 @@
       status.textContent = `${shownCount} of ${matchCount} matches`;
     }
 
-    function setNoteAndToggle({ q, matchCount, shownCount }) {
-      if (!note || !toggleBtn) return;
+    function setNoteAndNext({ matchCount, shownCount }) {
+      if (!note || !nextBtn) return;
 
-      if (matchCount <= TOP_N) {
+      if (matchCount <= PAGE_N) {
         note.textContent = `Showing ${shownCount} of ${matchCount}`;
-        toggleBtn.hidden = true;
+        nextBtn.hidden = true;
         return;
       }
 
-      if (!showAll) {
-        const remaining = matchCount - shownCount;
-        note.textContent = `Showing ${shownCount} of ${matchCount} - ${remaining} more`;
-        toggleBtn.textContent = `Show all (${remaining} more)`;
-        toggleBtn.hidden = false;
-        return;
-      }
+      const remaining = Math.max(0, matchCount - shownCount);
 
-      note.textContent = `Showing ${shownCount} of ${matchCount}`;
-      toggleBtn.textContent = `Show top ${TOP_N}`;
-      toggleBtn.hidden = false;
+      note.textContent = remaining
+        ? `Showing ${shownCount} of ${matchCount} - ${remaining} more`
+        : `Showing ${shownCount} of ${matchCount}`;
+
+      if (remaining > 0) {
+        const nextChunk = Math.min(PAGE_N, remaining);
+        // Button acts as a link-like progressive reveal.
+        nextBtn.textContent = `Next ${nextChunk} (${remaining} more)`;
+        nextBtn.hidden = false;
+      } else {
+        nextBtn.hidden = true;
+      }
     }
 
-    function directMatchesForQuery(q) {
+    function directMatchSets(q) {
       const matched = [];
       const nonMatched = [];
 
@@ -316,20 +329,25 @@
       const q = normalizeQuery(raw);
       const total = cards.length;
 
-      if (!q) showAll = false;
+      // When query changes, reset progressive reveal
+      // (we also reset when query clears below)
+      // NOTE: this is handled in input event by resetting visibleLimit
 
+      // -----------------------------------------------------------
+      // Query present - ranked, progressively revealed
+      // -----------------------------------------------------------
       if (q) {
-        // 1) Direct match using query as typed/normalized
-        let { matched, nonMatched } = directMatchesForQuery(q);
+        // Direct matches
+        let { matched, nonMatched } = directMatchSets(q);
 
-        // 1b) If no direct matches and query contains spaces, retry ignoring spaces
-        // This fixes "spa ghe" -> "spaghe" style inputs, without breaking legit multi-word queries
+        // If no direct matches and query contains spaces, retry ignoring spaces.
+        // This fixes "spa ghe" -> "spaghe", without breaking legit multi-word queries
         // because we only do it when the spaced version yields 0 matches.
         let qUsed = q;
         if (!matched.length && q.includes(" ")) {
           const qNoSpaces = q.replace(/\s+/g, "");
           if (qNoSpaces && qNoSpaces !== q) {
-            const retry = directMatchesForQuery(qNoSpaces);
+            const retry = directMatchSets(qNoSpaces);
             if (retry.matched.length) {
               matched = retry.matched;
               nonMatched = retry.nonMatched;
@@ -351,21 +369,24 @@
 
           reorderCards(ranked.concat(nonMatched));
 
-          const shown = showAll ? matched.length : Math.min(TOP_N, matched.length);
+          const shown = Math.min(visibleLimit, matched.length);
 
-          for (let i = 0; i < ranked.length; i++) ranked[i].style.display = i < shown ? "" : "none";
+          for (let i = 0; i < ranked.length; i++) {
+            ranked[i].style.display = i < shown ? "" : "none";
+          }
           for (const c of nonMatched) c.style.display = "none";
 
           setStatus(matched.length, shown, qUsed, "direct");
-          setNoteAndToggle({ q: qUsed, matchCount: matched.length, shownCount: shown });
+          setNoteAndNext({ matchCount: matched.length, shownCount: shown });
           return;
         }
 
-        // Fuzzy fallback (use the normalized query, but also try a no-spaces version if applicable)
+        // -----------------------------------------------------------
+        // Fuzzy fallback
+        // -----------------------------------------------------------
         await loadIndexIfNeeded();
 
-        const candidates = [];
-        candidates.push(q);
+        const candidates = [q];
         if (q.includes(" ")) {
           const qNoSpaces = q.replace(/\s+/g, "");
           if (qNoSpaces && qNoSpaces !== q) candidates.push(qNoSpaces);
@@ -395,7 +416,7 @@
 
         if (!slugs.length) {
           for (const cand of candidates) {
-            slugs = bestFuzzySlugs(cand, 10);
+            slugs = bestFuzzySlugs(cand, 50); // allow more so Next 10 is meaningful
             if (slugs.length) break;
           }
         }
@@ -412,33 +433,39 @@
           const remaining = originalOrder.filter((c) => !slugSet.has(c.getAttribute("data-slug")));
           reorderCards(ordered.concat(remaining));
 
-          const shown = showAll ? ordered.length : Math.min(TOP_N, ordered.length);
+          const shown = Math.min(visibleLimit, ordered.length);
 
-          for (let i = 0; i < ordered.length; i++) ordered[i].style.display = i < shown ? "" : "none";
+          for (let i = 0; i < ordered.length; i++) {
+            ordered[i].style.display = i < shown ? "" : "none";
+          }
           for (const c of remaining) c.style.display = "none";
 
           setStatus(ordered.length, shown, q, "fuzzy");
-          setNoteAndToggle({ q, matchCount: ordered.length, shownCount: shown });
+          setNoteAndNext({ matchCount: ordered.length, shownCount: shown });
           return;
         }
 
+        // No matches
         reorderCards(originalOrder);
         for (const c of cards) c.style.display = "none";
         setStatus(0, 0, q, "direct");
-        setNoteAndToggle({ q, matchCount: 0, shownCount: 0 });
+        setNoteAndNext({ matchCount: 0, shownCount: 0 });
         return;
       }
 
+      // -----------------------------------------------------------
+      // No query - restore original order + progressive reveal
+      // -----------------------------------------------------------
       reorderCards(originalOrder);
 
-      const shown = showAll ? total : Math.min(TOP_N, total);
+      const shown = Math.min(visibleLimit, total);
 
       for (let i = 0; i < originalOrder.length; i++) {
         originalOrder[i].style.display = i < shown ? "" : "none";
       }
 
       setStatus(total, shown, q, "direct");
-      setNoteAndToggle({ q, matchCount: total, shownCount: shown });
+      setNoteAndNext({ matchCount: total, shownCount: shown });
     }
 
     function renderRecents() {
@@ -481,6 +508,7 @@
       }
     }
 
+    // Record recents on click
     list.addEventListener("click", (e) => {
       const a = e.target.closest("a[data-recent]");
       if (!a) return;
@@ -490,13 +518,16 @@
       if (m && m[1]) addRecent(m[1]);
     });
 
-    if (toggleBtn) {
-      toggleBtn.addEventListener("click", () => {
-        showAll = !showAll;
+    // Next 10 behavior
+    if (nextBtn) {
+      nextBtn.addEventListener("click", (e) => {
+        e.preventDefault?.();
+        visibleLimit += PAGE_N;
         filter();
       });
     }
 
+    // Optional: support ?q= prefill
     try {
       const url = new URL(window.location.href);
       const qParam = url.searchParams.get("q");
@@ -506,7 +537,8 @@
     input.addEventListener(
       "input",
       () => {
-        if (!normalizeQuery(input.value)) showAll = false;
+        // On every new query, reset to Top 10
+        visibleLimit = PAGE_N;
         filter();
       },
       { passive: true }
@@ -520,9 +552,15 @@
       { once: true, passive: true }
     );
 
+    // Initial render
+    visibleLimit = PAGE_N;
     filter();
     renderRecents();
   }
+
+  // =============================================================================
+  // Detail page behavior (store recent on load)
+  // =============================================================================
 
   function initDetailPage() {
     const path = window.location.pathname || "";
@@ -530,9 +568,18 @@
     if (m && m[1]) addRecent(m[1]);
   }
 
+  // =============================================================================
+  // Identify page behavior
+  // =============================================================================
+
   function initIdentifyPage() {
-    // unchanged
+    // No changes required for this update.
+    // (Identify page logic lives elsewhere or is handled in its own script.)
   }
+
+  // =============================================================================
+  // Init
+  // =============================================================================
 
   document.addEventListener(
     "DOMContentLoaded",
