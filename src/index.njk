@@ -17,7 +17,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 } %}
 
 {% macro autoDescriptor(item) %}
-  {# Nunjucks-safe - no arrays/push #}
   {% set first = true %}
 
   {% if item.SizeClass and item.SizeClass != "unknown" %}
@@ -67,7 +66,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 </section>
 
 <section class="card stack" aria-label="Search pasta shapes">
-  {# These IDs are required by pasta-search.js #}
   <form id="pasta-search-form" class="search" action="/" method="get" autocomplete="off">
     <label class="sr-only" for="pasta-q">Search</label>
     <input
@@ -82,7 +80,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
     />
 
     <p id="pasta-search-status" class="muted" aria-live="polite"></p>
-
     <ul id="pasta-search-suggestions" class="suggestions" aria-label="Search suggestions"></ul>
   </form>
 
@@ -90,11 +87,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
     <div class="results-head">
       <h2 class="h2">Results</h2>
       <p class="muted">Loaded {{ pasta.length }} shapes.</p>
-    </div>
-
-    <div class="results-tools">
-      <p class="muted results-note" id="pasta-results-note" aria-live="polite"></p>
-      <button class="btn secondary btn-small" type="button" id="pasta-toggle-all" hidden></button>
     </div>
 
     <div id="recently-viewed-wrap" class="recent-wrap" hidden>
@@ -142,5 +134,11 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         </li>
       {% endfor %}
     </ul>
+
+    {# Move "more results" controls BELOW the list for mobile friendliness #}
+    <div class="results-tools">
+      <p class="muted results-note" id="pasta-results-note" aria-live="polite"></p>
+      <button class="btn secondary btn-small" type="button" id="pasta-toggle-all" hidden></button>
+    </div>
   </div>
 </section>
