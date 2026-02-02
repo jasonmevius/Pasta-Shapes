@@ -45,7 +45,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
 <section id="identify-app" class="identify">
   <div class="card identify-card">
     <div class="identify-header">
-      <div class="identify-illustration" aria-hidden="true">
+      <div class="identify-illustration" aria-hidden="true" id="identify-illustration">
         <span class="muted">Image placeholder</span>
       </div>
 
@@ -80,4 +80,406 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
 
 <script type="application/json" id="identify-data">
 {{ identifyData | dump | safe }}
+</script>
+
+<script>
+(function () {
+  // Guard - avoid double init if you later re-add external identify JS
+  if (window.__pastaIdentifyInit) return;
+  window.__pastaIdentifyInit = true;
+
+  const $ = (sel, root = document) => root.querySelector(sel);
+
+  const els = {
+    app: $("#identify-app"),
+    title: $("#identify-title"),
+    kicker: $("#identify-kicker"),
+    help: $("#identify-help"),
+    answers: $("#identify-answers"),
+    count: $("#identify-count"),
+    resultsCard: $("#identify-results"),
+    resultsCount: $("#identify-results-count"),
+    resultsList: $("#identify-results-list"),
+    btnBack: $("#identify-back"),
+    btnReset: $("#identify-reset"),
+    btnView: $("#identify-view"),
+    illustration: $("#identify-illustration"),
+    dataScript: $("#identify-data"),
+  };
+
+  if (!els.app || !els.dataScript) return;
+
+  let raw = [];
+  try {
+    raw = JSON.parse(els.dataScript.textContent || "[]");
+  } catch (e) {
+    console.error("Identify: failed to parse identify-data JSON", e);
+    els.title.textContent = "Error loading data";
+    els.help.textContent = "Could not parse pasta data on this page.";
+    return;
+  }
+
+  // Labels (keep in sync with the Nunjucks mapping above)
+  const TYPE_LABELS = {
+    strand: "Strand",
+    tube: "Tube",
+    ribbon: "Ribbon",
+    sheet: "Sheet",
+    short: "Short cut",
+    stuffed: "Stuffed",
+    soup: "Soup / pastina",
+    ring: "Ring / wheel",
+    dumpling: "Dumpling / pasta-like",
+  };
+
+  const QUESTION_DEFS = [
+    {
+      key: "type",
+      title: "What general type is it?",
+      help: "Start broad - this narrows the list quickly.",
+      kind: "enum",
+      label: (v) => TYPE_LABELS[v] || v,
+    },
+    {
+      key: "stuffed",
+      title: "Is it stuffed?",
+      help: "Stuffed pasta includes filled shapes like ravioli-type forms.",
+      kind: "bool",
+    },
+    {
+      key: "hollow",
+      title: "Is it hollow?",
+      help: "Hollow pasta has a visible tube or cavity.",
+      kind: "bool",
+    },
+    {
+      key: "ridged",
+      title: "Does it have ridges?",
+      help: "Ridges (rigate) help grip sauce.",
+      kind: "bool",
+    },
+    {
+      key: "twisted",
+      title: "Is it twisted?",
+      help: "Twisted shapes include spirals and corkscrews.",
+      kind: "bool",
+    },
+    {
+      key: "curved",
+      title: "Is it curved?",
+      help: "Curved shapes include elbows, crescents, and arcs.",
+      kind: "bool",
+    },
+    {
+      key: "size",
+      title: "What size class is it?",
+      help: "Size is best used later, after shape features.",
+      kind: "enum",
+      label: (v) => v,
+      deferUntilCountLTE: 25, // preference: keep size last if > 25 matches remain
+    },
+  ];
+
+  const normBool = (v) => {
+    const s = String(v || "").trim().toLowerCase();
+    if (!s) return "";
+    if (s === "yes" || s === "y" || s === "true" || s === "1") return "yes";
+    if (s === "no" || s === "n" || s === "false" || s === "0") return "no";
+    return "";
+  };
+
+  const normEnum = (v) => String(v || "").trim().toLowerCase();
+
+  const normalized = raw.map((p) => ({
+    slug: p.slug,
+    name: p.name,
+    thumb: p.thumb || "",
+    type: normEnum(p.type),
+    size: String(p.size || "").trim(),
+    hollow: normBool(p.hollow),
+    ridged: normBool(p.ridged),
+    twisted: normBool(p.twisted),
+    curved: normBool(p.curved),
+    stuffed: normBool(p.stuffed),
+  }));
+
+  const state = {
+    all: normalized,
+    candidates: normalized.slice(),
+    answers: {},     // key -> selected value (or null for "not sure")
+    history: [],     // snapshots for Back
+    currentKey: null,
+    resultsOpen: false,
+  };
+
+  const snapshot = () => ({
+    candidates: state.candidates.slice(),
+    answers: { ...state.answers },
+    currentKey: state.currentKey,
+    resultsOpen: state.resultsOpen,
+  });
+
+  const restore = (snap) => {
+    state.candidates = snap.candidates.slice();
+    state.answers = { ...snap.answers };
+    state.currentKey = snap.currentKey;
+    state.resultsOpen = snap.resultsOpen;
+  };
+
+  function uniqueValues(key, items) {
+    const set = new Set();
+    for (const it of items) {
+      const v = it[key];
+      if (v !== undefined && v !== null && String(v).trim() !== "") set.add(String(v));
+    }
+    return Array.from(set);
+  }
+
+  function scoreQuestion(key, items) {
+    // Prefer questions that split the remaining set well (Gini impurity),
+    // and penalize heavy blankness.
+    const total = items.length || 1;
+    const counts = new Map();
+    let blanks = 0;
+
+    for (const it of items) {
+      const v = (it[key] ?? "");
+      const s = String(v).trim();
+      if (!s) {
+        blanks += 1;
+        continue;
+      }
+      counts.set(s, (counts.get(s) || 0) + 1);
+    }
+
+    const nonBlank = total - blanks;
+    if (nonBlank <= 1) return -1;
+
+    let gini = 1;
+    for (const c of counts.values()) {
+      const p = c / nonBlank;
+      gini -= p * p;
+    }
+
+    const blankPenalty = blanks / total; // 0..1
+    return gini - (0.35 * blankPenalty);
+  }
+
+  function nextQuestionKey() {
+    // Always ask type first if not answered
+    if (state.answers.type === undefined) return "type";
+
+    const remaining = state.candidates.length;
+
+    // Eligible questions not answered yet
+    const eligible = QUESTION_DEFS
+      .filter((q) => q.key !== "type")
+      .filter((q) => state.answers[q.key] === undefined)
+      .filter((q) => {
+        if (q.key === "size" && q.deferUntilCountLTE && remaining > q.deferUntilCountLTE) {
+          return false;
+        }
+        // Must have at least 2 different non-blank values to be useful
+        const vals = uniqueValues(q.key, state.candidates);
+        return vals.length >= 2;
+      });
+
+    if (!eligible.length) {
+      // If nothing left, allow size even if it doesn't split well, or stop.
+      if (state.answers.size === undefined) {
+        const vals = uniqueValues("size", state.candidates);
+        if (vals.length >= 2) return "size";
+      }
+      return null;
+    }
+
+    // Choose best scoring split
+    let best = eligible[0];
+    let bestScore = -999;
+    for (const q of eligible) {
+      const s = scoreQuestion(q.key, state.candidates);
+      if (s > bestScore) {
+        bestScore = s;
+        best = q;
+      }
+    }
+    return best.key;
+  }
+
+  function getQuestionDef(key) {
+    return QUESTION_DEFS.find((q) => q.key === key) || null;
+  }
+
+  function buildOptions(q, items) {
+    if (q.kind === "bool") {
+      return [
+        { value: "yes", label: "Yes" },
+        { value: "no", label: "No" },
+        { value: "__ns__", label: "Not sure" },
+      ];
+    }
+
+    // enum
+    const vals = uniqueValues(q.key, items);
+
+    // Keep Type ordering stable
+    if (q.key === "type") {
+      const preferredOrder = ["strand","tube","ribbon","sheet","short","stuffed","soup","ring","dumpling"];
+      const sorted = vals.sort((a,b) => preferredOrder.indexOf(a) - preferredOrder.indexOf(b));
+      return sorted.map((v) => ({ value: v, label: q.label ? q.label(v) : v })).concat([{ value: "__ns__", label: "Not sure" }]);
+    }
+
+    // Size ordering (if it matches common buckets)
+    if (q.key === "size") {
+      const order = ["Pastina","Tiny","Small","Medium","Large","Extra large","Jumbo"];
+      const sorted = vals.sort((a,b) => order.indexOf(a) - order.indexOf(b));
+      return sorted.map((v) => ({ value: v, label: q.label ? q.label(v) : v })).concat([{ value: "__ns__", label: "Not sure" }]);
+    }
+
+    // Default: alpha-ish, then Not sure
+    vals.sort((a,b) => String(a).localeCompare(String(b)));
+    return vals.map((v) => ({ value: v, label: q.label ? q.label(v) : v })).concat([{ value: "__ns__", label: "Not sure" }]);
+  }
+
+  function applyAnswer(key, value) {
+    state.history.push(snapshot());
+
+    if (value === "__ns__") {
+      state.answers[key] = null; // explicitly skipped
+      // candidates unchanged
+    } else {
+      state.answers[key] = value;
+
+      if (key === "type") {
+        state.candidates = state.candidates.filter((p) => p.type === value);
+      } else if (getQuestionDef(key)?.kind === "bool") {
+        state.candidates = state.candidates.filter((p) => p[key] === value);
+      } else {
+        state.candidates = state.candidates.filter((p) => String(p[key] || "") === String(value));
+      }
+    }
+
+    state.currentKey = nextQuestionKey();
+    render();
+  }
+
+  function resetAll() {
+    state.candidates = state.all.slice();
+    state.answers = {};
+    state.history = [];
+    state.currentKey = nextQuestionKey();
+    state.resultsOpen = false;
+    render();
+  }
+
+  function goBack() {
+    const prev = state.history.pop();
+    if (!prev) return;
+    restore(prev);
+    render();
+  }
+
+  function renderAnswers(q) {
+    els.answers.innerHTML = "";
+    const options = buildOptions(q, state.candidates);
+
+    for (const opt of options) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn secondary";
+      btn.textContent = opt.label;
+      btn.addEventListener("click", () => applyAnswer(q.key, opt.value));
+      els.answers.appendChild(btn);
+    }
+  }
+
+  function renderCount() {
+    const n = state.candidates.length;
+    els.count.textContent = (n === 1) ? "1 possible match" : `${n} possible matches`;
+  }
+
+  function renderResults() {
+    const n = state.candidates.length;
+    els.resultsCount.textContent = (n === 1) ? "1 match" : `${n} matches`;
+    els.resultsList.innerHTML = "";
+
+    // Limit initial render for huge sets to keep things snappy
+    const max = 200;
+    const list = state.candidates.slice(0, max);
+
+    for (const p of list) {
+      const li = document.createElement("li");
+      li.className = "result-item";
+
+      const a = document.createElement("a");
+      a.href = `/pasta/${p.slug}/`;
+      a.className = "result-link";
+
+      // Thumb (optional)
+      if (p.thumb) {
+        const img = document.createElement("img");
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.alt = "";
+        img.className = "result-thumb";
+        img.src = p.thumb;
+        a.appendChild(img);
+      }
+
+      const name = document.createElement("span");
+      name.className = "result-name";
+      name.textContent = p.name;
+
+      a.appendChild(name);
+      li.appendChild(a);
+      els.resultsList.appendChild(li);
+    }
+
+    if (state.candidates.length > max) {
+      const li = document.createElement("li");
+      li.className = "result-item muted";
+      li.textContent = `Showing first ${max}. Narrow further to see fewer.`;
+      els.resultsList.appendChild(li);
+    }
+  }
+
+  function render() {
+    // Buttons
+    els.btnBack.disabled = state.history.length === 0;
+
+    // Current question
+    if (!state.currentKey) {
+      els.kicker.textContent = "Done";
+      els.title.textContent = "Review your matches";
+      els.help.textContent = "Use View matches, or hit Reset to start over.";
+      els.answers.innerHTML = "";
+      renderCount();
+    } else {
+      const q = getQuestionDef(state.currentKey);
+      els.kicker.textContent = "Question";
+      els.title.textContent = q ? q.title : "Question";
+      els.help.textContent = q ? q.help : "";
+      renderAnswers(q);
+      renderCount();
+    }
+
+    // Results visibility
+    els.resultsCard.hidden = !state.resultsOpen;
+    els.btnView.textContent = state.resultsOpen ? "Hide matches" : "View matches";
+
+    if (state.resultsOpen) renderResults();
+  }
+
+  // Events
+  els.btnReset.addEventListener("click", resetAll);
+  els.btnBack.addEventListener("click", goBack);
+  els.btnView.addEventListener("click", () => {
+    state.resultsOpen = !state.resultsOpen;
+    render();
+  });
+
+  // Init
+  state.currentKey = nextQuestionKey();
+  render();
+})();
 </script>
