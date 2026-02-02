@@ -490,7 +490,7 @@
       const items = slugs
         .map((s) => bySlug.get(s))
         .filter(Boolean)
-        .slice(0, 8);
+        .slice(0, 5); // max 5
 
       if (!items.length) {
         recentWrap.hidden = true;
@@ -501,20 +501,34 @@
       recentWrap.hidden = false;
     }
 
+    // Render as comma-delimited links (still inside the existing <ul>)
     function recentlyFillList(targetUl, cardItems) {
+      // Force UL to behave like an inline text container
       targetUl.innerHTML = "";
-      for (const card of cardItems) {
+      targetUl.style.listStyle = "none";
+      targetUl.style.padding = "0";
+      targetUl.style.margin = "0";
+
+      // One LI that contains comma-separated links
+      const li = document.createElement("li");
+      li.style.listStyle = "none";
+      li.style.display = "inline";
+
+      cardItems.forEach((card, idx) => {
         const link = card.querySelector("a[href]");
         const name = card.querySelector(".result-name");
-        if (!link) continue;
+        if (!link) return;
 
-        const li = document.createElement("li");
+        if (idx > 0) li.appendChild(document.createTextNode(", "));
+
         const a = document.createElement("a");
         a.href = link.getAttribute("href");
-        a.textContent = name ? name.textContent : a.href;
+        a.textContent = name ? name.textContent.trim() : a.href;
+
         li.appendChild(a);
-        targetUl.appendChild(li);
-      }
+      });
+
+      targetUl.appendChild(li);
     }
 
     // Record recents on click
