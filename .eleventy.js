@@ -16,23 +16,23 @@ module.exports = function (eleventyConfig) {
   const IK_THUMBS = `${IK_BASE}/pasta/thumbs/`;
   const IK_FULL = `${IK_BASE}/pasta/full/`;
 
-  // You said you will create this pending image:
+  // Pending placeholders (you will create these)
   const IK_PENDING_THUMB = `${IK_THUMBS}pending.png`;
+  const IK_PENDING_PHOTO = `${IK_FULL}pending.jpg`;
 
-  // Thumb URL from filename (or blank -> pending)
+  // Thumb URL from filename (or blank -> pending thumb)
   eleventyConfig.addFilter("pastaThumbUrl", (filename) => {
     const f = String(filename || "").trim();
     return f ? (IK_THUMBS + f) : IK_PENDING_THUMB;
   });
 
-  // Photo URL from filename (or blank -> pending for now)
-  // (If you later create a separate pending-photo.jpg, we can swap it.)
+  // Photo URL from filename (or blank -> pending photo)
   eleventyConfig.addFilter("pastaPhotoUrl", (filename) => {
     const f = String(filename || "").trim();
-    return f ? (IK_FULL + f) : IK_PENDING_THUMB;
+    return f ? (IK_FULL + f) : IK_PENDING_PHOTO;
   });
 
-  // Hero URL (prefer photo, else thumb, else pending)
+  // Hero URL (prefer photo, else thumb, else pending *photo*)
   eleventyConfig.addFilter("pastaHeroUrl", (thumbFilename, photoFilename) => {
     const p = String(photoFilename || "").trim();
     if (p) return IK_FULL + p;
@@ -40,7 +40,7 @@ module.exports = function (eleventyConfig) {
     const t = String(thumbFilename || "").trim();
     if (t) return IK_THUMBS + t;
 
-    return IK_PENDING_THUMB;
+    return IK_PENDING_PHOTO;
   });
 
   // Passthrough copy: publish static JS and CSS files
