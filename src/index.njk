@@ -16,6 +16,11 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   "dumpling": "Dumpling / pasta-like"
 } %}
 
+{# ImageKit config (filenames are stored in CSV; templates build full URLs) #}
+{% set IK_BASE = "https://ik.imagekit.io/mevius" %}
+{% set IK_THUMBS = IK_BASE ~ "/pasta/thumbs/" %}
+{% set IK_PENDING = IK_BASE ~ "/pasta/pending.png" %}
+
 {% macro autoDescriptor(item) %}
   {% if item.Descriptor %}
     {{ item.Descriptor }}
@@ -33,50 +38,43 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
     {% if item.IsTwisted == "yes" %}
       {% set _ = parts.push("twisted") %}
     {% endif %}
+    {% if item.IsCurved == "yes" %}
+      {% set _ = parts.push("curved") %}
+    {% endif %}
     {% if item.IsHollow == "yes" %}
       {% set _ = parts.push("hollow") %}
     {% endif %}
-    {% if item.Type %}
-      {% set _ = parts.push(item.Type) %}
-    {% elseif item.Category %}
-      {% set _ = parts.push(item.Category | lower) %}
+
+    {% if parts.length %}
+      {{ parts | join(", ") }}
+    {% else %}
+      {{ (typeLabels[item.Type] or item.Category or "pasta shape") | lower }}
     {% endif %}
-    {% if item.IsCurved == "yes" %}
-      {% set _ = parts.push("(curved)") %}
-    {% endif %}
-    {{ parts | join(" ") | trim }}
   {% endif %}
 {% endmacro %}
 
-<section class="page stack">
-  <header class="stack tight">
-    <h1 class="h1">Search pasta shapes</h1>
-    <p class="muted">Type a name - aliases count. Tap a result to see what it looks like.</p>
-  </header>
+<section class="hero stack">
+  <h1 class="h1">Pasta Shapes</h1>
+  <p class="lead muted">
+    Search pasta shapes by name and aliases, or identify a shape by answering a few quick questions.
+  </p>
+</section>
 
-  <form id="pasta-search-form" class="card stack" action="/" method="GET" novalidate>
-    <label for="pasta-q" class="label">Search by name</label>
-
+<section class="card stack" aria-label="Search pasta shapes">
+  <div class="search">
+    <label class="sr-only" for="pasta-q">Search</label>
     <input
       id="pasta-q"
-      name="q"
-      class="search-input"
+      class="input"
       type="search"
-      placeholder="e.g., capellini, angel hair, spaghetti chitara, plin"
+      placeholder="Search (e.g., penne, rigatoni, spahetti...)"
       autocomplete="off"
+      spellcheck="false"
       inputmode="search"
     />
+  </div>
 
-    <div class="actions">
-      <button type="submit" class="btn">Search</button>
-      <a class="btn secondary" href="/identify/">Identify by questions</a>
-      <span id="pasta-search-status" class="muted" aria-live="polite"></span>
-    </div>
-
-    <ul id="pasta-search-suggestions" class="muted suggestions"></ul>
-  </form>
-
-  <section class="card stack">
+  <div class="results stack">
     <div class="results-head">
       <h2 class="h2">Results</h2>
       <p class="muted">Loaded {{ pasta.length }} shapes.</p>
@@ -95,7 +93,8 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 
     <ul id="pasta-results" class="results-list">
       {% for item in pasta %}
-        {% set thumb = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") %}
+        {% set thumbFile = (item.ThumbnailImage or "") %}
+        {% set thumbUrl = (thumbFile ? (IK_THUMBS ~ thumbFile) : IK_PENDING) %}
         {% set displayType = typeLabels[item.Type] or item.Category or "" %}
         {% set synonyms = (item.Synonyms or "") %}
         {% set aliases = (item.SearchAliases or "") %}
@@ -106,18 +105,14 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         <li class="result-card" data-slug="{{ item.Slug }}" data-search="{{ searchBlob | escape }}">
           <a class="result-link" href="/pasta/{{ item.Slug }}/" data-recent="pasta">
             <div class="thumb">
-              {% if thumb %}
-                <img
-                  src="{{ thumb }}"
-                  alt=""
-                  width="56"
-                  height="56"
-                  loading="lazy"
-                  decoding="async"
-                />
-              {% else %}
-                <span class="thumb-na muted">N/A</span>
-              {% endif %}
+              <img
+                src="{{ thumbUrl }}"
+                alt=""
+                width="56"
+                height="56"
+                loading="lazy"
+                decoding="async"
+              />
             </div>
 
             <div class="result-body">
@@ -138,9 +133,5 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         </li>
       {% endfor %}
     </ul>
-
-    <noscript>
-      <p class="muted">Enable JavaScript to filter results as you type.</p>
-    </noscript>
-  </section>
+  </div>
 </section>
