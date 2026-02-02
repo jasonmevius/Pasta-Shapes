@@ -6,7 +6,20 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
 
 {% set identifyData = [] %}
 {% for item in pasta %}
+
+  {# Thumbnail normalization you already use #}
   {% set thumb = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") %}
+
+  {# Try common alias column names (use whichever exists in your CSV) #}
+  {% set alsoRaw =
+    item.SearchAliases
+    or item.Aliases
+    or item.Synonyms
+    or item.Also
+    or item.Misspellings
+    or ""
+  %}
+
   {% set _ = identifyData.push({
     slug: item.Slug,
     name: item.ShapeName,
@@ -17,6 +30,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     twisted: item.IsTwisted or "",
     curved: item.IsCurved or "",
     stuffed: item.IsStuffed or "",
+    also: alsoRaw,
     thumb: thumb
   }) %}
 {% endfor %}
@@ -30,8 +44,6 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
   <p class="muted">Answer one question at a time. You can always tap “Not sure.”</p>
 </header>
 
-{# Minimal styling to make option cards + results resemble search results.
-   If your global CSS already covers these classes, you can delete this <style> block later. #}
 <style>
   .identify .identify-card { display: block; }
   .identify .identify-question { margin-bottom: 12px; }
@@ -44,6 +56,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     .identify .identify-answers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
 
+  /* Answer options as “search-like” cards */
   .identify .option-card {
     width: 100%;
     text-align: left;
@@ -70,14 +83,37 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
 
   .identify .identify-meta { margin-top: 10px; }
 
+  /* Results: echo Search page hierarchy */
   .identify .identify-results { margin-top: 14px; }
   .identify .results-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
   .identify .results-list { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 10px; }
+
   .identify .result-item { border: 1px solid rgba(0,0,0,0.12); border-radius: 12px; background: #fff; }
-  .identify .result-link { display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: center; padding: 10px; text-decoration: none; color: inherit; }
+  .identify .result-link {
+    display: grid;
+    grid-template-columns: 44px 1fr;
+    gap: 10px;
+    align-items: center;
+    padding: 10px;
+    text-decoration: none;
+    color: inherit;
+  }
   .identify .result-link:hover { box-shadow: 0 6px 18px rgba(0,0,0,0.08); }
-  .identify .result-thumb { width: 44px; height: 44px; border-radius: 10px; object-fit: cover; background: rgba(0,0,0,0.03); }
-  .identify .result-name { font-weight: 650; }
+
+  .identify .result-thumb {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    object-fit: cover;
+    background: rgba(0,0,0,0.03);
+  }
+
+  .identify .result-text { min-width: 0; }
+  .identify .result-name { font-weight: 700; margin: 0; line-height: 1.15; }
+  .identify .result-type,
+  .identify .result-meta,
+  .identify .result-also { margin: 3px 0 0; font-size: 0.95rem; opacity: 0.75; }
+  .identify .result-type { margin-top: 4px; }
 
   .identify .identify-bottom-bar { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap; }
 </style>
@@ -247,6 +283,18 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
 
   const normEnum = (v) => String(v || "").trim().toLowerCase();
 
+  const normAlso = (v) => {
+    const s = String(v || "").trim();
+    if (!s) return "";
+    // If your aliases are comma-separated already, keep them. If they’re pipe-separated, normalize to comma.
+    return s.replace(/\s*\|\s*/g, ", ").replace(/\s*,\s*/g, ", ").trim();
+  };
+
+  const normSizeForDisplay = (v) => {
+    const s = String(v || "").trim();
+    return s ? s.toLowerCase() : "";
+  };
+
   const normalized = raw.map((p) => ({
     slug: p.slug,
     name: p.name,
@@ -258,6 +306,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     twisted: normBool(p.twisted),
     curved: normBool(p.curved),
     stuffed: normBool(p.stuffed),
+    also: normAlso(p.also),
   }));
 
   const state = {
@@ -371,7 +420,6 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
       };
     }
 
-    // enum
     const label = q.label ? q.label(value) : String(value);
     const desc = q.desc ? q.desc(value) : "";
     const icon = q.icon ? q.icon(value) : "/img/identify/option.png";
@@ -380,11 +428,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
 
   function buildOptions(q, items) {
     if (q.kind === "bool") {
-      return [
-        { value: "yes" },
-        { value: "no" },
-        { value: "__ns__" },
-      ];
+      return [{ value: "yes" }, { value: "no" }, { value: "__ns__" }];
     }
 
     const vals = uniqueValues(q.key, items);
@@ -412,7 +456,6 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
 
     if (value === "__ns__") {
       state.answers[key] = null;
-      // candidates unchanged
     } else {
       state.answers[key] = value;
 
@@ -426,10 +469,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     }
 
     state.currentKey = nextQuestionKey();
-
-    // If we meaningfully narrowed (vs Not sure), default to top 10 view
     if (state.candidates.length < state.all.length) state.showAllResults = false;
-
     render();
   }
 
@@ -494,8 +534,28 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
   }
 
   function shouldShowResults() {
-    // Show results automatically once we’ve actually narrowed from the initial full set
     return state.candidates.length < state.all.length;
+  }
+
+  function typeLabelFor(p) {
+    return TYPE_LABELS[p.type] || (p.type ? p.type : "");
+  }
+
+  function buildMetaLine(p) {
+    // Match your Search pattern: "medium , hollow"
+    const bits = [];
+
+    const size = normSizeForDisplay(p.size);
+    if (size) bits.push(size);
+
+    // Keep these as simple “tags” like Search
+    if (p.hollow === "yes") bits.push("hollow");
+    if (p.ridged === "yes") bits.push("ridged");
+    if (p.twisted === "yes") bits.push("twisted");
+    if (p.curved === "yes") bits.push("curved");
+    if (p.stuffed === "yes") bits.push("stuffed");
+
+    return bits.join(" , ");
   }
 
   function renderResults() {
@@ -504,7 +564,6 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     const list = state.candidates.slice(0, limit);
 
     els.resultsCount.textContent = (total === 1) ? "1 match" : `${total} matches`;
-
     els.resultsList.innerHTML = "";
 
     for (const p of list) {
@@ -524,25 +583,49 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
         img.src = p.thumb;
         a.appendChild(img);
       } else {
-        // keep layout stable even without thumbs
         const ph = document.createElement("div");
         ph.className = "result-thumb";
         a.appendChild(ph);
       }
 
-      const name = document.createElement("span");
+      const text = document.createElement("div");
+      text.className = "result-text";
+
+      // Line 1: Name (bold)
+      const name = document.createElement("p");
       name.className = "result-name";
       name.textContent = p.name;
 
-      a.appendChild(name);
+      // Line 2: Type
+      const type = document.createElement("p");
+      type.className = "result-type";
+      type.textContent = typeLabelFor(p);
+
+      // Line 3: Meta (size + flags)
+      const metaLine = buildMetaLine(p);
+      const meta = document.createElement("p");
+      meta.className = "result-meta";
+      meta.textContent = metaLine;
+
+      text.appendChild(name);
+      if (type.textContent) text.appendChild(type);
+      if (metaLine) text.appendChild(meta);
+
+      // Line 4: Also (aliases)
+      if (p.also) {
+        const also = document.createElement("p");
+        also.className = "result-also";
+        also.textContent = `Also: ${p.also}`;
+        text.appendChild(also);
+      }
+
+      a.appendChild(text);
       li.appendChild(a);
       els.resultsList.appendChild(li);
     }
 
-    // Toggle control text
     if (total > 10) {
       els.btnToggleResults.hidden = false;
-
       if (state.showAllResults) {
         els.btnToggleResults.textContent = "Show top 10";
       } else {
@@ -555,10 +638,8 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
   }
 
   function render() {
-    // Buttons
     els.btnBack.disabled = state.history.length === 0;
 
-    // Current question
     if (!state.currentKey) {
       els.kicker.textContent = "Done";
       els.title.textContent = "Review your matches";
@@ -574,14 +655,11 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
       renderCount();
     }
 
-    // Results - auto show once narrowed
     const show = shouldShowResults();
     els.resultsCard.hidden = !show;
-
     if (show) renderResults();
   }
 
-  // Events
   els.btnReset.addEventListener("click", resetAll);
   els.btnBack.addEventListener("click", goBack);
   els.btnToggleResults.addEventListener("click", () => {
@@ -589,7 +667,6 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     render();
   });
 
-  // Init
   state.currentKey = nextQuestionKey();
   render();
 })();
