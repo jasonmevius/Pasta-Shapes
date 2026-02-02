@@ -11,17 +11,7 @@ eleventyComputed:
   description: "{% if item.Synonyms %}Aliases: {{ item.Synonyms | truncate(140) }}{% else %}What {{ item.ShapeName }} looks like, plus key shape attributes.{% endif %}"
 ---
 
-{# ImageKit config (filenames are stored in CSV; templates build full URLs) #}
-{% set IK_BASE = "https://ik.imagekit.io/mevius" %}
-{% set IK_THUMBS = IK_BASE ~ "/pasta/thumbs/" %}
-{% set IK_FULL = IK_BASE ~ "/pasta/full/" %}
-{% set IK_PENDING = IK_BASE ~ "/pasta/pending.png" %}
-
-{% set thumbFile = (item.ThumbnailImage or "") %}
-{% set photoFile = (item.PhotoImage or "") %}
-{% set thumbUrl = (thumbFile ? (IK_THUMBS ~ thumbFile) : IK_PENDING) %}
-{% set photoUrl = (photoFile ? (IK_FULL ~ photoFile) : "") %}
-{% set heroUrl = (photoUrl or thumbUrl or IK_PENDING) %}
+{% set heroUrl = item.ThumbnailImage | pastaHeroUrl(item.PhotoImage) %}
 
 <nav class="breadcrumbs">
   <a href="/">← Back to search</a>
@@ -55,7 +45,7 @@ eleventyComputed:
 {% set desc = "" %}
 {% if item.Description %}
   {% set desc = item.Description %}
-{% elseif item.KeyDiscriminators %}
+{% elif item.KeyDiscriminators %}
   {% set desc = item.KeyDiscriminators %}
 {% endif %}
 
