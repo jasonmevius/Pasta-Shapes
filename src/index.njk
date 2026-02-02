@@ -16,38 +16,49 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   "dumpling": "Dumpling / pasta-like"
 } %}
 
-{# ImageKit config (filenames are stored in CSV; templates build full URLs) #}
+{# ImageKit config (CSV stores filenames only) #}
 {% set IK_BASE = "https://ik.imagekit.io/mevius" %}
 {% set IK_THUMBS = IK_BASE ~ "/pasta/thumbs/" %}
-{% set IK_PENDING = IK_BASE ~ "/pasta/thumbs/pending.png" %}
+{% set IK_PENDING_THUMB = IK_THUMBS ~ "pending.png" %}
 
 {% macro autoDescriptor(item) %}
+  {# Avoid array push/concat - keep this Nunjucks-safe #}
   {% if item.Descriptor %}
     {{ item.Descriptor }}
   {% else %}
-    {% set parts = [] %}
+    {% set first = true %}
+
     {% if item.SizeClass and item.SizeClass != "unknown" %}
-      {% set _ = parts.push(item.SizeClass) %}
-    {% endif %}
-    {% if item.IsStuffed == "yes" %}
-      {% set _ = parts.push("stuffed") %}
-    {% endif %}
-    {% if item.IsRidged == "yes" %}
-      {% set _ = parts.push("ridged") %}
-    {% endif %}
-    {% if item.IsTwisted == "yes" %}
-      {% set _ = parts.push("twisted") %}
-    {% endif %}
-    {% if item.IsCurved == "yes" %}
-      {% set _ = parts.push("curved") %}
-    {% endif %}
-    {% if item.IsHollow == "yes" %}
-      {% set _ = parts.push("hollow") %}
+      {{ item.SizeClass }}
+      {% set first = false %}
     {% endif %}
 
-    {% if parts.length %}
-      {{ parts | join(", ") }}
-    {% else %}
+    {% if item.IsStuffed == "yes" %}
+      {% if not first %}, {% endif %}stuffed
+      {% set first = false %}
+    {% endif %}
+
+    {% if item.IsRidged == "yes" %}
+      {% if not first %}, {% endif %}ridged
+      {% set first = false %}
+    {% endif %}
+
+    {% if item.IsTwisted == "yes" %}
+      {% if not first %}, {% endif %}twisted
+      {% set first = false %}
+    {% endif %}
+
+    {% if item.IsCurved == "yes" %}
+      {% if not first %}, {% endif %}curved
+      {% set first = false %}
+    {% endif %}
+
+    {% if item.IsHollow == "yes" %}
+      {% if not first %}, {% endif %}hollow
+      {% set first = false %}
+    {% endif %}
+
+    {% if first %}
       {{ (typeLabels[item.Type] or item.Category or "pasta shape") | lower }}
     {% endif %}
   {% endif %}
@@ -93,8 +104,12 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 
     <ul id="pasta-results" class="results-list">
       {% for item in pasta %}
-        {% set thumbFile = (item.ThumbnailImage or "") %}
-        {% set thumbUrl = (thumbFile ? (IK_THUMBS ~ thumbFile) : IK_PENDING) %}
+        {% set thumbFile = (item.ThumbnailImage or "") | trim %}
+        {% set thumbUrl = IK_PENDING_THUMB %}
+        {% if thumbFile %}
+          {% set thumbUrl = IK_THUMBS ~ thumbFile %}
+        {% endif %}
+
         {% set displayType = typeLabels[item.Type] or item.Category or "" %}
         {% set synonyms = (item.Synonyms or "") %}
         {% set aliases = (item.SearchAliases or "") %}
