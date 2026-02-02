@@ -2,49 +2,6 @@
   const $ = (sel, root = document) => root.querySelector(sel);
 
   // =============================================================================
-  // ImageKit helpers (CSV stores filenames only)
-  // =============================================================================
-  const IK_BASE = "https://ik.imagekit.io/mevius";
-  const IK_THUMBS = `${IK_BASE}/pasta/thumbs/`;
-  const IK_PENDING_THUMB = `${IK_THUMBS}pending.png`;
-
-  function isAbsUrl(s) {
-    return /^https?:\/\//i.test(String(s || "").trim());
-  }
-
-  function toThumbUrl(v) {
-    const raw = String(v || "").trim();
-
-    // Treat common placeholders as "missing"
-    if (!raw) return IK_PENDING_THUMB;
-    if (raw.toLowerCase() === "n/a") return IK_PENDING_THUMB;
-    if (raw.toLowerCase() === "na") return IK_PENDING_THUMB;
-
-    // Already absolute - use as-is
-    if (isAbsUrl(raw)) return raw;
-
-    // Back-compat: "<ImageKitPath>/..." -> replace with IK_BASE
-    if (raw.includes("<ImageKitPath>")) {
-      return raw.replace("<ImageKitPath>", IK_BASE);
-    }
-
-    // If they somehow pass "/pasta/thumbs/x.png" or "pasta/thumbs/x.png"
-    if (raw.startsWith("/")) return IK_BASE + raw;
-    if (raw.startsWith("pasta/")) return `${IK_BASE}/${raw}`;
-
-    // If they pass "thumbs/x.png" or "pasta/thumbs/x.png" in some variant
-    if (raw.includes("/")) {
-      // If it already includes "pasta/thumb" somewhere, just prefix base.
-      if (raw.includes("pasta/thumb")) return `${IK_BASE}/${raw.replace(/^\/+/, "")}`;
-      // Otherwise assume it's relative to thumbs.
-      return IK_THUMBS + raw.split("/").pop();
-    }
-
-    // Otherwise - assume filename only
-    return IK_THUMBS + raw;
-  }
-
-  // =============================================================================
   // Recently viewed helpers
   // =============================================================================
 
@@ -82,6 +39,8 @@
     if (!input || !status || !list) return;
 
     const cards = Array.from(list.querySelectorAll("[data-search]"));
+    const originalOrder = cards.slice();
+
     const recentWrap = $("#recently-viewed-wrap");
     const recentList = $("#recently-viewed");
 
@@ -254,47 +213,85 @@
     }
 
     // -----------------------------------------------------------------------------
+    // Ranking + ordering for direct matches
+    // -----------------------------------------------------------------------------
+    function cardNameNorm(card) {
+      const el = card.querySelector(".result-name");
+      return normalize(el ? el.textContent : "");
+    }
+
+    function cardBlobNorm(card) {
+      return normalize(card.getAttribute("data-search") || "");
+    }
+
+    function cardSlugNorm(card) {
+      return normalize(card.getAttribute("data-slug") || "");
+    }
+
+    function scoreCard(card, q) {
+      const name = cardNameNorm(card);
+      const slug = cardSlugNorm(card);
+      const blob = cardBlobNorm(card);
+
+      // Ranking buckets - lower is better
+      let bucket = 50;
+
+      if (name && name.startsWith(q)) bucket = 0;
+      else if (name && name.split(" ").some((t) => t.startsWith(q))) bucket = 1;
+      else if (slug && slug.startsWith(q)) bucket = 2;
+      else if (blob && blob.startsWith(q)) bucket = 3;
+      else if (name && name.includes(q)) bucket = 4;
+      else if (blob && blob.includes(q)) bucket = 5;
+
+      // Earlier position is better for "includes"
+      let pos = 9999;
+      if (bucket <= 3) pos = 0;
+      else if (bucket === 4) pos = name.indexOf(q);
+      else if (bucket === 5) pos = blob.indexOf(q);
+
+      const len = name ? name.length : 9999;
+      return { bucket, pos, len, name };
+    }
+
+    function reorderCards(order) {
+      for (const card of order) list.appendChild(card);
+    }
+
+    // -----------------------------------------------------------------------------
     // UI helpers
     // -----------------------------------------------------------------------------
-    function setStatus(visibleCount, totalCount, q, mode) {
+    function setStatus(matchCount, shownCount, q, mode) {
       if (!q) {
         status.textContent = "Type to filter - aliases included.";
         return;
       }
 
       if (mode === "fuzzy") {
-        status.textContent = `0 direct matches - showing closest results (${visibleCount})`;
+        status.textContent = `0 direct matches - showing closest results (${shownCount})`;
         return;
       }
 
-      status.textContent = `${visibleCount} of ${totalCount} matches`;
+      status.textContent = `${shownCount} of ${matchCount} matches`;
     }
 
-    function setNoteAndToggle({ q, total, limitedVisible }) {
+    function setNoteAndToggle({ q, matchCount, shownCount }) {
       if (!note || !toggleBtn) return;
 
-      // While searching, hide "show more"
-      if (q) {
-        note.textContent = "";
-        toggleBtn.hidden = true;
-        return;
-      }
-
-      if (total <= TOP_N) {
-        note.textContent = `Showing ${total} of ${total}`;
+      if (matchCount <= TOP_N) {
+        note.textContent = `Showing ${shownCount} of ${matchCount}`;
         toggleBtn.hidden = true;
         return;
       }
 
       if (!showAll) {
-        const remaining = total - limitedVisible;
-        note.textContent = `Showing ${limitedVisible} of ${total} - ${remaining} more`;
+        const remaining = matchCount - shownCount;
+        note.textContent = `Showing ${shownCount} of ${matchCount} - ${remaining} more`;
         toggleBtn.textContent = `Show all (${remaining} more)`;
         toggleBtn.hidden = false;
         return;
       }
 
-      note.textContent = `Showing ${total} of ${total}`;
+      note.textContent = `Showing ${shownCount} of ${matchCount}`;
       toggleBtn.textContent = `Show top ${TOP_N}`;
       toggleBtn.hidden = false;
     }
@@ -304,49 +301,58 @@
       const q = normalize(raw);
       const total = cards.length;
 
-      const limitActive = !q && !showAll;
+      // When query changes, default back to Top 10
+      if (!q) showAll = false;
 
-      // First-pass: direct substring match against each card's blob
-      let visibleMatches = 0;
-      let visibleShown = 0;
+      // -----------------------------------------------------------
+      // Query present - ranked, limited
+      // -----------------------------------------------------------
+      if (q) {
+        const matched = [];
+        const nonMatched = [];
 
-      let directFound = false;
-
-      cards.forEach((card, idx) => {
-        const blob = normalize(card.getAttribute("data-search"));
-        const matches = !q || blob.includes(q);
-
-        let show = matches;
-
-        if (limitActive && matches) {
-          show = idx < TOP_N;
+        for (const card of originalOrder) {
+          const blob = cardBlobNorm(card);
+          if (blob.includes(q)) matched.push(card);
+          else nonMatched.push(card);
         }
 
-        card.style.display = show ? "" : "none";
+        // Direct matches - rank by starts-with, then contains
+        if (matched.length) {
+          const ranked = matched
+            .map((c) => ({ c, s: scoreCard(c, q) }))
+            .sort((a, b) => {
+              if (a.s.bucket !== b.s.bucket) return a.s.bucket - b.s.bucket;
+              if (a.s.pos !== b.s.pos) return a.s.pos - b.s.pos;
+              if (a.s.len !== b.s.len) return a.s.len - b.s.len;
+              return a.s.name.localeCompare(b.s.name);
+            })
+            .map((x) => x.c);
 
-        if (matches) visibleMatches++;
-        if (show) visibleShown++;
-        if (q && matches) directFound = true;
-      });
+          reorderCards(ranked.concat(nonMatched));
 
-      // If searching and we found direct matches, we're done
-      if (q && directFound) {
-        setStatus(visibleMatches, total, q, "direct");
-        setNoteAndToggle({ q, total, limitedVisible: visibleShown });
-        return;
-      }
+          const shown = showAll ? matched.length : Math.min(TOP_N, matched.length);
 
-      // If searching and we did NOT find direct matches, try fuzzy using pasta index
-      if (q) {
+          for (let i = 0; i < ranked.length; i++) {
+            ranked[i].style.display = i < shown ? "" : "none";
+          }
+          for (const c of nonMatched) c.style.display = "none";
+
+          setStatus(matched.length, shown, q, "direct");
+          setNoteAndToggle({ q, matchCount: matched.length, shownCount: shown });
+          return;
+        }
+
+        // -----------------------------------------------------------
+        // Fuzzy fallback
+        // -----------------------------------------------------------
         await loadIndexIfNeeded();
 
-        // Exact alias match first (includes SearchAliases)
         let slugs = [];
         if (index && index.aliasToSlug) {
           const exactSlug = index.aliasToSlug[q];
           if (exactSlug) slugs = [exactSlug];
 
-          // Stopword-stripped exact match (only if unique)
           if (!slugs.length && stopKeyToSlugs) {
             const stopKey = stripStopwords(q);
             const set = stopKeyToSlugs.get(stopKey);
@@ -354,34 +360,53 @@
           }
         }
 
-        // If no exact slug, use fuzzy
         if (!slugs.length) slugs = bestFuzzySlugs(q, 10);
 
         if (slugs.length) {
           const slugSet = new Set(slugs);
 
-          visibleShown = 0;
-          cards.forEach((card) => {
-            const slug = card.getAttribute("data-slug");
-            const show = slugSet.has(slug);
-            card.style.display = show ? "" : "none";
-            if (show) visibleShown++;
-          });
+          const ordered = [];
+          for (const slug of slugs) {
+            const c = cardBySlug.get(slug);
+            if (c) ordered.push(c);
+          }
 
-          setStatus(visibleShown, total, q, "fuzzy");
-          setNoteAndToggle({ q, total, limitedVisible: visibleShown });
+          const remaining = originalOrder.filter((c) => !slugSet.has(c.getAttribute("data-slug")));
+          reorderCards(ordered.concat(remaining));
+
+          const shown = showAll ? ordered.length : Math.min(TOP_N, ordered.length);
+
+          for (let i = 0; i < ordered.length; i++) {
+            ordered[i].style.display = i < shown ? "" : "none";
+          }
+          for (const c of remaining) c.style.display = "none";
+
+          setStatus(ordered.length, shown, q, "fuzzy");
+          setNoteAndToggle({ q, matchCount: ordered.length, shownCount: shown });
           return;
         }
 
-        // If still nothing, keep the list empty and say 0 matches
-        setStatus(0, total, q, "direct");
-        setNoteAndToggle({ q, total, limitedVisible: 0 });
+        // No matches
+        reorderCards(originalOrder);
+        for (const c of cards) c.style.display = "none";
+        setStatus(0, 0, q, "direct");
+        setNoteAndToggle({ q, matchCount: 0, shownCount: 0 });
         return;
       }
 
-      // No query: status + "Top N + X more"
-      setStatus(limitActive ? visibleShown : visibleMatches, total, q, "direct");
-      setNoteAndToggle({ q, total, limitedVisible: visibleShown });
+      // -----------------------------------------------------------
+      // No query - restore original order + Top 10
+      // -----------------------------------------------------------
+      reorderCards(originalOrder);
+
+      const shown = showAll ? total : Math.min(TOP_N, total);
+
+      for (let i = 0; i < originalOrder.length; i++) {
+        originalOrder[i].style.display = i < shown ? "" : "none";
+      }
+
+      setStatus(total, shown, q, "direct");
+      setNoteAndToggle({ q, matchCount: total, shownCount: shown });
     }
 
     function renderRecents() {
@@ -434,7 +459,7 @@
       if (m && m[1]) addRecent(m[1]);
     });
 
-    // Toggle show all / show top N
+    // Toggle show all / show top N (works for both "no query" and "query present")
     if (toggleBtn) {
       toggleBtn.addEventListener("click", () => {
         showAll = !showAll;
@@ -448,7 +473,6 @@
       const q = url.searchParams.get("q");
       if (q) {
         input.value = q;
-        showAll = true;
       }
     } catch (e) {}
 
@@ -736,9 +760,8 @@
         const thumb = document.createElement("div");
         thumb.className = "thumb";
 
-        // Always show an image - if missing, use pending
         const img = document.createElement("img");
-        img.src = toThumbUrl(it.thumb);
+        img.src = it.thumb;
         img.alt = "";
         img.width = 56;
         img.height = 56;
