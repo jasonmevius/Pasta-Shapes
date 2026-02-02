@@ -19,7 +19,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 {# ImageKit config (filenames are stored in CSV; templates build full URLs) #}
 {% set IK_BASE = "https://ik.imagekit.io/mevius" %}
 {% set IK_THUMBS = IK_BASE ~ "/pasta/thumbs/" %}
-{% set IK_PENDING = IK_BASE ~ "/pasta/pending.png" %}
+{% set IK_PENDING = IK_BASE ~ "/pasta/thumbs/pending.png" %}
 
 {% macro autoDescriptor(item) %}
   {% if item.Descriptor %}
