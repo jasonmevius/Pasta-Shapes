@@ -1,5 +1,5 @@
 ---
-title: Pasta Shapes 
+title: Pasta Shapes
 layout: layout.njk
 description: "Search pasta shapes by name and aliases, or identify a shape by answering a few quick questions."
 ---
@@ -17,7 +17,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 } %}
 
 {% macro autoDescriptor(item) %}
-  {# Nunjucks-safe - no arrays, no push #}
+  {# Nunjucks-safe - no arrays/push #}
   {% set first = true %}
 
   {% if item.SizeClass and item.SizeClass != "unknown" %}
@@ -60,21 +60,31 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   <p class="lead muted">
     Search pasta shapes by name and aliases, or identify a shape by answering a few quick questions.
   </p>
+
+  <div class="hero-actions">
+    <a class="btn secondary" href="/identify/">Identify by questions</a>
+  </div>
 </section>
 
 <section class="card stack" aria-label="Search pasta shapes">
-  <div class="search">
+  {# These IDs are required by pasta-search.js #}
+  <form id="pasta-search-form" class="search" action="/" method="get" autocomplete="off">
     <label class="sr-only" for="pasta-q">Search</label>
     <input
       id="pasta-q"
       class="input"
       type="search"
+      name="q"
       placeholder="Search (e.g., penne, rigatoni, spahetti...)"
       autocomplete="off"
       spellcheck="false"
       inputmode="search"
     />
-  </div>
+
+    <p id="pasta-search-status" class="muted" aria-live="polite"></p>
+
+    <ul id="pasta-search-suggestions" class="suggestions" aria-label="Search suggestions"></ul>
+  </form>
 
   <div class="results stack">
     <div class="results-head">
@@ -99,7 +109,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         {% set displayType = typeLabels[item.Type] or item.Category or "" %}
         {% set synonyms = (item.Synonyms or "") %}
         {% set aliases = (item.SearchAliases or "") %}
-
         {% set searchBlob = (item.ShapeName ~ " " ~ synonyms ~ " " ~ aliases ~ " " ~ item.Slug) | lower %}
 
         <li class="result-card" data-slug="{{ item.Slug }}" data-search="{{ searchBlob | escape }}">
