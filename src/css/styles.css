@@ -395,17 +395,70 @@ a:focus{
   gap: 0.6rem;
 }
 
+/* Two-column option grid on wider screens */
+@media (min-width: 720px){
+  .identify-answers{
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* New "search-style" answer option cards (buttons) */
+.option-card{
+  width: 100%;
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 0.75rem;
+  align-items: center;
+  cursor: pointer;
+  text-align: left;
+}
+.option-card:hover{
+  text-decoration: none;
+  background: rgba(17,24,39,0.03);
+}
+.option-card:focus{
+  outline: 2px solid rgba(17,24,39,0.18);
+  outline-offset: 2px;
+}
+
+.option-thumb{
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  object-fit: contain;
+  display: block;
+}
+
+.option-name{
+  margin: 0;
+  font-weight: 650;
+  font-size: 1.02rem;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+.option-desc{
+  margin: 0.2rem 0 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+  line-height: 1.25;
+}
+
+/* Legacy answer button style (still safe to keep) */
 .answer-btn{
   width: 100%;
   justify-content: space-between;
   background: var(--bg);
   color: var(--fg);
 }
-
 .answer-btn:hover{
   text-decoration: none;
 }
-
 .answer-btn .answer-right{
   color: var(--muted);
   font-weight: 600;
@@ -440,6 +493,36 @@ a:focus{
 }
 
 .identify-results[hidden]{ display:none; }
+
+/* Identify results: make "result-item/result-thumb" match Search look if Identify uses them */
+.identify .result-item{
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+
+/* Ensure Identify results align to Search sizing */
+.identify .result-thumb{
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  object-fit: cover;
+  display: block;
+}
+
+.identify .result-text{
+  min-width: 0;
+}
+
+.identify .result-type,
+.identify .result-meta{
+  font-size: 0.95rem;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
 
 @media (max-width: 420px){
   .identify-header{
