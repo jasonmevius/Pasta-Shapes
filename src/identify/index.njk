@@ -107,11 +107,6 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
   const IK_IDENTIFY_BASE = "https://ik.imagekit.io/mevius/pasta/identify/";
   const FALLBACK_THUMB = "pending.png";
 
-  // Unambiguous boolean icon names
-  const BOOL_YES_ICON = "bool-yes.png";
-  const BOOL_NO_ICON = "bool-no.png";
-  const BOOL_UNKNOWN_ICON = "bool-unknown.png";
-
   const isUrl = (s) => /^https?:\/\//i.test(String(s || "").trim());
 
   const fileNameOnly = (s) => {
@@ -129,6 +124,15 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
   };
 
   const identifyIconUrlFor = (file) => IK_IDENTIFY_BASE + file;
+
+  // Question-specific answer icon mapping:
+  // hollow-yes.png / hollow-no.png / hollow-notsure.png
+  // twisted-yes.png / twisted-no.png / twisted-notsure.png
+  // etc.
+  const answerIconFor = (questionKey, value) => {
+    if (value === "__ns__") return identifyIconUrlFor(`${questionKey}-notsure.png`);
+    return identifyIconUrlFor(`${questionKey}-${value}.png`);
+  };
 
   if (!els.app || !els.dataScript) return;
 
@@ -359,7 +363,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     const notSure = value === "__ns__";
     if (notSure) {
       return {
-        icon: identifyIconUrlFor(BOOL_UNKNOWN_ICON),
+        icon: answerIconFor(q.key, "__ns__"), // e.g., hollow-notsure.png, type-notsure.png
         name: "Not sure",
         desc: "Skip this question and keep narrowing with the next best one.",
       };
@@ -368,7 +372,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     if (q.kind === "bool") {
       const yes = value === "yes";
       return {
-        icon: identifyIconUrlFor(yes ? BOOL_YES_ICON : BOOL_NO_ICON),
+        icon: answerIconFor(q.key, value), // e.g., hollow-yes.png, twisted-no.png
         name: yes ? "Yes" : "No",
         desc: yes ? (q.descYes || "") : (q.descNo || ""),
       };
