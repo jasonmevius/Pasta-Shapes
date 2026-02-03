@@ -1,0 +1,534 @@
+---
+title: Identify a pasta shape
+layout: layout.njk
+description: "Identify a pasta shape by answering a few quick questions. Mobile-friendly, one question at a time."
+---
+
+{# =============================================================================
+  identify/index.njk
+  ------------------------------------------------------------------------------
+  PURPOSE
+  - Identify pasta by narrowing down with sequential questions.
+  - Mobile-first UI: big tap targets, one question at a time.
+  - Tablet/desktop: can show matches panel more prominently via CSS.
+
+  DESIGN PRINCIPLES
+  - Never punish "Not sure" - it must always be a first-class option.
+  - Avoid dead ends - user can Back/Reset anytime.
+
+  IMPORTANT NOTES
+  - You currently embed JS in this template (existing behavior).
+  - If you later want to move this into /js/scripts.js, we can do it safely,
+    but for now we preserve your working implementation to avoid breakage.
+  - No inline CSS - all styling remains in /src/css/styles.css.
+============================================================================= #}
+
+{# -----------------------------------------------------------------------------
+  Build identifyData JSON in the template so JS has a compact dataset.
+  - This avoids extra API calls and keeps the experience fast.
+----------------------------------------------------------------------------- #}
+{% set identifyData = [] %}
+{% for item in pasta %}
+
+  {# Thumbnail notes:
+     - Could be blank
+     - Could be "penne.png"
+     - Could be a full URL
+     We store raw and normalize in JS.
+  #}
+  {% set thumbRaw = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
+
+  {# Aliases notes:
+     - Your CSV has evolved - we try multiple possible column names.
+     - Use whichever exists.
+  #}
+  {% set alsoRaw =
+    item.SearchAliases
+    or item.Aliases
+    or item.Synonyms
+    or item.Also
+    or item.Misspellings
+    or ""
+  %}
+
+  {# Push a normalized object into identifyData array #}
+  {% set _ = identifyData.push({
+    slug: item.Slug,
+    name: item.ShapeName,
+    type: item.Type or "",
+    size: item.SizeClass or "",
+    hollow: item.IsHollow or "",
+    ridged: item.IsRidged or "",
+    twisted: item.IsTwisted or "",
+    curved: item.IsCurved or "",
+    stuffed: item.IsStuffed or "",
+    also: alsoRaw,
+    thumb: thumbRaw
+  }) %}
+{% endfor %}
+
+{# --- Breadcrumbs ----------------------------------------------------------- #}
+<nav class="breadcrumbs">
+  <a href="/">← Back to search</a>
+</nav>
+
+<header class="stack tight">
+  <h1 class="h1">Identify a pasta shape</h1>
+  <p class="muted">Answer one question at a time. You can always tap “Not sure.”</p>
+</header>
+
+{# -----------------------------------------------------------------------------
+  Identify UI skeleton
+  - JS will populate:
+      - title/help text
+      - answer buttons
+      - match count
+      - matches list (optionally)
+----------------------------------------------------------------------------- #}
+<section id="identify-app" class="identify">
+  <div class="card identify-card">
+    <div class="identify-question">
+      <p class="identify-kicker muted" id="identify-kicker">Question</p>
+      <h2 class="identify-title" id="identify-title">Loading…</h2>
+      <p class="identify-help muted" id="identify-help"></p>
+    </div>
+
+    <div class="identify-answers" id="identify-answers" aria-live="polite"></div>
+
+    <div class="identify-meta">
+      <span class="muted" id="identify-count"></span>
+    </div>
+  </div>
+
+  {# Matches panel
+     - Hidden by default on mobile
+     - Can be shown on tablet/desktop via CSS and the "Show all" toggle
+  #}
+  <div class="card identify-results" id="identify-results" hidden>
+    <div class="results-head">
+      <h2 class="h2">Matches</h2>
+      <p class="muted" id="identify-results-count"></p>
+    </div>
+    <ul class="results-list" id="identify-results-list"></ul>
+  </div>
+
+  {# Bottom control bar
+     - Large buttons for mobile thumb usability
+  #}
+  <div class="identify-bottom-bar" role="navigation" aria-label="Identify controls">
+    <button class="btn secondary" type="button" id="identify-back" disabled>Back</button>
+    <button class="btn secondary" type="button" id="identify-reset">Reset</button>
+    <button class="btn" type="button" id="identify-toggle-results" hidden>Show all</button>
+  </div>
+</section>
+
+{# -----------------------------------------------------------------------------
+  JSON payload for JS
+  - Stored in a script tag so it ships with the page.
+----------------------------------------------------------------------------- #}
+<script type="application/json" id="identify-data">
+{{ identifyData | dump | safe }}
+</script>
+
+{# -----------------------------------------------------------------------------
+  Existing identify JS (preserved)
+  - If/when you want, we can move this into scripts.js for cleanliness.
+----------------------------------------------------------------------------- #}
+<script>
+(function () {
+  if (window.__pastaIdentifyInit) return;
+  window.__pastaIdentifyInit = true;
+
+  const $ = (sel, root = document) => root.querySelector(sel);
+
+  const els = {
+    app: $("#identify-app"),
+    title: $("#identify-title"),
+    kicker: $("#identify-kicker"),
+    help: $("#identify-help"),
+    answers: $("#identify-answers"),
+    count: $("#identify-count"),
+    resultsCard: $("#identify-results"),
+    resultsCount: $("#identify-results-count"),
+    resultsList: $("#identify-results-list"),
+    btnBack: $("#identify-back"),
+    btnReset: $("#identify-reset"),
+    btnToggleResults: $("#identify-toggle-results"),
+    dataScript: $("#identify-data"),
+  };
+
+  // ImageKit bases (per your requirements)
+  const IK_THUMBS_BASE = "https://ik.imagekit.io/mevius/pasta/thumbs/";
+  const IK_IDENTIFY_BASE = "https://ik.imagekit.io/mevius/pasta/identify/";
+  const FALLBACK_THUMB = "pending.png";
+
+  const isUrl = (s) => /^https?:\/\//i.test(String(s || "").trim());
+
+  const fileNameOnly = (s) => {
+    const str = String(s || "").trim();
+    if (!str) return "";
+    const clean = str.split("#")[0].split("?")[0];
+    const parts = clean.split("/");
+    return parts[parts.length - 1] || "";
+  };
+
+  const thumbUrlFor = (thumbRaw) => {
+    if (isUrl(thumbRaw)) return String(thumbRaw).trim();
+    const fn = fileNameOnly(thumbRaw);
+    return IK_THUMBS_BASE + (fn || FALLBACK_THUMB);
+  };
+
+  const identifyIconUrlFor = (file) => IK_IDENTIFY_BASE + file;
+
+  // Question-specific answer icon mapping:
+  // hollow-yes.png / hollow-no.png / hollow-notsure.png
+  // twisted-yes.png / twisted-no.png / twisted-notsure.png
+  // etc.
+  const answerIconFor = (questionKey, value) => {
+    if (value === "__ns__") return identifyIconUrlFor(`${questionKey}-notsure.png`);
+    return identifyIconUrlFor(`${questionKey}-${value}.png`);
+  };
+
+  if (!els.app || !els.dataScript) return;
+
+  let raw = [];
+  try {
+    raw = JSON.parse(els.dataScript.textContent || "[]");
+  } catch (e) {
+    console.error("Identify: failed to parse identify-data JSON", e);
+    els.title.textContent = "Error loading data";
+    els.help.textContent = "Could not parse pasta data on this page.";
+    return;
+  }
+
+  const TYPE_LABELS = {
+    strand: "Strand",
+    tube: "Tube",
+    ribbon: "Ribbon",
+    sheet: "Sheet",
+    short: "Short cut",
+    stuffed: "Stuffed",
+    soup: "Soup / pastina",
+    ring: "Ring / wheel",
+    dumpling: "Dumpling / pasta-like",
+  };
+
+  const TYPE_DESCS = {
+    strand: "Long, thin noodles (round or slightly flattened).",
+    tube: "Hollow pasta designed to hold sauce inside.",
+    ribbon: "Long, flat strips like fettuccine-style cuts.",
+    sheet: "Sheets used for layering or cutting (lasagna-style).",
+    short: "Short shapes that scoop, trap, or cling to sauce.",
+    stuffed: "Filled pasta (pockets, pillows, or sealed edges).",
+    soup: "Tiny pasta made for spoons and brothy soups.",
+    ring: "Rings and wheels that catch sauce in openings.",
+    dumpling: "Pasta-like dumplings (often irregular or rustic).",
+  };
+
+  const QUESTION_DEFS = [
+    {
+      key: "type",
+      title: "What general type is it?",
+      help: "Start broad - this narrows the list quickly.",
+      kind: "enum",
+      label: (v) => TYPE_LABELS[v] || v,
+      desc: (v) => TYPE_DESCS[v] || "",
+      icon: (v) => identifyIconUrlFor(`${v}.png`),
+    },
+    {
+      key: "stuffed",
+      title: "Is it stuffed?",
+      help: "Stuffed pasta includes filled shapes like ravioli-type forms.",
+      kind: "bool",
+      descYes: "There’s a filling inside (cheese, meat, etc.).",
+      descNo: "No filling - it’s just pasta dough.",
+    },
+    {
+      key: "hollow",
+      title: "Is it hollow?",
+      help: "Hollow pasta has a visible tube or cavity.",
+      kind: "bool",
+      descYes: "You can see a tube or opening through the shape.",
+      descNo: "Solid pasta - no tube or cavity.",
+    },
+    {
+      key: "ridged",
+      title: "Does it have ridges?",
+      help: "Ridges (rigate) help grip sauce.",
+      kind: "bool",
+      descYes: "Noticeable grooves or ridges on the surface.",
+      descNo: "Mostly smooth surface.",
+    },
+    {
+      key: "twisted",
+      title: "Is it twisted?",
+      help: "Twisted shapes include spirals and corkscrews.",
+      kind: "bool",
+      descYes: "Spiraled or corkscrew-like geometry.",
+      descNo: "Not spiraled or twisted.",
+    },
+    {
+      key: "curved",
+      title: "Is it curved?",
+      help: "Curved shapes include elbows, crescents, and arcs.",
+      kind: "bool",
+      descYes: "Bent or arced rather than straight.",
+      descNo: "Straight rather than bent.",
+    },
+    {
+      key: "size",
+      title: "What size is it?",
+      help: "If you’re unsure, pick “Not sure” - size is often the least reliable.",
+      kind: "enum",
+      values: ["tiny", "small", "medium", "large"],
+      label: (v) => v,
+      icon: (v) => identifyIconUrlFor(`size-${v}.png`),
+    },
+  ];
+
+  // --- State ---------------------------------------------------------------
+  const normalize = (v) => String(v || "").trim().toLowerCase();
+
+  const initial = raw.map((r) => ({
+    slug: r.slug,
+    name: r.name,
+    type: normalize(r.type),
+    size: normalize(r.size),
+    hollow: normalize(r.hollow),
+    ridged: normalize(r.ridged),
+    twisted: normalize(r.twisted),
+    curved: normalize(r.curved),
+    stuffed: normalize(r.stuffed),
+    also: String(r.also || ""),
+    thumb: String(r.thumb || ""),
+  }));
+
+  let working = initial.slice();
+  let history = []; // [{ key, value, prevWorking }]
+
+  const setText = (el, txt) => { if (el) el.textContent = txt; };
+
+  const renderMatchesCount = () => {
+    setText(els.count, `Matching: ${working.length}`);
+  };
+
+  const renderResultsList = () => {
+    if (!els.resultsList) return;
+
+    els.resultsList.innerHTML = "";
+    for (const item of working.slice(0, 100)) {
+      const li = document.createElement("li");
+      li.className = "result-card";
+
+      const a = document.createElement("a");
+      a.className = "result-link";
+      a.href = `/pasta/${item.slug}/`;
+      a.setAttribute("data-recent", "pasta");
+
+      const thumb = document.createElement("div");
+      thumb.className = "thumb";
+
+      const img = document.createElement("img");
+      img.width = 56;
+      img.height = 56;
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.alt = "";
+      img.src = thumbUrlFor(item.thumb);
+
+      thumb.appendChild(img);
+
+      const body = document.createElement("div");
+      body.className = "result-body";
+
+      const titleRow = document.createElement("div");
+      titleRow.className = "result-title-row";
+
+      const strong = document.createElement("strong");
+      strong.className = "result-name";
+      strong.textContent = item.name;
+
+      titleRow.appendChild(strong);
+      body.appendChild(titleRow);
+
+      a.appendChild(thumb);
+      a.appendChild(body);
+      li.appendChild(a);
+      els.resultsList.appendChild(li);
+    }
+
+    setText(els.resultsCount, `${working.length} match${working.length === 1 ? "" : "es"}`);
+  };
+
+  const showResultsPanel = (show) => {
+    if (!els.resultsCard || !els.btnToggleResults) return;
+    els.resultsCard.hidden = !show;
+    els.btnToggleResults.hidden = false;
+    els.btnToggleResults.textContent = show ? "Hide list" : "Show all";
+  };
+
+  // --- Question selection ---------------------------------------------------
+  const questionAlreadyAnswered = (key) => history.some((h) => h.key === key);
+
+  const nextQuestion = () => {
+    // Always start with Type.
+    if (!questionAlreadyAnswered("type")) return QUESTION_DEFS[0];
+
+    // Then ask the "shape discriminators" before size.
+    for (const q of QUESTION_DEFS) {
+      if (q.key === "type") continue;
+      if (q.key === "size") continue;
+      if (!questionAlreadyAnswered(q.key)) return q;
+    }
+
+    // Size last
+    if (!questionAlreadyAnswered("size")) return QUESTION_DEFS.find((q) => q.key === "size");
+
+    return null;
+  };
+
+  // --- Filtering ------------------------------------------------------------
+  const applyAnswer = (key, value) => {
+    const prev = working;
+    history.push({ key, value, prevWorking: prev });
+
+    working = working.filter((item) => {
+      const itemVal = item[key];
+      if (!itemVal) return true;
+
+      // "__ns__" means user is not sure - do not filter.
+      if (value === "__ns__") return true;
+
+      // bool values stored as "yes"/"no" in CSV
+      return itemVal === value;
+    });
+
+    render();
+  };
+
+  const goBack = () => {
+    if (!history.length) return;
+    const last = history.pop();
+    working = last.prevWorking || initial.slice();
+    render();
+  };
+
+  const reset = () => {
+    working = initial.slice();
+    history = [];
+    render();
+  };
+
+  // --- Rendering answers ----------------------------------------------------
+  const renderAnswers = (q) => {
+    if (!els.answers) return;
+    els.answers.innerHTML = "";
+
+    const addButton = (label, value, desc, iconUrl) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "identify-answer";
+
+      btn.addEventListener("click", () => applyAnswer(q.key, value));
+
+      const img = document.createElement("img");
+      img.alt = "";
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.width = 56;
+      img.height = 56;
+
+      // Prefer question-specific icon scheme for yes/no/not sure
+      if (q.kind === "bool") {
+        img.src = answerIconFor(q.key, value);
+      } else if (iconUrl) {
+        img.src = iconUrl;
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "identify-answer-meta";
+
+      const t = document.createElement("div");
+      t.className = "identify-answer-title";
+      t.textContent = label;
+
+      const d = document.createElement("div");
+      d.className = "identify-answer-desc muted";
+      d.textContent = desc || "";
+
+      meta.appendChild(t);
+      if (desc) meta.appendChild(d);
+
+      btn.appendChild(img);
+      btn.appendChild(meta);
+
+      els.answers.appendChild(btn);
+    };
+
+    if (q.kind === "bool") {
+      addButton("Yes", "yes", q.descYes || "", null);
+      addButton("No", "no", q.descNo || "", null);
+      addButton("Not sure", "__ns__", "Keep all possibilities.", null);
+      return;
+    }
+
+    // Enum questions
+    const values = q.values || Object.keys(TYPE_LABELS);
+    for (const v of values) {
+      addButton(q.label(v), v, q.desc(v), q.icon ? q.icon(v) : null);
+    }
+    addButton("Not sure", "__ns__", "Keep all possibilities.", null);
+  };
+
+  // --- Main render ----------------------------------------------------------
+  const render = () => {
+    const q = nextQuestion();
+
+    // Buttons: Back enabled only if we have history
+    if (els.btnBack) els.btnBack.disabled = history.length === 0;
+
+    // If we have exactly one match, go straight to detail page.
+    // NOTE: This is optional. If you prefer to keep user in Identify, remove.
+    if (working.length === 1) {
+      const only = working[0];
+      window.location.href = `/pasta/${only.slug}/`;
+      return;
+    }
+
+    // If no question remains, show list
+    if (!q) {
+      setText(els.kicker, "Done");
+      setText(els.title, "Here are your matches");
+      setText(els.help, "You can refine by restarting or tapping a match.");
+      renderAnswers({ key: "__none__", kind: "none" });
+      showResultsPanel(true);
+      renderMatchesCount();
+      renderResultsList();
+      return;
+    }
+
+    setText(els.kicker, `Question ${history.length + 1}`);
+    setText(els.title, q.title);
+    setText(els.help, q.help || "");
+
+    renderAnswers(q);
+    renderMatchesCount();
+
+    // Default behavior: keep list hidden on mobile unless user asks.
+    showResultsPanel(false);
+    renderResultsList();
+  };
+
+  // --- Wire up controls -----------------------------------------------------
+  if (els.btnBack) els.btnBack.addEventListener("click", goBack);
+  if (els.btnReset) els.btnReset.addEventListener("click", reset);
+  if (els.btnToggleResults) {
+    els.btnToggleResults.addEventListener("click", () => {
+      const isHidden = els.resultsCard.hidden;
+      showResultsPanel(isHidden);
+    });
+  }
+
+  render();
+})();
+</script>
