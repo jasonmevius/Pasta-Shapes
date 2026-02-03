@@ -7,27 +7,44 @@
       1) Search
       2) Identify
 
-  WHY THIS FILE WAS UPDATED
-  - Some Nunjucks environments choke on JS-style expressions like:
-      page.url.startsWith(...)
-      condition ? a : b
-  - This version avoids method calls and ternaries completely.
+  WHY THIS VERSION
+  - Netlify/Eleventy Nunjucks error: "expected block end in set statement"
+  - Some Nunjucks configurations are strict about expressions inside {% set %}.
+  - This version avoids ALL complex set expressions:
+      * no ternary
+      * no comparisons in set
+      * no method calls
+      * no parentheses in set
+  - Uses only a simple set + if blocks.
 
   IMPORTANT
   - No inline CSS.
-  - The slider effect is driven by:
+  - Slider effect is driven by:
       * data-active attribute on <nav>
       * CSS transform on .bottom-nav-indicator
 ============================================================================= #}
 
 {# ---------------------------------------------------------------------------
-  Determine whether we are on an Identify page.
-  We avoid startsWith() and use replace() + compare instead:
-    If replacing "/identify/" changes the string, then it contained "/identify/".
+  Get current URL safely.
+  - If page/url is missing, default to empty string.
 --------------------------------------------------------------------------- #}
-{% set currentUrl = page and page.url ? page.url : "" %}
-{% set urlWithoutIdentify = currentUrl | replace("/identify/", "") %}
-{% set isIdentify = (currentUrl != urlWithoutIdentify) %}
+{% set currentUrl = "" %}
+{% if page and page.url %}
+  {% set currentUrl = page.url %}
+{% endif %}
+
+{# ---------------------------------------------------------------------------
+  Determine whether this is an Identify page.
+  - We treat any URL that starts with "/identify" as Identify.
+  - We avoid startsWith() and avoid complex expressions in set.
+
+  Approach:
+  - If URL contains "/identify", we flip isIdentify to true.
+--------------------------------------------------------------------------- #}
+{% set isIdentify = false %}
+{% if currentUrl and (currentUrl | replace("/identify", "")) != currentUrl %}
+  {% set isIdentify = true %}
+{% endif %}
 
 <nav
   class="bottom-nav"
