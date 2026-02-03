@@ -3,22 +3,18 @@
 // Global site behaviors:
 //
 // 1) Recently Viewed (localStorage)
-//    - Stores last visited pasta detail slugs in localStorage.
-//    - Renders up to 5 recent items as a comma-delimited link list.
+// 2) Home Search filtering (Option B: show nothing until typing)
 //
-// 2) Search Results Filtering (Home page)
-//    - Filters pre-rendered result cards (<li data-search ...>).
-//    - Ranks matches (name-first).
-//    - Progressive reveal / paging:
-//        "Top 10 + X more" -> Next 10 button
+// IMPORTANT CHANGE IN THIS VERSION
+// - More robust initialization:
+//     * initialize immediately if DOM is already ready
+//     * still initialize on DOMContentLoaded for normal loads
+//     * re-initialize on "pageshow" (bfcache restore), common on mobile Safari
 //
-// IMPORTANT UX (Option B)
-// - Show NOTHING until the user starts typing.
-// - Once typing begins, show matches (Top 10) + pagination.
-//
-// IMPORTANT CONSTRAINTS
-// - No inline styles (all styling belongs in /src/css/styles.css).
-// - Script should fail safely if page doesn't have expected elements.
+// WHY
+// - You confirmed scripts.js loads (200) and the DOM elements exist,
+//   yet typing doesn't trigger filtering. The most likely reason is that
+//   the "input" listener never attached because init never ran in that session.
 // ============================================================================
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -38,7 +34,7 @@
     try {
       localStorage.setItem("pasta:recent", JSON.stringify(arr.slice(0, 12)));
     } catch (e) {
-      // If storage is blocked/full, silently ignore.
+      // ignore
     }
   }
 
@@ -63,20 +59,18 @@
     const cards = Array.from(list.querySelectorAll("[data-search]"));
     const originalOrder = cards.slice();
 
-    // Recently viewed (container + target element)
     const recentWrap = $("#recently-viewed-wrap");
-    const recentTarget = $("#recently-viewed"); // typically a <p> in your templates
+    const recentTarget = $("#recently-viewed");
 
-    // Paging UI (Top 10 + X more)
     const note = $("#pasta-results-note");
     const nextBtn = $("#pasta-toggle-all");
 
     const PAGE_N = 10;
     let visibleLimit = PAGE_N;
 
-    // -----------------------------------------------------------------------------
-    // Visibility helpers (no inline styles)
-    // -----------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Visibility helpers (use the HTML "hidden" attribute - no inline styles)
+    // -------------------------------------------------------------------------
     function showEl(el) {
       if (!el) return;
       el.hidden = false;
@@ -93,9 +87,9 @@
       for (const c of cards) c.hidden = true;
     }
 
-    // -----------------------------------------------------------------------------
-    // Normalization helpers (consistent with index normalization)
-    // -----------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Normalization helpers
+    // -------------------------------------------------------------------------
     const STOPWORDS = new Set([
       "a","ad","al","alla","alle","allo","ai","agli","all",
       "da","de","dei","degli","della","delle","del","di",
@@ -115,7 +109,6 @@
         .trim();
     }
 
-    // Collapses spaced-letter inputs like "p e n n e" -> "penne"
     function normalizeQuery(s) {
       const q = normalize(s);
       if (/^(?:[a-z0-9]\s+){2,}[a-z0-9]$/.test(q)) return q.replace(/\s+/g, "");
@@ -131,10 +124,9 @@
       return parts.join(" ").trim();
     }
 
-    // -----------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // Optional fuzzy support using /api/pasta-index.json
-    // - used only if direct matching finds nothing
-    // -----------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     let indexLoaded = false;
     let index = null;
     let aliasKeys = null;
@@ -172,7 +164,6 @@
       return index;
     }
 
-    // Bounded Levenshtein (fuzzy fallback)
     function levenshtein(a, b, maxDist) {
       if (a === b) return 0;
       if (!a || !b) return Math.max(a.length, b.length);
@@ -183,7 +174,6 @@
 
       let prev = new Array(bl + 1);
       let cur = new Array(bl + 1);
-
       for (let j = 0; j <= bl; j++) prev[j] = j;
 
       for (let i = 1; i <= al; i++) {
@@ -205,7 +195,6 @@
         prev = cur;
         cur = tmp;
       }
-
       return prev[bl];
     }
 
@@ -235,18 +224,16 @@
       return out;
     }
 
-    // -----------------------------------------------------------------------------
-    // Ranking helpers (name-first ordering)
-    // -----------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Ranking helpers
+    // -------------------------------------------------------------------------
     function cardNameNorm(card) {
       const el = card.querySelector(".result-name");
       return normalize(el ? el.textContent : "");
     }
-
     function cardBlobNorm(card) {
       return normalize(card.getAttribute("data-search") || "");
     }
-
     function cardSlugNorm(card) {
       return normalize(card.getAttribute("data-slug") || "");
     }
@@ -256,7 +243,6 @@
       const slug = cardSlugNorm(card);
       const blob = cardBlobNorm(card);
 
-      // Lower bucket = better
       let bucket = 50;
 
       if (name && name.startsWith(q)) bucket = 0;
@@ -279,21 +265,14 @@
       for (const card of order) list.appendChild(card);
     }
 
-    // -----------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // UI text helpers
-    // -----------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     function setStatusText(text) {
       status.textContent = text || "";
     }
 
-    /**
-     * setNoteAndNext
-     * - Updates the "Showing X of Y - Z more" note and the "Next N" button.
-     *
-     * BUGFIX (your note #1)
-     * - If remaining <= 0, we *force-hide* the Next button AND clear its text,
-     *   so stale button state cannot linger from earlier searches.
-     */
+    // Bugfix: never show "Next" if remaining <= 0
     function setNoteAndNext(matchCount, shownCount) {
       if (!note || !nextBtn) return;
 
@@ -326,9 +305,6 @@
       return n;
     }
 
-    // -----------------------------------------------------------------------------
-    // Direct match set: "blob includes query"
-    // -----------------------------------------------------------------------------
     function directMatchSets(q) {
       const matched = [];
       const nonMatched = [];
@@ -338,37 +314,31 @@
         if (blob.includes(q)) matched.push(card);
         else nonMatched.push(card);
       }
-
       return { matched, nonMatched };
     }
 
-    // -----------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     // Main filter routine (Option B: show nothing until typing)
-    // -----------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
     async function filter() {
       const raw = input.value || "";
       const q = normalizeQuery(raw);
 
-      // OPTION B: if there's NO query, show nothing.
       if (!q) {
         reorderCards(originalOrder);
         hideAllCards();
-
         setStatusText("Start typing to see matches (aliases included).");
-
         if (note) note.textContent = "";
         if (nextBtn) {
           nextBtn.textContent = "";
           hideEl(nextBtn);
         }
-
         visibleLimit = PAGE_N;
         return;
       }
 
       let { matched, nonMatched } = directMatchSets(q);
 
-      // If no direct matches and query contains spaces, retry ignoring spaces
       let qUsed = q;
       if (!matched.length && q.includes(" ")) {
         const qNoSpaces = q.replace(/\s+/g, "");
@@ -382,7 +352,6 @@
         }
       }
 
-      // Direct matches found
       if (matched.length) {
         const ranked = matched
           .map((c) => ({ c, s: scoreCard(c, qUsed) }))
@@ -408,7 +377,6 @@
         return;
       }
 
-      // Fuzzy fallback
       await loadIndexIfNeeded();
 
       const candidates = [q];
@@ -419,7 +387,6 @@
 
       let slugs = [];
 
-      // Exact alias match (fast path)
       if (index && index.aliasToSlug) {
         for (const cand of candidates) {
           const exactSlug = index.aliasToSlug[cand];
@@ -429,7 +396,6 @@
           }
         }
 
-        // Safe stopword-based exact match (unique slug only)
         if (!slugs.length && stopKeyToSlugs) {
           for (const cand of candidates) {
             const stopKey = stripStopwords(cand);
@@ -442,7 +408,6 @@
         }
       }
 
-      // Fuzzy if still nothing
       if (!slugs.length) {
         for (const cand of candidates) {
           slugs = bestFuzzySlugs(cand, 50);
@@ -476,12 +441,9 @@
         return;
       }
 
-      // No matches at all
       reorderCards(originalOrder);
       hideAllCards();
-
       setStatusText("No matches found.");
-
       if (note) note.textContent = "";
       if (nextBtn) {
         nextBtn.textContent = "";
@@ -489,9 +451,9 @@
       }
     }
 
-    // -----------------------------------------------------------------------------
-    // Recently viewed: render as comma-delimited links into a <p>
-    // -----------------------------------------------------------------------------
+    // -------------------------------------------------------------------------
+    // Recently viewed
+    // -------------------------------------------------------------------------
     function renderRecents() {
       if (!recentWrap || !recentTarget) return;
 
@@ -513,8 +475,8 @@
       }
 
       recentTarget.innerHTML = "";
-
       const frag = document.createDocumentFragment();
+
       items.forEach((card, idx) => {
         const link = card.querySelector("a[href]");
         const name = card.querySelector(".result-name");
@@ -532,9 +494,7 @@
       recentWrap.hidden = false;
     }
 
-    // -----------------------------------------------------------------------------
-    // Record recents on click (from result cards)
-    // -----------------------------------------------------------------------------
+    // Record recents on click
     list.addEventListener("click", (e) => {
       const a = e.target.closest("a[data-recent]");
       if (!a) return;
@@ -544,10 +504,10 @@
       if (m && m[1]) addRecent(m[1]);
     });
 
-    // Paging: Next 10
+    // Paging
     if (nextBtn) {
       nextBtn.addEventListener("click", (e) => {
-        if (typeof e.preventDefault === "function") e.preventDefault();
+        e.preventDefault();
         visibleLimit += PAGE_N;
         filter();
       });
@@ -556,26 +516,22 @@
       hideEl(nextBtn);
     }
 
-    // Pre-load index (optional) on focus
+    // Attach input listener (THIS is what must exist for "typing does something")
+    input.addEventListener("input", () => {
+      visibleLimit = PAGE_N;
+      filter();
+    });
+
+    // Optional: pre-load index on focus
     input.addEventListener(
       "focus",
       () => {
         loadIndexIfNeeded();
       },
-      { once: true, passive: true }
+      { once: true }
     );
 
-    // Filter as user types
-    input.addEventListener(
-      "input",
-      () => {
-        visibleLimit = PAGE_N;
-        filter();
-      },
-      { passive: true }
-    );
-
-    // Initial state (Option B)
+    // Initial state
     reorderCards(originalOrder);
     hideAllCards();
     setStatusText("Start typing to see matches (aliases included).");
@@ -588,7 +544,7 @@
   }
 
   // =============================================================================
-  // Detail page behavior (store recent on load)
+  // Detail page: store recent on load
   // =============================================================================
   function initDetailPage() {
     const path = window.location.pathname || "";
@@ -597,14 +553,22 @@
   }
 
   // =============================================================================
-  // Init
+  // Robust init
   // =============================================================================
-  document.addEventListener(
-    "DOMContentLoaded",
-    () => {
-      initSearchPage();
-      initDetailPage();
-    },
-    { once: true }
-  );
+  function initAll() {
+    initSearchPage();
+    initDetailPage();
+  }
+
+  // If DOM is already ready, run immediately. Otherwise wait.
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initAll, { once: true });
+  } else {
+    initAll();
+  }
+
+  // Re-init when page is restored from bfcache (mobile Safari / back button)
+  window.addEventListener("pageshow", (e) => {
+    if (e && e.persisted) initAll();
+  });
 })();
