@@ -1,501 +1,640 @@
-// src/js/pasta-identify.js
+// src/js/scripts.js
 // ============================================================================
-// Identify-by-features workflow (select-based UI).
+// Global site behaviors:
 //
-// This script ONLY runs if it finds #pasta-identify.
-// It expects these elements to exist (your current identify template provides them):
-// - #id-type, #id-hollow, #id-ridged, #id-twisted, #id-curved, #id-size
-// - #id-reset, #id-status, #id-results
+// 1) Recently Viewed (localStorage)
+//    - Stores last visited pasta detail slugs in localStorage.
+//    - Renders up to 5 recent items as a comma-delimited link list.
+//
+// 2) Search Results Filtering (Home page)
+//    - Filters pre-rendered result cards (<li data-search ...>).
+//    - Ranks matches (name-first).
+//    - Progressive reveal / paging:
+//        "Top 10 + X more" -> Next 10 button
+//
+// IMPORTANT UX CHANGE (Option B)
+// - Show NOTHING until the user starts typing.
+// - Once typing begins, show matches (Top 10) + "Next 10" pagination.
 //
 // IMPORTANT CONSTRAINTS
-// - Do NOT inject <style> tags.
-// - Do NOT set inline styles.
-// - All styling must live in /src/css/styles.css.
-//
-// UX GOALS
-// - Question cards show in a fixed order visually.
-// - The “next best question” logic determines which card to reveal next,
-//   but the visual order remains stable.
+// - No inline styles (all styling belongs in /src/css/styles.css).
+// - Script should fail safely if page doesn't have expected elements.
 // ============================================================================
-(function () {
-  const root = document.getElementById("pasta-identify");
-  if (!root) return;
+(() => {
+  const $ = (sel, root = document) => root.querySelector(sel);
 
-  const elType = document.getElementById("id-type");
-  const elHollow = document.getElementById("id-hollow");
-  const elRidged = document.getElementById("id-ridged");
-  const elTwisted = document.getElementById("id-twisted");
-  const elCurved = document.getElementById("id-curved");
-  const elSize = document.getElementById("id-size");
-  const elReset = document.getElementById("id-reset");
-  const elStatus = document.getElementById("id-status");
-  const elResults = document.getElementById("id-results");
-
-  if (
-    !elType ||
-    !elHollow ||
-    !elRidged ||
-    !elTwisted ||
-    !elCurved ||
-    !elSize ||
-    !elReset ||
-    !elStatus ||
-    !elResults
-  ) return;
-
-  let entries = [];
-  let loaded = false;
-
-  const MAX_SHOW = 25;
-  const SIZE_ONLY_IF_MORE_THAN = 10;
-
-  // Fixed sequential order in the UI (always displayed in this order)
-  const STEPS = [
-    {
-      key: "type",
-      el: elType,
-      title: "Type",
-      desc: "Start with the overall form - long strands, tubes, sheets, stuffed, soup shapes, etc.",
-    },
-    {
-      key: "isHollow",
-      el: elHollow,
-      title: "Hollow",
-      desc: "Does it have a hole or tube running through it (like penne or rigatoni)?",
-      kind: "structural",
-    },
-    {
-      key: "isRidged",
-      el: elRidged,
-      title: "Ridged",
-      desc: "Are there ridges or grooves on the surface (often used to grab sauce)?",
-      kind: "structural",
-    },
-    {
-      key: "isTwisted",
-      el: elTwisted,
-      title: "Twisted",
-      desc: "Is the shape spiraled or twisted (like fusilli)?",
-      kind: "structural",
-    },
-    {
-      key: "isCurved",
-      el: elCurved,
-      title: "Curved",
-      desc: "Is the shape notably curved (like elbows or shells)?",
-      kind: "structural",
-    },
-    {
-      key: "sizeClass",
-      el: elSize,
-      title: "Size",
-      desc: "A rough bucket - small / medium / large. Helpful as a last step, but subjective.",
-      kind: "size",
-    },
-  ];
-
-  function normVal(v) {
-    return String(v || "").trim().toLowerCase();
+  // =============================================================================
+  // Recently viewed helpers (localStorage)
+  // =============================================================================
+  function readRecents() {
+    try {
+      return JSON.parse(localStorage.getItem("pasta:recent") || "[]");
+    } catch (e) {
+      return [];
+    }
   }
 
-  function clearResults() {
-    elResults.innerHTML = "";
+  function writeRecents(arr) {
+    try {
+      localStorage.setItem("pasta:recent", JSON.stringify(arr.slice(0, 12)));
+    } catch (e) {
+      // If storage is blocked/full, silently ignore.
+    }
   }
 
-  function setStatus(text) {
-    elStatus.textContent = text;
+  function addRecent(slug) {
+    if (!slug) return;
+    const cur = readRecents().filter((x) => x !== slug);
+    cur.unshift(slug);
+    writeRecents(cur);
   }
 
-  // --------------------------------------------------------------------------
-  // Rendering results without inline styles
-  // --------------------------------------------------------------------------
-  function render(results) {
-    clearResults();
+  // =============================================================================
+  // Search page behavior (Home page filtering)
+  // =============================================================================
+  function initSearchPage() {
+    const input = $("#pasta-q");
+    const status = $("#pasta-search-status");
+    const list = $("#pasta-results");
 
-    const show = results.slice(0, MAX_SHOW);
+    // Only run on pages that have the search + results list.
+    if (!input || !status || !list) return;
 
-    for (const r of show) {
-      const li = document.createElement("li");
-      li.className = "id-result";
+    const cards = Array.from(list.querySelectorAll("[data-search]"));
+    const originalOrder = cards.slice();
 
-      const a = document.createElement("a");
-      a.href = r.url;
-      a.textContent = r.name;
-      li.appendChild(a);
+    // Recently viewed (container + target element)
+    const recentWrap = $("#recently-viewed-wrap");
+    const recentTarget = $("#recently-viewed"); // now a <p> in your templates
 
-      if (r.description) {
-        const div = document.createElement("div");
-        div.className = "id-result-desc";
-        div.textContent = r.description;
-        li.appendChild(div);
+    // "Top 10 + X more"
+    const note = $("#pasta-results-note");
+    const nextBtn = $("#pasta-toggle-all");
+
+    const PAGE_N = 10;
+    let visibleLimit = PAGE_N;
+
+    // -----------------------------------------------------------------------------
+    // Visibility helpers (we avoid inline style - use hidden attribute)
+    // -----------------------------------------------------------------------------
+    function showEl(el) {
+      if (!el) return;
+      el.hidden = false;
+      el.setAttribute("aria-hidden", "false");
+    }
+
+    function hideEl(el) {
+      if (!el) return;
+      el.hidden = true;
+      el.setAttribute("aria-hidden", "true");
+    }
+
+    function hideAllCards() {
+      for (const c of cards) c.hidden = true;
+    }
+
+    // -----------------------------------------------------------------------------
+    // Normalization helpers (consistent with your index normalization)
+    // -----------------------------------------------------------------------------
+    const STOPWORDS = new Set([
+      "a","ad","al","alla","alle","allo","ai","agli","all",
+      "da","de","dei","degli","della","delle","del","di",
+      "e","ed","in","con","per","su","lo","la","le","il",
+      "un","una","uno",
+    ]);
+
+    function normalize(s) {
+      return String(s || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/&/g, "and")
+        .replace(/[’']/g, " ")
+        .replace(/[^a-z0-9\s-]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    // Collapses spaced-letter inputs like "p e n n e" -> "penne"
+    function normalizeQuery(s) {
+      const q = normalize(s);
+      if (/^(?:[a-z0-9]\s+){2,}[a-z0-9]$/.test(q)) return q.replace(/\s+/g, "");
+      return q;
+    }
+
+    function stripStopwords(normalizedString) {
+      const parts = (normalizedString || "")
+        .split(" ")
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .filter((t) => !STOPWORDS.has(t));
+      return parts.join(" ").trim();
+    }
+
+    // -----------------------------------------------------------------------------
+    // Optional fuzzy support using /api/pasta-index.json
+    // (We use it only if direct matching finds nothing.)
+    // -----------------------------------------------------------------------------
+    let indexLoaded = false;
+    let index = null;
+    let aliasKeys = null;
+    let stopKeyToSlugs = null;
+
+    const cardBySlug = new Map(cards.map((c) => [c.getAttribute("data-slug"), c]));
+
+    async function loadIndexIfNeeded() {
+      if (indexLoaded) return index;
+      indexLoaded = true;
+
+      try {
+        const res = await fetch("/api/pasta-index.json", { cache: "force-cache" });
+        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+        index = await res.json();
+
+        const a2s = index.aliasToSlug || {};
+        aliasKeys = Object.keys(a2s);
+
+        stopKeyToSlugs = new Map();
+        for (const k of aliasKeys) {
+          const stopKey = stripStopwords(k);
+          if (!stopKey) continue;
+          const slug = a2s[k];
+          if (!slug) continue;
+          if (!stopKeyToSlugs.has(stopKey)) stopKeyToSlugs.set(stopKey, new Set());
+          stopKeyToSlugs.get(stopKey).add(slug);
+        }
+      } catch (e) {
+        index = null;
+        aliasKeys = null;
+        stopKeyToSlugs = null;
       }
 
-      elResults.appendChild(li);
+      return index;
     }
 
-    if (results.length > MAX_SHOW) {
-      const li = document.createElement("li");
-      li.className = "id-result id-result-note";
-      li.textContent = `Showing ${MAX_SHOW} of ${results.length}. Add more answers to narrow it down.`;
-      elResults.appendChild(li);
+    // Bounded Levenshtein used for fuzzy fallback
+    function levenshtein(a, b, maxDist) {
+      if (a === b) return 0;
+      if (!a || !b) return Math.max(a.length, b.length);
+
+      const al = a.length;
+      const bl = b.length;
+
+      if (Math.abs(al - bl) > maxDist) return maxDist + 1;
+
+      let prev = new Array(bl + 1);
+      let cur = new Array(bl + 1);
+
+      for (let j = 0; j <= bl; j++) prev[j] = j;
+
+      for (let i = 1; i <= al; i++) {
+        cur[0] = i;
+
+        let rowMin = cur[0];
+        const ai = a.charCodeAt(i - 1);
+
+        for (let j = 1; j <= bl; j++) {
+          const cost = ai === b.charCodeAt(j - 1) ? 0 : 1;
+          const val = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+          cur[j] = val;
+          if (val < rowMin) rowMin = val;
+        }
+
+        if (rowMin > maxDist) return maxDist + 1;
+
+        const tmp = prev;
+        prev = cur;
+        cur = tmp;
+      }
+
+      return prev[bl];
     }
-  }
 
-  function matchesFilter(entry, key, selected) {
-    if (!selected) return true; // Any
-    const val = normVal(entry[key]);
-    if (!val) return selected === "unknown"; // blank treated as unknown
-    return val === selected;
-  }
+    function bestFuzzySlugs(qKey, limit = 50) {
+      if (!index || !aliasKeys || !qKey || qKey.length < 3) return [];
 
-  function getFilterState() {
-    return {
-      type: normVal(elType.value),
-      isHollow: normVal(elHollow.value),
-      isRidged: normVal(elRidged.value),
-      isTwisted: normVal(elTwisted.value),
-      isCurved: normVal(elCurved.value),
-      sizeClass: normVal(elSize.value),
-    };
-  }
+      const a2s = index.aliasToSlug || {};
+      const maxDist = Math.min(3, Math.floor(qKey.length / 6) + 1);
 
-  function applyAllFilters(baseList, filters) {
-    return baseList.filter((e) => {
-      if (filters.type && normVal(e.type) !== filters.type) return false;
-      if (!matchesFilter(e, "isHollow", filters.isHollow)) return false;
-      if (!matchesFilter(e, "isRidged", filters.isRidged)) return false;
-      if (!matchesFilter(e, "isTwisted", filters.isTwisted)) return false;
-      if (!matchesFilter(e, "isCurved", filters.isCurved)) return false;
+      const scored = [];
+      for (const k of aliasKeys) {
+        const d = levenshtein(qKey, k, maxDist);
+        if (d <= maxDist) scored.push({ k, d });
+      }
 
-      // sizeClass: allow blank values when selecting unknown
-      if (filters.sizeClass) {
-        const v = normVal(e.sizeClass);
-        if (v !== filters.sizeClass) {
-          if (!(filters.sizeClass === "unknown" && !v)) return false;
+      scored.sort((a, b) => a.d - b.d || a.k.length - b.k.length);
+
+      const out = [];
+      const used = new Set();
+
+      for (const s of scored) {
+        const slug = a2s[s.k];
+        if (!slug || used.has(slug)) continue;
+        used.add(slug);
+        out.push(slug);
+        if (out.length >= limit) break;
+      }
+
+      return out;
+    }
+
+    // -----------------------------------------------------------------------------
+    // Ranking helpers (name-first ordering)
+    // -----------------------------------------------------------------------------
+    function cardNameNorm(card) {
+      const el = card.querySelector(".result-name");
+      return normalize(el ? el.textContent : "");
+    }
+
+    function cardBlobNorm(card) {
+      return normalize(card.getAttribute("data-search") || "");
+    }
+
+    function cardSlugNorm(card) {
+      return normalize(card.getAttribute("data-slug") || "");
+    }
+
+    function scoreCard(card, q) {
+      const name = cardNameNorm(card);
+      const slug = cardSlugNorm(card);
+      const blob = cardBlobNorm(card);
+
+      // Lower bucket = better
+      let bucket = 50;
+
+      if (name && name.startsWith(q)) bucket = 0;
+      else if (name && name.split(" ").some((t) => t.startsWith(q))) bucket = 1;
+      else if (slug && slug.startsWith(q)) bucket = 2;
+      else if (blob && blob.startsWith(q)) bucket = 3;
+      else if (name && name.includes(q)) bucket = 4;
+      else if (blob && blob.includes(q)) bucket = 5;
+
+      let pos = 9999;
+      if (bucket <= 3) pos = 0;
+      else if (bucket === 4) pos = name.indexOf(q);
+      else if (bucket === 5) pos = blob.indexOf(q);
+
+      const len = name ? name.length : 9999;
+      return { bucket, pos, len, name };
+    }
+
+    function reorderCards(order) {
+      for (const card of order) list.appendChild(card);
+    }
+
+    // -----------------------------------------------------------------------------
+    // UI text helpers
+    // -----------------------------------------------------------------------------
+    function setStatusText(text) {
+      status.textContent = text || "";
+    }
+
+    function setNoteAndNext(matchCount, shownCount) {
+      if (!note || !nextBtn) return;
+
+      const remaining = Math.max(0, matchCount - shownCount);
+
+      if (matchCount === 0) {
+        note.textContent = "";
+        hideEl(nextBtn);
+        return;
+      }
+
+      if (remaining === 0) {
+        note.textContent = `Showing ${shownCount} of ${matchCount}`;
+        hideEl(nextBtn);
+        return;
+      }
+
+      note.textContent = `Showing ${shownCount} of ${matchCount} - ${remaining} more`;
+
+      const nextChunk = Math.min(PAGE_N, remaining);
+      nextBtn.textContent = `Next ${nextChunk} (${remaining} more)`;
+      showEl(nextBtn);
+    }
+
+    function countShown(arr) {
+      let n = 0;
+      for (const el of arr) if (!el.hidden) n++;
+      return n;
+    }
+
+    // -----------------------------------------------------------------------------
+    // Direct match set: "blob includes query"
+    // -----------------------------------------------------------------------------
+    function directMatchSets(q) {
+      const matched = [];
+      const nonMatched = [];
+
+      for (const card of originalOrder) {
+        const blob = cardBlobNorm(card);
+        if (blob.includes(q)) matched.push(card);
+        else nonMatched.push(card);
+      }
+
+      return { matched, nonMatched };
+    }
+
+    // -----------------------------------------------------------------------------
+    // Main filter routine (Option B: show nothing until typing)
+    // -----------------------------------------------------------------------------
+    async function filter() {
+      const raw = input.value || "";
+      const q = normalizeQuery(raw);
+
+      // -----------------------------------------------------------------------
+      // OPTION B behavior:
+      // - If there's NO query, show nothing.
+      // - This keeps the homepage minimal and avoids a "wall of results."
+      // -----------------------------------------------------------------------
+      if (!q) {
+        // Preserve original DOM order (helps predictable future filtering)
+        reorderCards(originalOrder);
+
+        // Hide every card until typing begins
+        hideAllCards();
+
+        // UI guidance
+        setStatusText("Start typing to see matches (aliases included).");
+
+        // Hide paging UI
+        if (note) note.textContent = "";
+        hideEl(nextBtn);
+
+        // Reset paging limit so first keystroke starts at Top 10
+        visibleLimit = PAGE_N;
+        return;
+      }
+
+      // From here on, we are actively searching/filtering.
+      let { matched, nonMatched } = directMatchSets(q);
+
+      // If no direct matches and query contains spaces, retry ignoring spaces
+      let qUsed = q;
+      if (!matched.length && q.includes(" ")) {
+        const qNoSpaces = q.replace(/\s+/g, "");
+        if (qNoSpaces && qNoSpaces !== q) {
+          const retry = directMatchSets(qNoSpaces);
+          if (retry.matched.length) {
+            matched = retry.matched;
+            nonMatched = retry.nonMatched;
+            qUsed = qNoSpaces;
+          }
         }
       }
 
-      return true;
+      // Direct matches found ---------------------------------------------------
+      if (matched.length) {
+        const ranked = matched
+          .map((c) => ({ c, s: scoreCard(c, qUsed) }))
+          .sort((a, b) => {
+            if (a.s.bucket !== b.s.bucket) return a.s.bucket - b.s.bucket;
+            if (a.s.pos !== b.s.pos) return a.s.pos - b.s.pos;
+            if (a.s.len !== b.s.len) return a.s.len - b.s.len;
+            return a.s.name.localeCompare(b.s.name);
+          })
+          .map((x) => x.c);
+
+        reorderCards(ranked.concat(nonMatched));
+
+        const requestedShown = Math.min(visibleLimit, ranked.length);
+
+        // Show matched up to visibleLimit, hide the rest
+        for (let i = 0; i < ranked.length; i++) ranked[i].hidden = i >= requestedShown;
+
+        // Hide non-matched completely
+        for (const c of nonMatched) c.hidden = true;
+
+        const actualShown = countShown(ranked);
+
+        setStatusText(`${actualShown} of ${ranked.length} matches`);
+        setNoteAndNext(ranked.length, actualShown);
+        return;
+      }
+
+      // Fuzzy fallback ---------------------------------------------------------
+      await loadIndexIfNeeded();
+
+      const candidates = [q];
+      if (q.includes(" ")) {
+        const qNoSpaces = q.replace(/\s+/g, "");
+        if (qNoSpaces && qNoSpaces !== q) candidates.push(qNoSpaces);
+      }
+
+      let slugs = [];
+
+      // Try exact aliasToSlug for candidate variants
+      if (index && index.aliasToSlug) {
+        for (const cand of candidates) {
+          const exactSlug = index.aliasToSlug[cand];
+          if (exactSlug) {
+            slugs = [exactSlug];
+            break;
+          }
+        }
+
+        // Safe stopword-based exact match (unique slug only)
+        if (!slugs.length && stopKeyToSlugs) {
+          for (const cand of candidates) {
+            const stopKey = stripStopwords(cand);
+            const set = stopKeyToSlugs.get(stopKey);
+            if (set && set.size === 1) {
+              slugs = [Array.from(set)[0]];
+              break;
+            }
+          }
+        }
+      }
+
+      // If still nothing, use bounded fuzzy
+      if (!slugs.length) {
+        for (const cand of candidates) {
+          slugs = bestFuzzySlugs(cand, 50);
+          if (slugs.length) break;
+        }
+      }
+
+      if (slugs.length) {
+        const slugSet = new Set(slugs);
+
+        const ordered = [];
+        for (const slug of slugs) {
+          const c = cardBySlug.get(slug);
+          if (c) ordered.push(c);
+        }
+
+        const remaining = originalOrder.filter((c) => !slugSet.has(c.getAttribute("data-slug")));
+        reorderCards(ordered.concat(remaining));
+
+        const requestedShown = Math.min(visibleLimit, ordered.length);
+
+        for (let i = 0; i < ordered.length; i++) ordered[i].hidden = i >= requestedShown;
+        for (const c of remaining) c.hidden = true;
+
+        const actualShown = countShown(ordered);
+
+        setStatusText(`0 direct matches - showing closest results (${actualShown})`);
+        setNoteAndNext(ordered.length, actualShown);
+        return;
+      }
+
+      // No matches at all ------------------------------------------------------
+      reorderCards(originalOrder);
+      hideAllCards();
+      setStatusText("No matches found.");
+      if (note) note.textContent = "";
+      hideEl(nextBtn);
+    }
+
+    // -----------------------------------------------------------------------------
+    // Recently viewed: render as comma-delimited links into a <p> (or UL fallback)
+    // -----------------------------------------------------------------------------
+    function renderRecents() {
+      if (!recentWrap || !recentTarget) return;
+
+      const slugs = readRecents();
+      if (!slugs.length) {
+        recentWrap.hidden = true;
+        return;
+      }
+
+      const bySlug = new Map(cards.map((c) => [c.getAttribute("data-slug"), c]));
+      const items = slugs
+        .map((s) => bySlug.get(s))
+        .filter(Boolean)
+        .slice(0, 5); // max 5
+
+      if (!items.length) {
+        recentWrap.hidden = true;
+        return;
+      }
+
+      fillRecentsTarget(recentTarget, items);
+      recentWrap.hidden = false;
+    }
+
+    function fillRecentsTarget(targetEl, cardItems) {
+      const tag = (targetEl.tagName || "").toUpperCase();
+
+      targetEl.innerHTML = "";
+
+      // Preferred: <p> container (comma-delimited links)
+      if (tag === "P" || tag === "DIV" || tag === "SPAN") {
+        const frag = document.createDocumentFragment();
+
+        cardItems.forEach((card, idx) => {
+          const link = card.querySelector("a[href]");
+          const name = card.querySelector(".result-name");
+          if (!link) return;
+
+          if (idx > 0) frag.appendChild(document.createTextNode(", "));
+
+          const a = document.createElement("a");
+          a.href = link.getAttribute("href");
+          a.textContent = name ? name.textContent.trim() : a.href;
+
+          frag.appendChild(a);
+        });
+
+        targetEl.appendChild(frag);
+        return;
+      }
+
+      // Fallback if you ever swap markup back to a UL/OL
+      if (tag === "UL" || tag === "OL") {
+        const li = document.createElement("li");
+        li.className = "recent-inline";
+
+        cardItems.forEach((card, idx) => {
+          const link = card.querySelector("a[href]");
+          const name = card.querySelector(".result-name");
+          if (!link) return;
+
+          if (idx > 0) li.appendChild(document.createTextNode(", "));
+
+          const a = document.createElement("a");
+          a.href = link.getAttribute("href");
+          a.textContent = name ? name.textContent.trim() : a.href;
+
+          li.appendChild(a);
+        });
+
+        targetEl.appendChild(li);
+      }
+    }
+
+    // -----------------------------------------------------------------------------
+    // Record recents on click (from result cards)
+    // -----------------------------------------------------------------------------
+    list.addEventListener("click", (e) => {
+      const a = e.target.closest("a[data-recent]");
+      if (!a) return;
+
+      const href = a.getAttribute("href") || "";
+      const m = href.match(/\/pasta\/([^\/]+)\//);
+      if (m && m[1]) addRecent(m[1]);
     });
-  }
 
-  // --------------------------------------------------------------------------
-  // "Next best question" scoring (entropy-ish)
-  // --------------------------------------------------------------------------
-  function entropyFromCounts(counts) {
-    const total = counts.reduce((a, b) => a + b, 0);
-    if (!total) return 0;
-    let h = 0;
-    for (const c of counts) {
-      if (!c) continue;
-      const p = c / total;
-      h -= p * Math.log2(p);
-    }
-    return h;
-  }
+    // Paging: Next 10
+    if (nextBtn) {
+      nextBtn.addEventListener("click", (e) => {
+        if (typeof e.preventDefault === "function") e.preventDefault();
+        visibleLimit += PAGE_N;
+        filter();
+      });
 
-  function getValueBucket(entry, key) {
-    const v = normVal(entry[key]);
-    return v || "unknown";
-  }
-
-  function scoreQuestion(candidateEntries, key) {
-    const buckets = new Map();
-    for (const e of candidateEntries) {
-      const b = getValueBucket(e, key);
-      buckets.set(b, (buckets.get(b) || 0) + 1);
+      hideEl(nextBtn);
     }
 
-    const counts = Array.from(buckets.values());
-    const total = counts.reduce((a, b) => a + b, 0);
-    if (!total) return -1;
-
-    // If everything is unknown, don't ask this.
-    if (buckets.size === 1 && buckets.has("unknown")) return -1;
-
-    // If essentially constant, low value.
-    const maxCount = Math.max(...counts);
-    const dominance = maxCount / total;
-    if (dominance >= 0.92) return 0;
-
-    const h = entropyFromCounts(counts);
-
-    // Penalize unknown-heavy splits
-    const unknownFrac = (buckets.get("unknown") || 0) / total;
-    const penalty = unknownFrac * 0.35 + Math.max(0, buckets.size - 3) * 0.1;
-
-    return h - penalty;
-  }
-
-  function getAnsweredKeys() {
-    const answered = new Set();
-    if (normVal(elType.value)) answered.add("type");
-    for (const s of STEPS) {
-      if (s.key === "type") continue;
-      if (normVal(s.el.value)) answered.add(s.key);
-    }
-    return answered;
-  }
-
-  /**
-   * Behavior:
-   * - Prefer remaining structural questions first (if useful).
-   * - Only offer Size when results still big and no good structural left.
-   */
-  function pickNextQuestion(candidateEntries, answeredKeys) {
-    if (candidateEntries.length <= 1) return null;
-
-    const remaining = STEPS.filter((s) => s.key !== "type" && !answeredKeys.has(s.key));
-
-    const structural = [];
-    let sizeCandidate = null;
-
-    for (const s of remaining) {
-      const sc = scoreQuestion(candidateEntries, s.key);
-      if (sc <= 0) continue;
-
-      if (s.kind === "structural") structural.push({ step: s, score: sc });
-      else if (s.kind === "size") sizeCandidate = { step: s, score: sc };
-    }
-
-    structural.sort((a, b) => b.score - a.score);
-
-    if (structural.length) return structural[0].step;
-
-    if (
-      sizeCandidate &&
-      candidateEntries.length > SIZE_ONLY_IF_MORE_THAN &&
-      !answeredKeys.has("sizeClass")
-    ) {
-      return sizeCandidate.step;
-    }
-
-    return null;
-  }
-
-  // --------------------------------------------------------------------------
-  // Step card UI (no injected CSS)
-  // --------------------------------------------------------------------------
-  function getLabelFor(selectEl) {
-    return (
-      root.querySelector(`label[for="${selectEl.id}"]`) ||
-      document.querySelector(`label[for="${selectEl.id}"]`)
+    // Improve responsiveness: pre-load fuzzy index on focus (optional)
+    input.addEventListener(
+      "focus",
+      () => {
+        loadIndexIfNeeded();
+      },
+      { once: true, passive: true }
     );
+
+    // When typing begins, start fresh at Top 10
+    input.addEventListener(
+      "input",
+      () => {
+        visibleLimit = PAGE_N;
+        filter();
+      },
+      { passive: true }
+    );
+
+    // Initial state for Option B
+    // - Hide all cards immediately (so the page loads clean)
+    // - Provide instruction text
+    // - Render recents (if present)
+    hideAllCards();
+    setStatusText("Start typing to see matches (aliases included).");
+    if (note) note.textContent = "";
+    hideEl(nextBtn);
+
+    renderRecents();
   }
 
-  function buildStepCard(step) {
-    const selectEl = step.el;
-    const labelEl = getLabelFor(selectEl);
-
-    const card = document.createElement("section");
-    card.className = "id-step";
-    card.dataset.stepKey = step.key;
-
-    const top = document.createElement("div");
-    top.className = "id-step__top";
-
-    const img = document.createElement("div");
-    img.className = "id-step__img";
-    img.setAttribute("aria-hidden", "true");
-    img.textContent = "Image soon";
-
-    const text = document.createElement("div");
-    const h = document.createElement("p");
-    h.className = "id-step__title";
-    h.textContent = step.title;
-
-    const d = document.createElement("p");
-    d.className = "id-step__desc";
-    d.textContent = step.desc;
-
-    text.appendChild(h);
-    text.appendChild(d);
-
-    top.appendChild(img);
-    top.appendChild(text);
-
-    const control = document.createElement("div");
-    control.className = "id-step__control";
-
-    // Keep existing label semantics if your HTML wraps select inside label.
-    if (labelEl && labelEl.contains(selectEl)) {
-      control.appendChild(labelEl);
-    } else {
-      if (labelEl) control.appendChild(labelEl);
-      control.appendChild(selectEl);
-    }
-
-    card.appendChild(top);
-    card.appendChild(control);
-
-    return card;
+  // =============================================================================
+  // Detail page behavior (store recent on load)
+  // =============================================================================
+  function initDetailPage() {
+    const path = window.location.pathname || "";
+    const m = path.match(/^\/pasta\/([^\/]+)\/?$/);
+    if (m && m[1]) addRecent(m[1]);
   }
 
-  let stepsContainer = null;
-  let stepCardByKey = new Map();
-
-  function buildStepsUI() {
-    // If we already built cards, reuse them.
-    const existing = root.querySelector(".id-steps");
-    if (existing) {
-      stepsContainer = existing;
-      stepCardByKey = new Map();
-      for (const el of stepsContainer.querySelectorAll(".id-step")) {
-        stepCardByKey.set(el.dataset.stepKey, el);
-      }
-      return;
-    }
-
-    stepsContainer = document.createElement("div");
-    stepsContainer.className = "id-steps";
-
-    for (const step of STEPS) {
-      const card = buildStepCard(step);
-      stepsContainer.appendChild(card);
-      stepCardByKey.set(step.key, card);
-    }
-
-    // Place steps above the status block if possible.
-    if (elStatus && elStatus.parentNode) {
-      elStatus.parentNode.insertBefore(stepsContainer, elStatus);
-    } else {
-      root.appendChild(stepsContainer);
-    }
-  }
-
-  function setStepVisible(key, visible) {
-    const card = stepCardByKey.get(key);
-    if (!card) return;
-    card.hidden = !visible;
-  }
-
-  function hideAllStepsExceptType() {
-    for (const s of STEPS) setStepVisible(s.key, s.key === "type");
-  }
-
-  function showAnsweredAndNextStep(nextStepKey) {
-    const answered = getAnsweredKeys();
-
-    for (const s of STEPS) {
-      if (s.key === "type") {
-        setStepVisible("type", true);
-        continue;
-      }
-      setStepVisible(s.key, answered.has(s.key));
-    }
-
-    if (nextStepKey && !answered.has(nextStepKey)) {
-      setStepVisible(nextStepKey, true);
-    }
-  }
-
-  function clearFieldsAfter(changedKey) {
-    const order = STEPS.map((s) => s.key);
-    const idx = order.indexOf(changedKey);
-    if (idx === -1) return;
-
-    for (let i = idx + 1; i < order.length; i++) {
-      const key = order[i];
-      const step = STEPS.find((s) => s.key === key);
-      if (step) step.el.value = "";
-    }
-  }
-
-  function removeBlankTypeOptions() {
-    const typeCounts = new Map();
-    for (const e of entries) {
-      const t = normVal(e.type);
-      if (!t) continue;
-      typeCounts.set(t, (typeCounts.get(t) || 0) + 1);
-    }
-
-    const opts = Array.from(elType.options || []);
-    for (const opt of opts) {
-      const v = normVal(opt.value);
-      if (!v) continue;
-      if (!typeCounts.get(v)) opt.remove();
-    }
-  }
-
-  function updateUI() {
-    if (!loaded) return;
-
-    const filters = getFilterState();
-
-    if (!filters.type) {
-      hideAllStepsExceptType();
-      setStatus(`Choose a Type to start narrowing down from ${entries.length} shapes.`);
-      clearResults();
-      return;
-    }
-
-    const results = applyAllFilters(entries, filters);
-
-    if (!results.length) {
-      setStatus("No matches with those answers. Try changing your last selection.");
-      clearResults();
-      showAnsweredAndNextStep(null);
-      return;
-    }
-
-    const answeredKeys = getAnsweredKeys();
-    const nextStep = pickNextQuestion(results, answeredKeys);
-
-    setStatus(`${results.length} match${results.length === 1 ? "" : "es"}.`);
-    render(results);
-
-    showAnsweredAndNextStep(nextStep ? nextStep.key : null);
-  }
-
-  function reset() {
-    elType.value = "";
-    for (const s of STEPS) {
-      if (s.key === "type") continue;
-      s.el.value = "";
-    }
-    hideAllStepsExceptType();
-    setStatus("Choose a Type to start.");
-    clearResults();
-  }
-
-  async function init() {
-    setStatus("Loading feature index...");
-
-    buildStepsUI();
-    hideAllStepsExceptType();
-
-    try {
-      const res = await fetch("/api/pasta-features.json", { cache: "force-cache" });
-      if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
-      const json = await res.json();
-
-      entries = Array.isArray(json.entries) ? json.entries : [];
-      loaded = true;
-
-      removeBlankTypeOptions();
-
-      setStatus(`Choose a Type to start narrowing down from ${entries.length} shapes.`);
-    } catch (e) {
-      setStatus("Identify-by-shape is unavailable right now.");
-      loaded = false;
-    }
-  }
-
-  // Events
-  elType.addEventListener("change", () => {
-    clearFieldsAfter("type");
-    updateUI();
-  });
-
-  for (const s of STEPS) {
-    if (s.key === "type") continue;
-    s.el.addEventListener("change", () => {
-      clearFieldsAfter(s.key);
-      updateUI();
-    });
-  }
-
-  elReset.addEventListener("click", reset);
-
-  init();
+  // =============================================================================
+  // Init
+  // =============================================================================
+  document.addEventListener(
+    "DOMContentLoaded",
+    () => {
+      initSearchPage();
+      initDetailPage();
+    },
+    { once: true }
+  );
 })();
