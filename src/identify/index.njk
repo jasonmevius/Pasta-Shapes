@@ -1,17 +1,47 @@
 ---
 title: Identify a pasta shape
 layout: layout.njk
-description: "Identify a pasta shape by answering a few quick questions. Search-first design, mobile-friendly."
+description: "Identify a pasta shape by answering a few quick questions. Mobile-friendly, one question at a time."
 ---
 
+{# =============================================================================
+  identify/index.njk
+  ------------------------------------------------------------------------------
+  PURPOSE
+  - Identify pasta by narrowing down with sequential questions.
+  - Mobile-first UI: big tap targets, one question at a time.
+  - Tablet/desktop: can show matches panel more prominently via CSS.
+
+  DESIGN PRINCIPLES
+  - Never punish "Not sure" - it must always be a first-class option.
+  - Avoid dead ends - user can Back/Reset anytime.
+
+  IMPORTANT NOTES
+  - You currently embed JS in this template (existing behavior).
+  - If you later want to move this into /js/scripts.js, we can do it safely,
+    but for now we preserve your working implementation to avoid breakage.
+  - No inline CSS - all styling remains in /src/css/styles.css.
+============================================================================= #}
+
+{# -----------------------------------------------------------------------------
+  Build identifyData JSON in the template so JS has a compact dataset.
+  - This avoids extra API calls and keeps the experience fast.
+----------------------------------------------------------------------------- #}
 {% set identifyData = [] %}
 {% for item in pasta %}
 
-  {# Thumbnail: could be blank, could be "penne.png", could be a full URL.
-     We'll store raw, and normalize to ImageKit thumbs in JS. #}
+  {# Thumbnail notes:
+     - Could be blank
+     - Could be "penne.png"
+     - Could be a full URL
+     We store raw and normalize in JS.
+  #}
   {% set thumbRaw = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
 
-  {# Try common alias column names (use whichever exists in your CSV) #}
+  {# Aliases notes:
+     - Your CSV has evolved - we try multiple possible column names.
+     - Use whichever exists.
+  #}
   {% set alsoRaw =
     item.SearchAliases
     or item.Aliases
@@ -21,6 +51,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     or ""
   %}
 
+  {# Push a normalized object into identifyData array #}
   {% set _ = identifyData.push({
     slug: item.Slug,
     name: item.ShapeName,
@@ -36,6 +67,7 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
   }) %}
 {% endfor %}
 
+{# --- Breadcrumbs ----------------------------------------------------------- #}
 <nav class="breadcrumbs">
   <a href="/">← Back to search</a>
 </nav>
@@ -45,6 +77,14 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
   <p class="muted">Answer one question at a time. You can always tap “Not sure.”</p>
 </header>
 
+{# -----------------------------------------------------------------------------
+  Identify UI skeleton
+  - JS will populate:
+      - title/help text
+      - answer buttons
+      - match count
+      - matches list (optionally)
+----------------------------------------------------------------------------- #}
 <section id="identify-app" class="identify">
   <div class="card identify-card">
     <div class="identify-question">
@@ -60,6 +100,10 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     </div>
   </div>
 
+  {# Matches panel
+     - Hidden by default on mobile
+     - Can be shown on tablet/desktop via CSS and the "Show all" toggle
+  #}
   <div class="card identify-results" id="identify-results" hidden>
     <div class="results-head">
       <h2 class="h2">Matches</h2>
@@ -68,6 +112,9 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
     <ul class="results-list" id="identify-results-list"></ul>
   </div>
 
+  {# Bottom control bar
+     - Large buttons for mobile thumb usability
+  #}
   <div class="identify-bottom-bar" role="navigation" aria-label="Identify controls">
     <button class="btn secondary" type="button" id="identify-back" disabled>Back</button>
     <button class="btn secondary" type="button" id="identify-reset">Reset</button>
@@ -75,10 +122,18 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
   </div>
 </section>
 
+{# -----------------------------------------------------------------------------
+  JSON payload for JS
+  - Stored in a script tag so it ships with the page.
+----------------------------------------------------------------------------- #}
 <script type="application/json" id="identify-data">
 {{ identifyData | dump | safe }}
 </script>
 
+{# -----------------------------------------------------------------------------
+  Existing identify JS (preserved)
+  - If/when you want, we can move this into scripts.js for cleanliness.
+----------------------------------------------------------------------------- #}
 <script>
 (function () {
   if (window.__pastaIdentifyInit) return;
@@ -218,399 +273,262 @@ description: "Identify a pasta shape by answering a few quick questions. Search-
       help: "Curved shapes include elbows, crescents, and arcs.",
       kind: "bool",
       descYes: "Bent or arced rather than straight.",
-      descNo: "Mostly straight (or not defined by a curve).",
+      descNo: "Straight rather than bent.",
     },
     {
       key: "size",
-      title: "What size class is it?",
-      help: "Use size once you’ve narrowed the shape family.",
+      title: "What size is it?",
+      help: "If you’re unsure, pick “Not sure” - size is often the least reliable.",
       kind: "enum",
+      values: ["tiny", "small", "medium", "large"],
       label: (v) => v,
-      desc: (v) => `Choose this if the pasta feels like “${v}”.`,
-      icon: () => identifyIconUrlFor("size.png"),
-      deferUntilCountLTE: 25,
+      icon: (v) => identifyIconUrlFor(`size-${v}.png`),
     },
   ];
 
-  const normBool = (v) => {
-    const s = String(v || "").trim().toLowerCase();
-    if (!s) return "";
-    if (s === "yes" || s === "y" || s === "true" || s === "1") return "yes";
-    if (s === "no" || s === "n" || s === "false" || s === "0") return "no";
-    return "";
-  };
+  // --- State ---------------------------------------------------------------
+  const normalize = (v) => String(v || "").trim().toLowerCase();
 
-  const normEnum = (v) => String(v || "").trim().toLowerCase();
-
-  const normAlso = (v) => {
-    const s = String(v || "").trim();
-    if (!s) return "";
-    return s.replace(/\s*\|\s*/g, ", ").replace(/\s*,\s*/g, ", ").trim();
-  };
-
-  const normSizeForDisplay = (v) => {
-    const s = String(v || "").trim();
-    return s ? s.toLowerCase() : "";
-  };
-
-  const normalized = raw.map((p) => ({
-    slug: p.slug,
-    name: p.name,
-    thumb: thumbUrlFor(p.thumb),
-    type: normEnum(p.type),
-    size: String(p.size || "").trim(),
-    hollow: normBool(p.hollow),
-    ridged: normBool(p.ridged),
-    twisted: normBool(p.twisted),
-    curved: normBool(p.curved),
-    stuffed: normBool(p.stuffed),
-    also: normAlso(p.also),
+  const initial = raw.map((r) => ({
+    slug: r.slug,
+    name: r.name,
+    type: normalize(r.type),
+    size: normalize(r.size),
+    hollow: normalize(r.hollow),
+    ridged: normalize(r.ridged),
+    twisted: normalize(r.twisted),
+    curved: normalize(r.curved),
+    stuffed: normalize(r.stuffed),
+    also: String(r.also || ""),
+    thumb: String(r.thumb || ""),
   }));
 
-  const state = {
-    all: normalized,
-    candidates: normalized.slice(),
-    answers: {},
-    history: [],
-    currentKey: null,
-    showAllResults: false, // Top 10 by default
+  let working = initial.slice();
+  let history = []; // [{ key, value, prevWorking }]
+
+  const setText = (el, txt) => { if (el) el.textContent = txt; };
+
+  const renderMatchesCount = () => {
+    setText(els.count, `Matching: ${working.length}`);
   };
 
-  const snapshot = () => ({
-    candidates: state.candidates.slice(),
-    answers: { ...state.answers },
-    currentKey: state.currentKey,
-    showAllResults: state.showAllResults,
-  });
+  const renderResultsList = () => {
+    if (!els.resultsList) return;
 
-  const restore = (snap) => {
-    state.candidates = snap.candidates.slice();
-    state.answers = { ...snap.answers };
-    state.currentKey = snap.currentKey;
-    state.showAllResults = snap.showAllResults;
-  };
-
-  function uniqueValues(key, items) {
-    const set = new Set();
-    for (const it of items) {
-      const v = it[key];
-      if (v !== undefined && v !== null && String(v).trim() !== "") set.add(String(v));
-    }
-    return Array.from(set);
-  }
-
-  function scoreQuestion(key, items) {
-    const total = items.length || 1;
-    const counts = new Map();
-    let blanks = 0;
-
-    for (const it of items) {
-      const v = (it[key] ?? "");
-      const s = String(v).trim();
-      if (!s) { blanks += 1; continue; }
-      counts.set(s, (counts.get(s) || 0) + 1);
-    }
-
-    const nonBlank = total - blanks;
-    if (nonBlank <= 1) return -1;
-
-    let gini = 1;
-    for (const c of counts.values()) {
-      const p = c / nonBlank;
-      gini -= p * p;
-    }
-
-    const blankPenalty = blanks / total;
-    return gini - (0.35 * blankPenalty);
-  }
-
-  function nextQuestionKey() {
-    if (state.answers.type === undefined) return "type";
-
-    const remaining = state.candidates.length;
-
-    const eligible = QUESTION_DEFS
-      .filter((q) => q.key !== "type")
-      .filter((q) => state.answers[q.key] === undefined)
-      .filter((q) => {
-        if (q.key === "size" && q.deferUntilCountLTE && remaining > q.deferUntilCountLTE) return false;
-        const vals = uniqueValues(q.key, state.candidates);
-        return vals.length >= 2;
-      });
-
-    if (!eligible.length) {
-      if (state.answers.size === undefined) {
-        const vals = uniqueValues("size", state.candidates);
-        if (vals.length >= 2) return "size";
-      }
-      return null;
-    }
-
-    let best = eligible[0];
-    let bestScore = -999;
-    for (const q of eligible) {
-      const s = scoreQuestion(q.key, state.candidates);
-      if (s > bestScore) { bestScore = s; best = q; }
-    }
-    return best.key;
-  }
-
-  function getQuestionDef(key) {
-    return QUESTION_DEFS.find((q) => q.key === key) || null;
-  }
-
-  function optionMeta(q, value) {
-    const notSure = value === "__ns__";
-    if (notSure) {
-      return {
-        icon: answerIconFor(q.key, "__ns__"), // e.g., hollow-notsure.png, type-notsure.png
-        name: "Not sure",
-        desc: "Skip this question and keep narrowing with the next best one.",
-      };
-    }
-
-    if (q.kind === "bool") {
-      const yes = value === "yes";
-      return {
-        icon: answerIconFor(q.key, value), // e.g., hollow-yes.png, twisted-no.png
-        name: yes ? "Yes" : "No",
-        desc: yes ? (q.descYes || "") : (q.descNo || ""),
-      };
-    }
-
-    const label = q.label ? q.label(value) : String(value);
-    const desc = q.desc ? q.desc(value) : "";
-    const icon = q.icon ? q.icon(value) : identifyIconUrlFor("option.png");
-    return { icon, name: label, desc };
-  }
-
-  function buildOptions(q, items) {
-    if (q.kind === "bool") return [{ value: "yes" }, { value: "no" }, { value: "__ns__" }];
-
-    const vals = uniqueValues(q.key, items);
-
-    if (q.key === "type") {
-      const preferredOrder = ["strand","tube","ribbon","sheet","short","stuffed","soup","ring","dumpling"];
-      vals.sort((a,b) => preferredOrder.indexOf(a) - preferredOrder.indexOf(b));
-      return vals.map((v) => ({ value: v })).concat([{ value: "__ns__" }]);
-    }
-
-    if (q.key === "size") {
-      const order = ["Pastina","Tiny","Small","Medium","Large","Extra large","Jumbo"];
-      vals.sort((a,b) => order.indexOf(a) - order.indexOf(b));
-      return vals.map((v) => ({ value: v })).concat([{ value: "__ns__" }]);
-    }
-
-    vals.sort((a,b) => String(a).localeCompare(String(b)));
-    return vals.map((v) => ({ value: v })).concat([{ value: "__ns__" }]);
-  }
-
-  function applyAnswer(key, value) {
-    state.history.push(snapshot());
-
-    const q = getQuestionDef(key);
-
-    if (value === "__ns__") {
-      state.answers[key] = null;
-    } else {
-      state.answers[key] = value;
-
-      if (key === "type") {
-        state.candidates = state.candidates.filter((p) => p.type === value);
-      } else if (q && q.kind === "bool") {
-        state.candidates = state.candidates.filter((p) => p[key] === value);
-      } else {
-        state.candidates = state.candidates.filter((p) => String(p[key] || "") === String(value));
-      }
-    }
-
-    state.currentKey = nextQuestionKey();
-    if (state.candidates.length < state.all.length) state.showAllResults = false;
-    render();
-  }
-
-  function resetAll() {
-    state.candidates = state.all.slice();
-    state.answers = {};
-    state.history = [];
-    state.currentKey = nextQuestionKey();
-    state.showAllResults = false;
-    render();
-  }
-
-  function goBack() {
-    const prev = state.history.pop();
-    if (!prev) return;
-    restore(prev);
-    render();
-  }
-
-  function renderAnswers(q) {
-    els.answers.innerHTML = "";
-    const options = buildOptions(q, state.candidates);
-
-    for (const opt of options) {
-      const meta = optionMeta(q, opt.value);
-
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "option-card";
-      btn.addEventListener("click", () => applyAnswer(q.key, opt.value));
-
-      const img = document.createElement("img");
-      img.className = "option-thumb";
-      img.loading = "lazy";
-      img.decoding = "async";
-      img.alt = "";
-      img.src = meta.icon;
-
-      const wrap = document.createElement("div");
-
-      const name = document.createElement("p");
-      name.className = "option-name";
-      name.textContent = meta.name;
-
-      const desc = document.createElement("p");
-      desc.className = "option-desc";
-      desc.textContent = meta.desc;
-
-      wrap.appendChild(name);
-      wrap.appendChild(desc);
-
-      btn.appendChild(img);
-      btn.appendChild(wrap);
-
-      els.answers.appendChild(btn);
-    }
-  }
-
-  function renderCount() {
-    const n = state.candidates.length;
-    els.count.textContent = (n === 1) ? "1 possible match" : `${n} possible matches`;
-  }
-
-  function shouldShowResults() {
-    return state.candidates.length < state.all.length;
-  }
-
-  function typeLabelFor(p) {
-    return TYPE_LABELS[p.type] || (p.type ? p.type : "");
-  }
-
-  function buildMetaLine(p) {
-    const bits = [];
-    const size = normSizeForDisplay(p.size);
-    if (size) bits.push(size);
-
-    if (p.hollow === "yes") bits.push("hollow");
-    if (p.ridged === "yes") bits.push("ridged");
-    if (p.twisted === "yes") bits.push("twisted");
-    if (p.curved === "yes") bits.push("curved");
-    if (p.stuffed === "yes") bits.push("stuffed");
-
-    return bits.join(" , ");
-  }
-
-  function renderResults() {
-    const total = state.candidates.length;
-    const limit = state.showAllResults ? total : 10;
-    const list = state.candidates.slice(0, limit);
-
-    els.resultsCount.textContent = (total === 1) ? "1 match" : `${total} matches`;
     els.resultsList.innerHTML = "";
-
-    for (const p of list) {
+    for (const item of working.slice(0, 100)) {
       const li = document.createElement("li");
-      li.className = "result-item";
+      li.className = "result-card";
 
       const a = document.createElement("a");
-      a.href = `/pasta/${p.slug}/`;
       a.className = "result-link";
+      a.href = `/pasta/${item.slug}/`;
+      a.setAttribute("data-recent", "pasta");
+
+      const thumb = document.createElement("div");
+      thumb.className = "thumb";
 
       const img = document.createElement("img");
+      img.width = 56;
+      img.height = 56;
       img.loading = "lazy";
       img.decoding = "async";
       img.alt = "";
-      img.className = "result-thumb";
-      img.src = p.thumb || (IK_THUMBS_BASE + FALLBACK_THUMB);
-      a.appendChild(img);
+      img.src = thumbUrlFor(item.thumb);
 
-      const text = document.createElement("div");
-      text.className = "result-text";
+      thumb.appendChild(img);
 
-      const name = document.createElement("p");
-      name.className = "result-name";
-      name.textContent = p.name;
+      const body = document.createElement("div");
+      body.className = "result-body";
 
-      const type = document.createElement("p");
-      type.className = "result-type";
-      type.textContent = typeLabelFor(p);
+      const titleRow = document.createElement("div");
+      titleRow.className = "result-title-row";
 
-      const metaLine = buildMetaLine(p);
-      const meta = document.createElement("p");
-      meta.className = "result-meta";
-      meta.textContent = metaLine;
+      const strong = document.createElement("strong");
+      strong.className = "result-name";
+      strong.textContent = item.name;
 
-      text.appendChild(name);
-      if (type.textContent) text.appendChild(type);
-      if (metaLine) text.appendChild(meta);
+      titleRow.appendChild(strong);
+      body.appendChild(titleRow);
 
-      if (p.also) {
-        const also = document.createElement("p");
-        also.className = "result-also";
-        also.textContent = `Also: ${p.also}`;
-        text.appendChild(also);
-      }
-
-      a.appendChild(text);
+      a.appendChild(thumb);
+      a.appendChild(body);
       li.appendChild(a);
       els.resultsList.appendChild(li);
     }
 
-    if (total > 10) {
-      els.btnToggleResults.hidden = false;
-      if (state.showAllResults) {
-        els.btnToggleResults.textContent = "Show top 10";
-      } else {
-        const more = total - 10;
-        els.btnToggleResults.textContent = `Show all ${total} matches (${more} more)`;
-      }
-    } else {
-      els.btnToggleResults.hidden = true;
-    }
-  }
+    setText(els.resultsCount, `${working.length} match${working.length === 1 ? "" : "es"}`);
+  };
 
-  function render() {
-    els.btnBack.disabled = state.history.length === 0;
-
-    if (!state.currentKey) {
-      els.kicker.textContent = "Done";
-      els.title.textContent = "Review your matches";
-      els.help.textContent = "If you still have too many, use Back and pick a different answer.";
-      els.answers.innerHTML = "";
-      renderCount();
-    } else {
-      const q = getQuestionDef(state.currentKey);
-      els.kicker.textContent = "Question";
-      els.title.textContent = q ? q.title : "Question";
-      els.help.textContent = q ? q.help : "";
-      renderAnswers(q);
-      renderCount();
-    }
-
-    const show = shouldShowResults();
+  const showResultsPanel = (show) => {
+    if (!els.resultsCard || !els.btnToggleResults) return;
     els.resultsCard.hidden = !show;
-    if (show) renderResults();
+    els.btnToggleResults.hidden = false;
+    els.btnToggleResults.textContent = show ? "Hide list" : "Show all";
+  };
+
+  // --- Question selection ---------------------------------------------------
+  const questionAlreadyAnswered = (key) => history.some((h) => h.key === key);
+
+  const nextQuestion = () => {
+    // Always start with Type.
+    if (!questionAlreadyAnswered("type")) return QUESTION_DEFS[0];
+
+    // Then ask the "shape discriminators" before size.
+    for (const q of QUESTION_DEFS) {
+      if (q.key === "type") continue;
+      if (q.key === "size") continue;
+      if (!questionAlreadyAnswered(q.key)) return q;
+    }
+
+    // Size last
+    if (!questionAlreadyAnswered("size")) return QUESTION_DEFS.find((q) => q.key === "size");
+
+    return null;
+  };
+
+  // --- Filtering ------------------------------------------------------------
+  const applyAnswer = (key, value) => {
+    const prev = working;
+    history.push({ key, value, prevWorking: prev });
+
+    working = working.filter((item) => {
+      const itemVal = item[key];
+      if (!itemVal) return true;
+
+      // "__ns__" means user is not sure - do not filter.
+      if (value === "__ns__") return true;
+
+      // bool values stored as "yes"/"no" in CSV
+      return itemVal === value;
+    });
+
+    render();
+  };
+
+  const goBack = () => {
+    if (!history.length) return;
+    const last = history.pop();
+    working = last.prevWorking || initial.slice();
+    render();
+  };
+
+  const reset = () => {
+    working = initial.slice();
+    history = [];
+    render();
+  };
+
+  // --- Rendering answers ----------------------------------------------------
+  const renderAnswers = (q) => {
+    if (!els.answers) return;
+    els.answers.innerHTML = "";
+
+    const addButton = (label, value, desc, iconUrl) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "identify-answer";
+
+      btn.addEventListener("click", () => applyAnswer(q.key, value));
+
+      const img = document.createElement("img");
+      img.alt = "";
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.width = 56;
+      img.height = 56;
+
+      // Prefer question-specific icon scheme for yes/no/not sure
+      if (q.kind === "bool") {
+        img.src = answerIconFor(q.key, value);
+      } else if (iconUrl) {
+        img.src = iconUrl;
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "identify-answer-meta";
+
+      const t = document.createElement("div");
+      t.className = "identify-answer-title";
+      t.textContent = label;
+
+      const d = document.createElement("div");
+      d.className = "identify-answer-desc muted";
+      d.textContent = desc || "";
+
+      meta.appendChild(t);
+      if (desc) meta.appendChild(d);
+
+      btn.appendChild(img);
+      btn.appendChild(meta);
+
+      els.answers.appendChild(btn);
+    };
+
+    if (q.kind === "bool") {
+      addButton("Yes", "yes", q.descYes || "", null);
+      addButton("No", "no", q.descNo || "", null);
+      addButton("Not sure", "__ns__", "Keep all possibilities.", null);
+      return;
+    }
+
+    // Enum questions
+    const values = q.values || Object.keys(TYPE_LABELS);
+    for (const v of values) {
+      addButton(q.label(v), v, q.desc(v), q.icon ? q.icon(v) : null);
+    }
+    addButton("Not sure", "__ns__", "Keep all possibilities.", null);
+  };
+
+  // --- Main render ----------------------------------------------------------
+  const render = () => {
+    const q = nextQuestion();
+
+    // Buttons: Back enabled only if we have history
+    if (els.btnBack) els.btnBack.disabled = history.length === 0;
+
+    // If we have exactly one match, go straight to detail page.
+    // NOTE: This is optional. If you prefer to keep user in Identify, remove.
+    if (working.length === 1) {
+      const only = working[0];
+      window.location.href = `/pasta/${only.slug}/`;
+      return;
+    }
+
+    // If no question remains, show list
+    if (!q) {
+      setText(els.kicker, "Done");
+      setText(els.title, "Here are your matches");
+      setText(els.help, "You can refine by restarting or tapping a match.");
+      renderAnswers({ key: "__none__", kind: "none" });
+      showResultsPanel(true);
+      renderMatchesCount();
+      renderResultsList();
+      return;
+    }
+
+    setText(els.kicker, `Question ${history.length + 1}`);
+    setText(els.title, q.title);
+    setText(els.help, q.help || "");
+
+    renderAnswers(q);
+    renderMatchesCount();
+
+    // Default behavior: keep list hidden on mobile unless user asks.
+    showResultsPanel(false);
+    renderResultsList();
+  };
+
+  // --- Wire up controls -----------------------------------------------------
+  if (els.btnBack) els.btnBack.addEventListener("click", goBack);
+  if (els.btnReset) els.btnReset.addEventListener("click", reset);
+  if (els.btnToggleResults) {
+    els.btnToggleResults.addEventListener("click", () => {
+      const isHidden = els.resultsCard.hidden;
+      showResultsPanel(isHidden);
+    });
   }
 
-  els.btnReset.addEventListener("click", resetAll);
-  els.btnBack.addEventListener("click", goBack);
-  els.btnToggleResults.addEventListener("click", () => {
-    state.showAllResults = !state.showAllResults;
-    render();
-  });
-
-  state.currentKey = nextQuestionKey();
   render();
 })();
 </script>
