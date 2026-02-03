@@ -12,9 +12,9 @@
 //    - Progressive reveal / paging:
 //        "Top 10 + X more" -> Next 10 button
 //
-// IMPORTANT UX CHANGE (Option B)
+// IMPORTANT UX (Option B)
 // - Show NOTHING until the user starts typing.
-// - Once typing begins, show matches (Top 10) + "Next 10" pagination.
+// - Once typing begins, show matches (Top 10) + pagination.
 //
 // IMPORTANT CONSTRAINTS
 // - No inline styles (all styling belongs in /src/css/styles.css).
@@ -65,9 +65,9 @@
 
     // Recently viewed (container + target element)
     const recentWrap = $("#recently-viewed-wrap");
-    const recentTarget = $("#recently-viewed"); // now a <p> in your templates
+    const recentTarget = $("#recently-viewed"); // typically a <p> in your templates
 
-    // "Top 10 + X more"
+    // Paging UI (Top 10 + X more)
     const note = $("#pasta-results-note");
     const nextBtn = $("#pasta-toggle-all");
 
@@ -75,7 +75,7 @@
     let visibleLimit = PAGE_N;
 
     // -----------------------------------------------------------------------------
-    // Visibility helpers (we avoid inline style - use hidden attribute)
+    // Visibility helpers (no inline styles)
     // -----------------------------------------------------------------------------
     function showEl(el) {
       if (!el) return;
@@ -94,7 +94,7 @@
     }
 
     // -----------------------------------------------------------------------------
-    // Normalization helpers (consistent with your index normalization)
+    // Normalization helpers (consistent with index normalization)
     // -----------------------------------------------------------------------------
     const STOPWORDS = new Set([
       "a","ad","al","alla","alle","allo","ai","agli","all",
@@ -133,7 +133,7 @@
 
     // -----------------------------------------------------------------------------
     // Optional fuzzy support using /api/pasta-index.json
-    // (We use it only if direct matching finds nothing.)
+    // - used only if direct matching finds nothing
     // -----------------------------------------------------------------------------
     let indexLoaded = false;
     let index = null;
@@ -172,14 +172,13 @@
       return index;
     }
 
-    // Bounded Levenshtein used for fuzzy fallback
+    // Bounded Levenshtein (fuzzy fallback)
     function levenshtein(a, b, maxDist) {
       if (a === b) return 0;
       if (!a || !b) return Math.max(a.length, b.length);
 
       const al = a.length;
       const bl = b.length;
-
       if (Math.abs(al - bl) > maxDist) return maxDist + 1;
 
       let prev = new Array(bl + 1);
@@ -226,7 +225,6 @@
 
       const out = [];
       const used = new Set();
-
       for (const s of scored) {
         const slug = a2s[s.k];
         if (!slug || used.has(slug)) continue;
@@ -234,7 +232,6 @@
         out.push(slug);
         if (out.length >= limit) break;
       }
-
       return out;
     }
 
@@ -289,6 +286,14 @@
       status.textContent = text || "";
     }
 
+    /**
+     * setNoteAndNext
+     * - Updates the "Showing X of Y - Z more" note and the "Next N" button.
+     *
+     * BUGFIX (your note #1)
+     * - If remaining <= 0, we *force-hide* the Next button AND clear its text,
+     *   so stale button state cannot linger from earlier searches.
+     */
     function setNoteAndNext(matchCount, shownCount) {
       if (!note || !nextBtn) return;
 
@@ -296,12 +301,14 @@
 
       if (matchCount === 0) {
         note.textContent = "";
+        nextBtn.textContent = "";
         hideEl(nextBtn);
         return;
       }
 
-      if (remaining === 0) {
+      if (remaining <= 0) {
         note.textContent = `Showing ${shownCount} of ${matchCount}`;
+        nextBtn.textContent = "";
         hideEl(nextBtn);
         return;
       }
@@ -342,31 +349,23 @@
       const raw = input.value || "";
       const q = normalizeQuery(raw);
 
-      // -----------------------------------------------------------------------
-      // OPTION B behavior:
-      // - If there's NO query, show nothing.
-      // - This keeps the homepage minimal and avoids a "wall of results."
-      // -----------------------------------------------------------------------
+      // OPTION B: if there's NO query, show nothing.
       if (!q) {
-        // Preserve original DOM order (helps predictable future filtering)
         reorderCards(originalOrder);
-
-        // Hide every card until typing begins
         hideAllCards();
 
-        // UI guidance
         setStatusText("Start typing to see matches (aliases included).");
 
-        // Hide paging UI
         if (note) note.textContent = "";
-        hideEl(nextBtn);
+        if (nextBtn) {
+          nextBtn.textContent = "";
+          hideEl(nextBtn);
+        }
 
-        // Reset paging limit so first keystroke starts at Top 10
         visibleLimit = PAGE_N;
         return;
       }
 
-      // From here on, we are actively searching/filtering.
       let { matched, nonMatched } = directMatchSets(q);
 
       // If no direct matches and query contains spaces, retry ignoring spaces
@@ -383,7 +382,7 @@
         }
       }
 
-      // Direct matches found ---------------------------------------------------
+      // Direct matches found
       if (matched.length) {
         const ranked = matched
           .map((c) => ({ c, s: scoreCard(c, qUsed) }))
@@ -399,10 +398,7 @@
 
         const requestedShown = Math.min(visibleLimit, ranked.length);
 
-        // Show matched up to visibleLimit, hide the rest
         for (let i = 0; i < ranked.length; i++) ranked[i].hidden = i >= requestedShown;
-
-        // Hide non-matched completely
         for (const c of nonMatched) c.hidden = true;
 
         const actualShown = countShown(ranked);
@@ -412,7 +408,7 @@
         return;
       }
 
-      // Fuzzy fallback ---------------------------------------------------------
+      // Fuzzy fallback
       await loadIndexIfNeeded();
 
       const candidates = [q];
@@ -423,7 +419,7 @@
 
       let slugs = [];
 
-      // Try exact aliasToSlug for candidate variants
+      // Exact alias match (fast path)
       if (index && index.aliasToSlug) {
         for (const cand of candidates) {
           const exactSlug = index.aliasToSlug[cand];
@@ -446,7 +442,7 @@
         }
       }
 
-      // If still nothing, use bounded fuzzy
+      // Fuzzy if still nothing
       if (!slugs.length) {
         for (const cand of candidates) {
           slugs = bestFuzzySlugs(cand, 50);
@@ -463,7 +459,9 @@
           if (c) ordered.push(c);
         }
 
-        const remaining = originalOrder.filter((c) => !slugSet.has(c.getAttribute("data-slug")));
+        const remaining = originalOrder.filter(
+          (c) => !slugSet.has(c.getAttribute("data-slug"))
+        );
         reorderCards(ordered.concat(remaining));
 
         const requestedShown = Math.min(visibleLimit, ordered.length);
@@ -478,16 +476,21 @@
         return;
       }
 
-      // No matches at all ------------------------------------------------------
+      // No matches at all
       reorderCards(originalOrder);
       hideAllCards();
+
       setStatusText("No matches found.");
+
       if (note) note.textContent = "";
-      hideEl(nextBtn);
+      if (nextBtn) {
+        nextBtn.textContent = "";
+        hideEl(nextBtn);
+      }
     }
 
     // -----------------------------------------------------------------------------
-    // Recently viewed: render as comma-delimited links into a <p> (or UL fallback)
+    // Recently viewed: render as comma-delimited links into a <p>
     // -----------------------------------------------------------------------------
     function renderRecents() {
       if (!recentWrap || !recentTarget) return;
@@ -502,65 +505,31 @@
       const items = slugs
         .map((s) => bySlug.get(s))
         .filter(Boolean)
-        .slice(0, 5); // max 5
+        .slice(0, 5);
 
       if (!items.length) {
         recentWrap.hidden = true;
         return;
       }
 
-      fillRecentsTarget(recentTarget, items);
+      recentTarget.innerHTML = "";
+
+      const frag = document.createDocumentFragment();
+      items.forEach((card, idx) => {
+        const link = card.querySelector("a[href]");
+        const name = card.querySelector(".result-name");
+        if (!link) return;
+
+        if (idx > 0) frag.appendChild(document.createTextNode(", "));
+
+        const a = document.createElement("a");
+        a.href = link.getAttribute("href");
+        a.textContent = name ? name.textContent.trim() : a.href;
+        frag.appendChild(a);
+      });
+
+      recentTarget.appendChild(frag);
       recentWrap.hidden = false;
-    }
-
-    function fillRecentsTarget(targetEl, cardItems) {
-      const tag = (targetEl.tagName || "").toUpperCase();
-
-      targetEl.innerHTML = "";
-
-      // Preferred: <p> container (comma-delimited links)
-      if (tag === "P" || tag === "DIV" || tag === "SPAN") {
-        const frag = document.createDocumentFragment();
-
-        cardItems.forEach((card, idx) => {
-          const link = card.querySelector("a[href]");
-          const name = card.querySelector(".result-name");
-          if (!link) return;
-
-          if (idx > 0) frag.appendChild(document.createTextNode(", "));
-
-          const a = document.createElement("a");
-          a.href = link.getAttribute("href");
-          a.textContent = name ? name.textContent.trim() : a.href;
-
-          frag.appendChild(a);
-        });
-
-        targetEl.appendChild(frag);
-        return;
-      }
-
-      // Fallback if you ever swap markup back to a UL/OL
-      if (tag === "UL" || tag === "OL") {
-        const li = document.createElement("li");
-        li.className = "recent-inline";
-
-        cardItems.forEach((card, idx) => {
-          const link = card.querySelector("a[href]");
-          const name = card.querySelector(".result-name");
-          if (!link) return;
-
-          if (idx > 0) li.appendChild(document.createTextNode(", "));
-
-          const a = document.createElement("a");
-          a.href = link.getAttribute("href");
-          a.textContent = name ? name.textContent.trim() : a.href;
-
-          li.appendChild(a);
-        });
-
-        targetEl.appendChild(li);
-      }
     }
 
     // -----------------------------------------------------------------------------
@@ -583,10 +552,11 @@
         filter();
       });
 
+      nextBtn.textContent = "";
       hideEl(nextBtn);
     }
 
-    // Improve responsiveness: pre-load fuzzy index on focus (optional)
+    // Pre-load index (optional) on focus
     input.addEventListener(
       "focus",
       () => {
@@ -595,7 +565,7 @@
       { once: true, passive: true }
     );
 
-    // When typing begins, start fresh at Top 10
+    // Filter as user types
     input.addEventListener(
       "input",
       () => {
@@ -605,15 +575,15 @@
       { passive: true }
     );
 
-    // Initial state for Option B
-    // - Hide all cards immediately (so the page loads clean)
-    // - Provide instruction text
-    // - Render recents (if present)
+    // Initial state (Option B)
+    reorderCards(originalOrder);
     hideAllCards();
     setStatusText("Start typing to see matches (aliases included).");
     if (note) note.textContent = "";
-    hideEl(nextBtn);
-
+    if (nextBtn) {
+      nextBtn.textContent = "";
+      hideEl(nextBtn);
+    }
     renderRecents();
   }
 
