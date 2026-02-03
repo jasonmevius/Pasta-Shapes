@@ -1,20 +1,16 @@
 // src/js/scripts.js
 // ============================================================================
-// Global site behaviors:
+// DEBUG-INSTRUMENTED VERSION
+// ---------------------------------------------------------------------------
+// Why this exists:
+// - You confirmed scripts.js loads (200), and the DOM elements exist,
+//   yet typing in the search box produces no visible changes.
+// - This version uses the on-page status line to prove, in order:
+//     1) initSearchPage() ran
+//     2) the input listener is firing
+//     3) filter() is executing (or if not, what error occurs)
 //
-// 1) Recently Viewed (localStorage)
-// 2) Home Search filtering (Option B: show nothing until typing)
-//
-// IMPORTANT CHANGE IN THIS VERSION
-// - More robust initialization:
-//     * initialize immediately if DOM is already ready
-//     * still initialize on DOMContentLoaded for normal loads
-//     * re-initialize on "pageshow" (bfcache restore), common on mobile Safari
-//
-// WHY
-// - You confirmed scripts.js loads (200) and the DOM elements exist,
-//   yet typing doesn't trigger filtering. The most likely reason is that
-//   the "input" listener never attached because init never ran in that session.
+// After we diagnose the issue, we can remove the debug messages.
 // ============================================================================
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -69,7 +65,7 @@
     let visibleLimit = PAGE_N;
 
     // -------------------------------------------------------------------------
-    // Visibility helpers (use the HTML "hidden" attribute - no inline styles)
+    // Visibility helpers
     // -------------------------------------------------------------------------
     function showEl(el) {
       if (!el) return;
@@ -266,13 +262,12 @@
     }
 
     // -------------------------------------------------------------------------
-    // UI text helpers
+    // UI helpers
     // -------------------------------------------------------------------------
     function setStatusText(text) {
       status.textContent = text || "";
     }
 
-    // Bugfix: never show "Next" if remaining <= 0
     function setNoteAndNext(matchCount, shownCount) {
       if (!note || !nextBtn) return;
 
@@ -314,11 +309,12 @@
         if (blob.includes(q)) matched.push(card);
         else nonMatched.push(card);
       }
+
       return { matched, nonMatched };
     }
 
     // -------------------------------------------------------------------------
-    // Main filter routine (Option B: show nothing until typing)
+    // Main filter routine (Option B)
     // -------------------------------------------------------------------------
     async function filter() {
       const raw = input.value || "";
@@ -327,7 +323,7 @@
       if (!q) {
         reorderCards(originalOrder);
         hideAllCards();
-        setStatusText("Start typing to see matches (aliases included).");
+        setStatusText("Search ready - start typing to see matches.");
         if (note) note.textContent = "";
         if (nextBtn) {
           nextBtn.textContent = "";
@@ -377,6 +373,7 @@
         return;
       }
 
+      // Fuzzy fallback
       await loadIndexIfNeeded();
 
       const candidates = [q];
@@ -452,7 +449,7 @@
     }
 
     // -------------------------------------------------------------------------
-    // Recently viewed
+    // Recently viewed rendering
     // -------------------------------------------------------------------------
     function renderRecents() {
       if (!recentWrap || !recentTarget) return;
@@ -504,25 +501,36 @@
       if (m && m[1]) addRecent(m[1]);
     });
 
-    // Paging
+    // Paging button
     if (nextBtn) {
       nextBtn.addEventListener("click", (e) => {
         e.preventDefault();
         visibleLimit += PAGE_N;
-        filter();
+        safeFilter();
       });
 
       nextBtn.textContent = "";
       hideEl(nextBtn);
     }
 
-    // Attach input listener (THIS is what must exist for "typing does something")
+    // Wrap filter in try/catch so errors show up on the page
+    async function safeFilter() {
+      try {
+        await filter();
+      } catch (err) {
+        setStatusText(`Search error: ${err && err.message ? err.message : String(err)}`);
+      }
+    }
+
+    // Instrumented input handler:
+    // - Updates status on every keystroke so we know the event is firing.
     input.addEventListener("input", () => {
+      setStatusText(`Typing: ${(input.value || "").trim()}`);
       visibleLimit = PAGE_N;
-      filter();
+      safeFilter();
     });
 
-    // Optional: pre-load index on focus
+    // Optional pre-load index
     input.addEventListener(
       "focus",
       () => {
@@ -531,10 +539,10 @@
       { once: true }
     );
 
-    // Initial state
+    // Initial state - proves init ran
     reorderCards(originalOrder);
     hideAllCards();
-    setStatusText("Start typing to see matches (aliases included).");
+    setStatusText("Search ready - start typing to see matches.");
     if (note) note.textContent = "";
     if (nextBtn) {
       nextBtn.textContent = "";
@@ -553,21 +561,20 @@
   }
 
   // =============================================================================
-  // Robust init
+  // Robust init (not only DOMContentLoaded)
   // =============================================================================
   function initAll() {
     initSearchPage();
     initDetailPage();
   }
 
-  // If DOM is already ready, run immediately. Otherwise wait.
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initAll, { once: true });
   } else {
     initAll();
   }
 
-  // Re-init when page is restored from bfcache (mobile Safari / back button)
+  // Re-init on bfcache restore
   window.addEventListener("pageshow", (e) => {
     if (e && e.persisted) initAll();
   });
