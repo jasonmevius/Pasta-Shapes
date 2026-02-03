@@ -1,47 +1,43 @@
 // src/js/pasta-search.js
+// ============================================================================
+// Pasta name "typeahead" search (suggestions + exact-match redirect).
+//
+// This script ONLY runs if it finds the typeahead DOM elements:
+// - #pasta-search-form
+// - #pasta-q
+// - #pasta-search-status
+// - #pasta-search-suggestions
+//
+// IMPORTANT CONSTRAINTS
+// - Do NOT use inline styles here. All styling lives in /src/css/styles.css.
+//
+// HOW IT WORKS
+// - Loads /api/pasta-index.json (cached).
+// - Attempts an exact match (including synonyms / aliases).
+// - If no exact match, shows suggestions.
+// - If still none, falls back to fuzzy "did you mean" suggestions.
+// ============================================================================
 (function () {
   const form = document.getElementById("pasta-search-form");
   const input = document.getElementById("pasta-q");
   const status = document.getElementById("pasta-search-status");
   const list = document.getElementById("pasta-search-suggestions");
 
+  // If the page doesn't have these elements, this script does nothing.
   if (!form || !input || !status || !list) return;
 
-  // Common Italian “connector” words that often appear in menu names but get omitted in searches.
-  // We only use this for a safe, secondary exact-match attempt (unique slug only).
+  // Common Italian connector words that appear in menu names.
+  // Used only for a safe, secondary exact-match attempt (unique slug only).
   const STOPWORDS = new Set([
-    "a",
-    "ad",
-    "al",
-    "alla",
-    "alle",
-    "allo",
-    "ai",
-    "agli",
-    "all",
-    "da",
-    "de",
-    "dei",
-    "degli",
-    "della",
-    "delle",
-    "del",
-    "di",
-    "e",
-    "ed",
-    "in",
-    "con",
-    "per",
-    "su",
-    "lo",
-    "la",
-    "le",
-    "il",
-    "un",
-    "una",
-    "uno",
+    "a","ad","al","alla","alle","allo","ai","agli","all",
+    "da","de","dei","degli","della","delle","del","di",
+    "e","ed","in","con","per","su","lo","la","le","il",
+    "un","una","uno",
   ]);
 
+  // --------------------------------------------------------------------------
+  // Normalization helpers
+  // --------------------------------------------------------------------------
   function normalize(s) {
     return (s || "")
       .toLowerCase()
@@ -76,6 +72,9 @@
     return [];
   }
 
+  // --------------------------------------------------------------------------
+  // Small DOM helpers (no inline CSS)
+  // --------------------------------------------------------------------------
   function clearSuggestions() {
     list.innerHTML = "";
   }
@@ -102,6 +101,7 @@
     return `${entryName} (commonly known as: ${aliasDisplay})`;
   }
 
+  // Renders suggestions using semantic markup + CSS classes only.
   function renderSuggestions(items) {
     clearSuggestions();
 
@@ -115,8 +115,7 @@
 
       if (it.description) {
         const div = document.createElement("div");
-        div.style.marginTop = "0.15rem";
-        div.style.fontSize = "0.9em";
+        div.className = "suggestion-desc";
         div.textContent = it.description;
         li.appendChild(div);
       }
@@ -125,7 +124,9 @@
     }
   }
 
-  // Levenshtein distance with early exit (bounded)
+  // --------------------------------------------------------------------------
+  // Levenshtein (bounded) for fuzzy "did you mean"
+  // --------------------------------------------------------------------------
   function levenshtein(a, b, maxDist) {
     if (a === b) return 0;
     if (!a || !b) return Math.max(a.length, b.length);
@@ -133,6 +134,7 @@
     const al = a.length;
     const bl = b.length;
 
+    // Early exit: too different in length.
     if (Math.abs(al - bl) > maxDist) return maxDist + 1;
 
     let prev = new Array(bl + 1);
@@ -166,7 +168,7 @@
   function computeDidYouMean(queryKey, aliasKeys, limit = 5) {
     if (!queryKey || queryKey.length < 3) return [];
 
-    // Slightly larger cap helps multi-word phrases while still staying bounded.
+    // Bounded distance - scales gently with query length.
     const maxDist = Math.min(4, Math.floor(queryKey.length / 6) + 1);
 
     const scored = [];
@@ -179,6 +181,9 @@
     return scored.slice(0, limit).map((s) => s.k);
   }
 
+  // --------------------------------------------------------------------------
+  // Index structures (built once)
+  // --------------------------------------------------------------------------
   let indexCache = null;
 
   // Built once per page-load
@@ -193,7 +198,7 @@
   let aliasKeyToDisplay = null;
 
   // Stopword-stripped alias key -> Set of slugs that match it
-  // Used only for a safe, secondary exact match (unique slug only).
+  // Used only for safe secondary exact match (unique slug only).
   let stopKeyToSlugs = null;
 
   function buildLookupStructures(idx) {
@@ -215,7 +220,6 @@
         if (synKey && !aliasKeyToDisplay.has(synKey)) aliasKeyToDisplay.set(synKey, syn);
       }
 
-      // If your /api/pasta-index.json includes searchAliases, use them for nicer labels
       for (const a of toArray(e.searchAliases || e.search_aliases || e.aliases)) {
         const aKey = normalize(a);
         if (aKey && !aliasKeyToDisplay.has(aKey)) aliasKeyToDisplay.set(aKey, a);
@@ -236,15 +240,12 @@
       if (seen.has(dedupeKey)) continue;
       seen.add(dedupeKey);
 
-      const aliasDisplay =
-        aliasKeyToDisplay.get(aliasKey) ||
-        // Fallback - show the normalized alias as-is
-        aliasKey;
+      const aliasDisplay = aliasKeyToDisplay.get(aliasKey) || aliasKey;
 
       aliasList.push({ key: aliasKey, slug, url, aliasDisplay });
       aliasKeys.push(aliasKey);
 
-      // Build stopword-stripped lookup
+      // Stopword-stripped lookup
       const stopKey = stripStopwords(aliasKey);
       if (stopKey) {
         if (!stopKeyToSlugs.has(stopKey)) stopKeyToSlugs.set(stopKey, new Set());
@@ -281,7 +282,7 @@
       return entry || { slug, url: `/pasta/${slug}/`, name: slug };
     }
 
-    // 2) Safe fallback: stopword-stripped exact match, but only if it resolves uniquely
+    // 2) Safe fallback: stopword-stripped exact match, but only if unique
     const stopKey = stripStopwords(key);
     if (stopKey && stopKeyToSlugs?.has(stopKey)) {
       const slugs = stopKeyToSlugs.get(stopKey);
@@ -371,7 +372,7 @@
       return { match: null, suggestions: [], redirected: false };
     }
 
-    // 1) Exact match (canonical, synonyms, searchAliases, plus safe stopword-strip fallback)
+    // 1) Exact match
     const match = findExactMatch(idx, raw);
     if (match && match.url) {
       setMatchStatus({ name: match.name, url: match.url });
@@ -383,7 +384,7 @@
       return { match, suggestions: [], redirected: false };
     }
 
-    // 2) Normal suggestions (prefix/includes)
+    // 2) Suggestions (prefix/includes)
     const s1 = suggestFromAliases(raw, 10);
     if (s1.length) {
       setStatusText("No exact match. Suggestions:");
@@ -410,10 +411,7 @@
     runSearch(input.value, { redirectIfFound: false });
   });
 
-  // Submit behavior:
-  // - Exact match redirects (handled in runSearch)
-  // - If ONE suggestion remains, redirect to it
-  // - If MULTIPLE suggestions, do not guess - force the user to choose
+  // Submit behavior
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -437,7 +435,7 @@
     setStatusText("No match found.");
   });
 
-  // Handle /?q=... (shared links)
+  // Handle /?q=... shared links
   (function handleQueryParamOnLoad() {
     const params = new URLSearchParams(window.location.search);
     const q = params.get("q");
