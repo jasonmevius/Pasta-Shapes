@@ -1,9 +1,27 @@
---- 
+---
 title: Pasta Shapes
 layout: layout.njk
 description: "Search pasta shapes by name and aliases, or identify a shape by answering a few quick questions."
 ---
 
+{# =============================================================================
+  index.njk (Home)
+  ------------------------------------------------------------------------------
+  PURPOSE
+  - Mobile-first search is the default "restaurant" workflow.
+  - Identify remains highly visible as a primary alternate path.
+  - The heavy lifting (filtering, suggestions, recently viewed) is done in JS.
+
+  IMPORTANT
+  - No inline CSS.
+  - Keep content minimal and task-oriented.
+============================================================================= #}
+
+{# -----------------------------------------------------------------------------
+  Labels / descriptors used in results rows
+  - Keeping these in template is fine because it avoids JS reformatting.
+  - If you later move these to JS, you can delete this block safely.
+----------------------------------------------------------------------------- #}
 {% set typeLabels = {
   "strand": "Strand",
   "tube": "Tube",
@@ -16,6 +34,11 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   "dumpling": "Dumpling / pasta-like"
 } %}
 
+{# -----------------------------------------------------------------------------
+  Macro: autoDescriptor(item)
+  - Produces a short human-readable descriptor for each result row.
+  - Intentionally minimal: it’s meant for quick scanning.
+----------------------------------------------------------------------------- #}
 {% macro autoDescriptor(item) %}
   {% set first = true %}
 
@@ -54,23 +77,34 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   {% endif %}
 {% endmacro %}
 
-<section class="hero stack">
+{# --- Page intro (very small) ----------------------------------------------- #}
+<header class="hero stack">
   <h1 class="h1">Pasta Shapes</h1>
   <p class="lead muted">
-    Search pasta shapes by name and aliases, or identify a shape by answering a few quick questions.
+    Search by name (fastest), or identify a shape by answering a few quick questions.
   </p>
 
   <div class="hero-actions">
     <a class="btn secondary" href="/identify/">Identify by questions</a>
   </div>
-</section>
+</header>
 
+{# --- Search card ----------------------------------------------------------- #}
 <section class="card stack" aria-label="Search pasta shapes">
+  {# --------------------------------------------------------------------------
+    Search form
+    - scripts.js binds to:
+        #pasta-q
+        #pasta-search-status
+        #pasta-search-suggestions
+    - The action remains "/" so refresh/share keeps behavior simple.
+  -------------------------------------------------------------------------- #}
   <form id="pasta-search-form" class="search" action="/" method="get" autocomplete="off">
     <label class="sr-only" for="pasta-q">Search</label>
+
     <input
       id="pasta-q"
-      class="input"
+      class="search-input"
       type="search"
       name="q"
       placeholder="Search (e.g., penne, rigatoni, spahetti...)"
@@ -79,7 +113,10 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       inputmode="search"
     />
 
+    {# Live status line (JS updates this) #}
     <p id="pasta-search-status" class="muted" aria-live="polite"></p>
+
+    {# Suggestion rows (JS populates this) #}
     <ul id="pasta-search-suggestions" class="suggestions" aria-label="Search suggestions"></ul>
   </form>
 
@@ -89,18 +126,33 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       <p class="muted">Loaded {{ pasta.length }} shapes.</p>
     </div>
 
+    {# ------------------------------------------------------------------------
+      Recently viewed (comma-delimited is preferred)
+      - scripts.js should render this as: Name, Name, Name (max 5)
+      - This container stays hidden until JS fills it.
+    ------------------------------------------------------------------------ #}
     <div id="recently-viewed-wrap" class="recent-wrap" hidden>
       <h3 class="h3 muted">Recently viewed</h3>
-      <ul id="recently-viewed" class="recent-list"></ul>
+
+      {# NOTE: Previously this was a <ul>. We prefer a comma-delimited line. #}
+      <p id="recently-viewed" class="muted"></p>
+
       <hr class="divider" />
     </div>
 
+    {# ------------------------------------------------------------------------
+      Results list
+      - Pre-rendered for performance and simplicity.
+      - JS filters/hides rows using data-search.
+    ------------------------------------------------------------------------ #}
     <ul id="pasta-results" class="results-list">
       {% for item in pasta %}
         {% set thumbUrl = item.ThumbnailImage | pastaThumbUrl %}
         {% set displayType = typeLabels[item.Type] or item.Category or "" %}
         {% set synonyms = (item.Synonyms or "") %}
         {% set aliases = (item.SearchAliases or "") %}
+
+        {# Search blob - the string JS will match against #}
         {% set searchBlob = (item.ShapeName ~ " " ~ synonyms ~ " " ~ aliases ~ " " ~ item.Slug) | lower %}
 
         <li class="result-card" data-slug="{{ item.Slug }}" data-search="{{ searchBlob | escape }}">
@@ -135,7 +187,10 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       {% endfor %}
     </ul>
 
-    {# Move "more results" controls BELOW the list for mobile friendliness #}
+    {# ------------------------------------------------------------------------
+      “Top 10 + X more” controls (driven by scripts.js)
+      - The button starts hidden and JS reveals it only when needed.
+    ------------------------------------------------------------------------ #}
     <div class="results-tools">
       <p class="muted results-note" id="pasta-results-note" aria-live="polite"></p>
       <button class="btn secondary btn-small" type="button" id="pasta-toggle-all" hidden></button>
