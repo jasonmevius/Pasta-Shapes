@@ -3,16 +3,43 @@
   ------------------------------------------------------------------------------
   PURPOSE
   - Mobile-only bottom navigation.
-  - Thumb-friendly access to Search and Identify.
-  - Hidden on wider screens via CSS.
+  - Acts like a fast two-way toggle between the two primary flows:
+      1) Search
+      2) Identify
+  - Implemented as normal links for reliability + accessibility, but styled as a
+    segmented control with a sliding indicator ("slider") behind the active tab.
+
+  IMPORTANT
+  - No inline CSS.
+  - The slider effect is driven by:
+      * data-active attribute on <nav>
+      * CSS transform on .bottom-nav-indicator
 ============================================================================= #}
 
-<nav class="bottom-nav" aria-label="Primary (mobile)">
-  <a class="bottom-nav-link" href="/" {% if page and page.url == "/" %}aria-current="page"{% endif %}>
+{# Determine which tab is active based on current URL. #}
+{% set isIdentify = page and page.url and page.url.startsWith("/identify") %}
+
+<nav
+  class="bottom-nav"
+  aria-label="Primary (mobile)"
+  data-active="{{ isIdentify ? "identify" : "search" }}"
+>
+  {# Sliding background indicator (purely presentational) #}
+  <span class="bottom-nav-indicator" aria-hidden="true"></span>
+
+  <a
+    class="bottom-nav-link"
+    href="/"
+    {% if page and page.url == "/" %}aria-current="page"{% endif %}
+  >
     Search
   </a>
 
-  <a class="bottom-nav-link" href="/identify/" {% if page and page.url and page.url.startsWith("/identify") %}aria-current="page"{% endif %}>
+  <a
+    class="bottom-nav-link"
+    href="/identify/"
+    {% if isIdentify %}aria-current="page"{% endif %}
+  >
     Identify
   </a>
 
