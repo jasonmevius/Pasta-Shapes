@@ -1,616 +1,501 @@
-(() => {
-  const $ = (sel, root = document) => root.querySelector(sel);
-
-  // =============================================================================
-  // Recently viewed helpers
-  // =============================================================================
-
-  function readRecents() {
-    try {
-      return JSON.parse(localStorage.getItem("pasta:recent") || "[]");
-    } catch (e) {
-      return [];
-    }
-  }
-
-  function writeRecents(arr) {
-    try {
-      localStorage.setItem("pasta:recent", JSON.stringify(arr.slice(0, 12)));
-    } catch (e) {}
-  }
-
-  function addRecent(slug) {
-    if (!slug) return;
-    const cur = readRecents().filter((x) => x !== slug);
-    cur.unshift(slug);
-    writeRecents(cur);
-  }
-
-  // =============================================================================
-  // Search page behavior
-  // =============================================================================
-
-  function initSearchPage() {
-    const input = $("#pasta-q");
-    const status = $("#pasta-search-status");
-    const list = $("#pasta-results");
-
-    // Only run on the search page
-    if (!input || !status || !list) return;
-
-    const cards = Array.from(list.querySelectorAll("[data-search]"));
-    const originalOrder = cards.slice();
-
-    const recentWrap = $("#recently-viewed-wrap");
-    const recentList = $("#recently-viewed");
-
-    const note = $("#pasta-results-note");
-    const nextBtn = $("#pasta-toggle-all"); // reused - now "Next 10"
-
-    const PAGE_N = 10;
-    let visibleLimit = PAGE_N;
-
-    function setControlVisible(el, isVisible) {
-      if (!el) return;
-      // Some CSS can override [hidden], so force display none as well.
-      el.hidden = !isVisible;
-      el.style.display = isVisible ? "" : "none";
-      el.setAttribute("aria-hidden", isVisible ? "false" : "true");
-    }
-
-    // -----------------------------------------------------------------------------
-    // Normalization
-    // -----------------------------------------------------------------------------
-    const STOPWORDS = new Set([
-      "a",
-      "ad",
-      "al",
-      "alla",
-      "alle",
-      "allo",
-      "ai",
-      "agli",
-      "all",
-      "da",
-      "de",
-      "dei",
-      "degli",
-      "della",
-      "delle",
-      "del",
-      "di",
-      "e",
-      "ed",
-      "in",
-      "con",
-      "per",
-      "su",
-      "lo",
-      "la",
-      "le",
-      "il",
-      "un",
-      "una",
-      "uno",
-    ]);
-
-    function normalize(s) {
-      return String(s || "")
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/&/g, "and")
-        .replace(/[’']/g, " ")
-        .replace(/[^a-z0-9\s-]/g, " ")
-        .replace(/\s+/g, " ")
-        .trim();
-    }
-
-    // Collapses spaced-letter inputs like "p e n n e" -> "penne"
-    function normalizeQuery(s) {
-      const q = normalize(s);
-      if (/^(?:[a-z0-9]\s+){2,}[a-z0-9]$/.test(q)) return q.replace(/\s+/g, "");
-      return q;
-    }
-
-    function stripStopwords(normalizedString) {
-      const parts = (normalizedString || "")
-        .split(" ")
-        .map((t) => t.trim())
-        .filter(Boolean)
-        .filter((t) => !STOPWORDS.has(t));
-      return parts.join(" ").trim();
-    }
-
-    // -----------------------------------------------------------------------------
-    // Optional fuzzy support using /api/pasta-index.json
-    // -----------------------------------------------------------------------------
-    let indexLoaded = false;
-    let index = null;
-    let aliasKeys = null;
-    let stopKeyToSlugs = null;
-    const cardBySlug = new Map(cards.map((c) => [c.getAttribute("data-slug"), c]));
-
-    async function loadIndexIfNeeded() {
-      if (indexLoaded) return index;
-      indexLoaded = true;
-
-      try {
-        const res = await fetch("/api/pasta-index.json", { cache: "force-cache" });
-        if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
-        index = await res.json();
-
-        const a2s = index.aliasToSlug || {};
-        aliasKeys = Object.keys(a2s);
-
-        stopKeyToSlugs = new Map();
-        for (const k of aliasKeys) {
-          const stopKey = stripStopwords(k);
-          if (!stopKey) continue;
-          const slug = a2s[k];
-          if (!slug) continue;
-          if (!stopKeyToSlugs.has(stopKey)) stopKeyToSlugs.set(stopKey, new Set());
-          stopKeyToSlugs.get(stopKey).add(slug);
-        }
-      } catch (e) {
-        index = null;
-        aliasKeys = null;
-        stopKeyToSlugs = null;
-      }
-
-      return index;
-    }
-
-    function levenshtein(a, b, maxDist) {
-      if (a === b) return 0;
-      if (!a || !b) return Math.max(a.length, b.length);
-
-      const al = a.length;
-      const bl = b.length;
-
-      if (Math.abs(al - bl) > maxDist) return maxDist + 1;
-
-      let prev = new Array(bl + 1);
-      let cur = new Array(bl + 1);
-
-      for (let j = 0; j <= bl; j++) prev[j] = j;
-
-      for (let i = 1; i <= al; i++) {
-        cur[0] = i;
-
-        let rowMin = cur[0];
-        const ai = a.charCodeAt(i - 1);
-
-        for (let j = 1; j <= bl; j++) {
-          const cost = ai === b.charCodeAt(j - 1) ? 0 : 1;
-          const val = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
-          cur[j] = val;
-          if (val < rowMin) rowMin = val;
-        }
-
-        if (rowMin > maxDist) return maxDist + 1;
-
-        const tmp = prev;
-        prev = cur;
-        cur = tmp;
-      }
-
-      return prev[bl];
-    }
-
-    function bestFuzzySlugs(qKey, limit = 50) {
-      if (!index || !aliasKeys || !qKey || qKey.length < 3) return [];
-
-      const a2s = index.aliasToSlug || {};
-      const maxDist = Math.min(3, Math.floor(qKey.length / 6) + 1);
-
-      const scored = [];
-      for (const k of aliasKeys) {
-        const d = levenshtein(qKey, k, maxDist);
-        if (d <= maxDist) scored.push({ k, d });
-      }
-
-      scored.sort((a, b) => a.d - b.d || a.k.length - b.k.length);
-
-      const out = [];
-      const used = new Set();
-
-      for (const s of scored) {
-        const slug = a2s[s.k];
-        if (!slug || used.has(slug)) continue;
-        used.add(slug);
-        out.push(slug);
-        if (out.length >= limit) break;
-      }
-
-      return out;
-    }
-
-    // -----------------------------------------------------------------------------
-    // Ranking helpers
-    // -----------------------------------------------------------------------------
-    function cardNameNorm(card) {
-      const el = card.querySelector(".result-name");
-      return normalize(el ? el.textContent : "");
-    }
-
-    function cardBlobNorm(card) {
-      return normalize(card.getAttribute("data-search") || "");
-    }
-
-    function cardSlugNorm(card) {
-      return normalize(card.getAttribute("data-slug") || "");
-    }
-
-    function scoreCard(card, q) {
-      const name = cardNameNorm(card);
-      const slug = cardSlugNorm(card);
-      const blob = cardBlobNorm(card);
-
-      let bucket = 50;
-
-      if (name && name.startsWith(q)) bucket = 0;
-      else if (name && name.split(" ").some((t) => t.startsWith(q))) bucket = 1;
-      else if (slug && slug.startsWith(q)) bucket = 2;
-      else if (blob && blob.startsWith(q)) bucket = 3;
-      else if (name && name.includes(q)) bucket = 4;
-      else if (blob && blob.includes(q)) bucket = 5;
-
-      let pos = 9999;
-      if (bucket <= 3) pos = 0;
-      else if (bucket === 4) pos = name.indexOf(q);
-      else if (bucket === 5) pos = blob.indexOf(q);
-
-      const len = name ? name.length : 9999;
-      return { bucket, pos, len, name };
-    }
-
-    function reorderCards(order) {
-      for (const card of order) list.appendChild(card);
-    }
-
-    // -----------------------------------------------------------------------------
-    // UI helpers
-    // -----------------------------------------------------------------------------
-    function setStatus(matchCount, shownCount, q, mode) {
-      if (!q) {
-        status.textContent = "Type to filter - aliases included.";
-        return;
-      }
-
-      if (mode === "fuzzy") {
-        status.textContent = `0 direct matches - showing closest results (${shownCount})`;
-        return;
-      }
-
-      status.textContent = `${shownCount} of ${matchCount} matches`;
-    }
-
-    function countVisible(arr) {
-      let n = 0;
-      for (const el of arr) {
-        if (el.style.display !== "none") n++;
-      }
-      return n;
-    }
-
-    function setNoteAndNext(matchCount, shownCount) {
-      if (!note || !nextBtn) return;
-
-      const remaining = Math.max(0, matchCount - shownCount);
-
-      if (matchCount === 0) {
-        note.textContent = "";
-        setControlVisible(nextBtn, false);
-        return;
-      }
-
-      if (remaining === 0) {
-        note.textContent = `Showing ${shownCount} of ${matchCount}`;
-        setControlVisible(nextBtn, false);
-        return;
-      }
-
-      note.textContent = `Showing ${shownCount} of ${matchCount} - ${remaining} more`;
-
-      const nextChunk = Math.min(PAGE_N, remaining);
-      nextBtn.textContent = `Next ${nextChunk} (${remaining} more)`;
-      setControlVisible(nextBtn, true);
-    }
-
-    function directMatchSets(q) {
-      const matched = [];
-      const nonMatched = [];
-
-      for (const card of originalOrder) {
-        const blob = cardBlobNorm(card);
-        if (blob.includes(q)) matched.push(card);
-        else nonMatched.push(card);
-      }
-
-      return { matched, nonMatched };
-    }
-
-    async function filter() {
-      const raw = input.value || "";
-      const q = normalizeQuery(raw);
-      const total = cards.length;
-
-      // -----------------------------------------------------------
-      // Query present
-      // -----------------------------------------------------------
-      if (q) {
-        let { matched, nonMatched } = directMatchSets(q);
-
-        // If no direct matches and query contains spaces, retry ignoring spaces
-        let qUsed = q;
-        if (!matched.length && q.includes(" ")) {
-          const qNoSpaces = q.replace(/\s+/g, "");
-          if (qNoSpaces && qNoSpaces !== q) {
-            const retry = directMatchSets(qNoSpaces);
-            if (retry.matched.length) {
-              matched = retry.matched;
-              nonMatched = retry.nonMatched;
-              qUsed = qNoSpaces;
-            }
-          }
-        }
-
-        if (matched.length) {
-          const ranked = matched
-            .map((c) => ({ c, s: scoreCard(c, qUsed) }))
-            .sort((a, b) => {
-              if (a.s.bucket !== b.s.bucket) return a.s.bucket - b.s.bucket;
-              if (a.s.pos !== b.s.pos) return a.s.pos - b.s.pos;
-              if (a.s.len !== b.s.len) return a.s.len - b.s.len;
-              return a.s.name.localeCompare(b.s.name);
-            })
-            .map((x) => x.c);
-
-          reorderCards(ranked.concat(nonMatched));
-
-          const requestedShown = Math.min(visibleLimit, ranked.length);
-
-          for (let i = 0; i < ranked.length; i++) ranked[i].style.display = i < requestedShown ? "" : "none";
-          for (const c of nonMatched) c.style.display = "none";
-
-          const actualShown = countVisible(ranked);
-
-          // clamp visibleLimit so it doesn't overshoot forever
-          visibleLimit = Math.max(PAGE_N, Math.min(visibleLimit, ranked.length || PAGE_N));
-
-          setStatus(ranked.length, actualShown, qUsed, "direct");
-          setNoteAndNext(ranked.length, actualShown);
-          return;
-        }
-
-        // -----------------------------------------------------------
-        // Fuzzy fallback
-        // -----------------------------------------------------------
-        await loadIndexIfNeeded();
-
-        const candidates = [q];
-        if (q.includes(" ")) {
-          const qNoSpaces = q.replace(/\s+/g, "");
-          if (qNoSpaces && qNoSpaces !== q) candidates.push(qNoSpaces);
-        }
-
-        let slugs = [];
-        if (index && index.aliasToSlug) {
-          for (const cand of candidates) {
-            const exactSlug = index.aliasToSlug[cand];
-            if (exactSlug) {
-              slugs = [exactSlug];
-              break;
-            }
-          }
-
-          if (!slugs.length && stopKeyToSlugs) {
-            for (const cand of candidates) {
-              const stopKey = stripStopwords(cand);
-              const set = stopKeyToSlugs.get(stopKey);
-              if (set && set.size === 1) {
-                slugs = [Array.from(set)[0]];
-                break;
-              }
-            }
-          }
-        }
-
-        if (!slugs.length) {
-          for (const cand of candidates) {
-            slugs = bestFuzzySlugs(cand, 50);
-            if (slugs.length) break;
-          }
-        }
-
-        if (slugs.length) {
-          const slugSet = new Set(slugs);
-
-          const ordered = [];
-          for (const slug of slugs) {
-            const c = cardBySlug.get(slug);
-            if (c) ordered.push(c);
-          }
-
-          const remaining = originalOrder.filter((c) => !slugSet.has(c.getAttribute("data-slug")));
-          reorderCards(ordered.concat(remaining));
-
-          const requestedShown = Math.min(visibleLimit, ordered.length);
-
-          for (let i = 0; i < ordered.length; i++) ordered[i].style.display = i < requestedShown ? "" : "none";
-          for (const c of remaining) c.style.display = "none";
-
-          const actualShown = countVisible(ordered);
-
-          visibleLimit = Math.max(PAGE_N, Math.min(visibleLimit, ordered.length || PAGE_N));
-
-          setStatus(ordered.length, actualShown, q, "fuzzy");
-          setNoteAndNext(ordered.length, actualShown);
-          return;
-        }
-
-        // No matches
-        reorderCards(originalOrder);
-        for (const c of cards) c.style.display = "none";
-        setStatus(0, 0, q, "direct");
-        setNoteAndNext(0, 0);
-        return;
-      }
-
-      // -----------------------------------------------------------
-      // No query - restore original order + progressive reveal
-      // -----------------------------------------------------------
-      reorderCards(originalOrder);
-
-      const requestedShown = Math.min(visibleLimit, total);
-
-      for (let i = 0; i < originalOrder.length; i++) {
-        originalOrder[i].style.display = i < requestedShown ? "" : "none";
-      }
-
-      const actualShown = countVisible(originalOrder);
-
-      visibleLimit = Math.max(PAGE_N, Math.min(visibleLimit, total || PAGE_N));
-
-      setStatus(total, actualShown, q, "direct");
-      setNoteAndNext(total, actualShown);
-    }
-
-    function renderRecents() {
-      if (!recentWrap || !recentList) return;
-
-      const slugs = readRecents();
-      if (!slugs.length) {
-        recentWrap.hidden = true;
-        return;
-      }
-
-      const bySlug = new Map(cards.map((c) => [c.getAttribute("data-slug"), c]));
-      const items = slugs
-        .map((s) => bySlug.get(s))
-        .filter(Boolean)
-        .slice(0, 5); // max 5
-
-      if (!items.length) {
-        recentWrap.hidden = true;
-        return;
-      }
-
-      recentlyFillList(recentList, items);
-      recentWrap.hidden = false;
-    }
-
-    // Render as comma-delimited links (still inside the existing <ul>)
-    function recentlyFillList(targetUl, cardItems) {
-      // Force UL to behave like an inline text container
-      targetUl.innerHTML = "";
-      targetUl.style.listStyle = "none";
-      targetUl.style.padding = "0";
-      targetUl.style.margin = "0";
-
-      // One LI that contains comma-separated links
-      const li = document.createElement("li");
-      li.style.listStyle = "none";
-      li.style.display = "inline";
-
-      cardItems.forEach((card, idx) => {
-        const link = card.querySelector("a[href]");
-        const name = card.querySelector(".result-name");
-        if (!link) return;
-
-        if (idx > 0) li.appendChild(document.createTextNode(", "));
-
-        const a = document.createElement("a");
-        a.href = link.getAttribute("href");
-        a.textContent = name ? name.textContent.trim() : a.href;
-
-        li.appendChild(a);
-      });
-
-      targetUl.appendChild(li);
-    }
-
-    // Record recents on click
-    list.addEventListener("click", (e) => {
-      const a = e.target.closest("a[data-recent]");
-      if (!a) return;
-
-      const href = a.getAttribute("href") || "";
-      const m = href.match(/\/pasta\/([^\/]+)\//);
-      if (m && m[1]) addRecent(m[1]);
-    });
-
-    // Next 10 behavior
-    if (nextBtn) {
-      nextBtn.addEventListener("click", (e) => {
-        if (typeof e.preventDefault === "function") e.preventDefault();
-        visibleLimit += PAGE_N;
-        filter();
-      });
-
-      // Ensure initial state isn't stuck visible from CSS overrides
-      setControlVisible(nextBtn, false);
-    }
-
-    // Optional: support ?q= prefill
-    try {
-      const url = new URL(window.location.href);
-      const qParam = url.searchParams.get("q");
-      if (qParam) input.value = qParam;
-    } catch (e) {}
-
-    input.addEventListener(
-      "input",
-      () => {
-        visibleLimit = PAGE_N;
-        filter();
-      },
-      { passive: true }
-    );
-
-    input.addEventListener(
-      "focus",
-      () => {
-        loadIndexIfNeeded();
-      },
-      { once: true, passive: true }
-    );
-
-    visibleLimit = PAGE_N;
-    filter();
-    renderRecents();
-  }
-
-  // =============================================================================
-  // Detail page behavior (store recent on load)
-  // =============================================================================
-
-  function initDetailPage() {
-    const path = window.location.pathname || "";
-    const m = path.match(/^\/pasta\/([^\/]+)\/?$/);
-    if (m && m[1]) addRecent(m[1]);
-  }
-
-  // =============================================================================
-  // Identify page behavior
-  // =============================================================================
-
-  function initIdentifyPage() {
-    // unchanged
-  }
-
-  // =============================================================================
-  // Init
-  // =============================================================================
-
-  document.addEventListener(
-    "DOMContentLoaded",
-    () => {
-      initSearchPage();
-      initDetailPage();
-      initIdentifyPage();
+// src/js/pasta-identify.js
+// ============================================================================
+// Identify-by-features workflow (select-based UI).
+//
+// This script ONLY runs if it finds #pasta-identify.
+// It expects these elements to exist (your current identify template provides them):
+// - #id-type, #id-hollow, #id-ridged, #id-twisted, #id-curved, #id-size
+// - #id-reset, #id-status, #id-results
+//
+// IMPORTANT CONSTRAINTS
+// - Do NOT inject <style> tags.
+// - Do NOT set inline styles.
+// - All styling must live in /src/css/styles.css.
+//
+// UX GOALS
+// - Question cards show in a fixed order visually.
+// - The “next best question” logic determines which card to reveal next,
+//   but the visual order remains stable.
+// ============================================================================
+(function () {
+  const root = document.getElementById("pasta-identify");
+  if (!root) return;
+
+  const elType = document.getElementById("id-type");
+  const elHollow = document.getElementById("id-hollow");
+  const elRidged = document.getElementById("id-ridged");
+  const elTwisted = document.getElementById("id-twisted");
+  const elCurved = document.getElementById("id-curved");
+  const elSize = document.getElementById("id-size");
+  const elReset = document.getElementById("id-reset");
+  const elStatus = document.getElementById("id-status");
+  const elResults = document.getElementById("id-results");
+
+  if (
+    !elType ||
+    !elHollow ||
+    !elRidged ||
+    !elTwisted ||
+    !elCurved ||
+    !elSize ||
+    !elReset ||
+    !elStatus ||
+    !elResults
+  ) return;
+
+  let entries = [];
+  let loaded = false;
+
+  const MAX_SHOW = 25;
+  const SIZE_ONLY_IF_MORE_THAN = 10;
+
+  // Fixed sequential order in the UI (always displayed in this order)
+  const STEPS = [
+    {
+      key: "type",
+      el: elType,
+      title: "Type",
+      desc: "Start with the overall form - long strands, tubes, sheets, stuffed, soup shapes, etc.",
     },
-    { once: true }
-  );
+    {
+      key: "isHollow",
+      el: elHollow,
+      title: "Hollow",
+      desc: "Does it have a hole or tube running through it (like penne or rigatoni)?",
+      kind: "structural",
+    },
+    {
+      key: "isRidged",
+      el: elRidged,
+      title: "Ridged",
+      desc: "Are there ridges or grooves on the surface (often used to grab sauce)?",
+      kind: "structural",
+    },
+    {
+      key: "isTwisted",
+      el: elTwisted,
+      title: "Twisted",
+      desc: "Is the shape spiraled or twisted (like fusilli)?",
+      kind: "structural",
+    },
+    {
+      key: "isCurved",
+      el: elCurved,
+      title: "Curved",
+      desc: "Is the shape notably curved (like elbows or shells)?",
+      kind: "structural",
+    },
+    {
+      key: "sizeClass",
+      el: elSize,
+      title: "Size",
+      desc: "A rough bucket - small / medium / large. Helpful as a last step, but subjective.",
+      kind: "size",
+    },
+  ];
+
+  function normVal(v) {
+    return String(v || "").trim().toLowerCase();
+  }
+
+  function clearResults() {
+    elResults.innerHTML = "";
+  }
+
+  function setStatus(text) {
+    elStatus.textContent = text;
+  }
+
+  // --------------------------------------------------------------------------
+  // Rendering results without inline styles
+  // --------------------------------------------------------------------------
+  function render(results) {
+    clearResults();
+
+    const show = results.slice(0, MAX_SHOW);
+
+    for (const r of show) {
+      const li = document.createElement("li");
+      li.className = "id-result";
+
+      const a = document.createElement("a");
+      a.href = r.url;
+      a.textContent = r.name;
+      li.appendChild(a);
+
+      if (r.description) {
+        const div = document.createElement("div");
+        div.className = "id-result-desc";
+        div.textContent = r.description;
+        li.appendChild(div);
+      }
+
+      elResults.appendChild(li);
+    }
+
+    if (results.length > MAX_SHOW) {
+      const li = document.createElement("li");
+      li.className = "id-result id-result-note";
+      li.textContent = `Showing ${MAX_SHOW} of ${results.length}. Add more answers to narrow it down.`;
+      elResults.appendChild(li);
+    }
+  }
+
+  function matchesFilter(entry, key, selected) {
+    if (!selected) return true; // Any
+    const val = normVal(entry[key]);
+    if (!val) return selected === "unknown"; // blank treated as unknown
+    return val === selected;
+  }
+
+  function getFilterState() {
+    return {
+      type: normVal(elType.value),
+      isHollow: normVal(elHollow.value),
+      isRidged: normVal(elRidged.value),
+      isTwisted: normVal(elTwisted.value),
+      isCurved: normVal(elCurved.value),
+      sizeClass: normVal(elSize.value),
+    };
+  }
+
+  function applyAllFilters(baseList, filters) {
+    return baseList.filter((e) => {
+      if (filters.type && normVal(e.type) !== filters.type) return false;
+      if (!matchesFilter(e, "isHollow", filters.isHollow)) return false;
+      if (!matchesFilter(e, "isRidged", filters.isRidged)) return false;
+      if (!matchesFilter(e, "isTwisted", filters.isTwisted)) return false;
+      if (!matchesFilter(e, "isCurved", filters.isCurved)) return false;
+
+      // sizeClass: allow blank values when selecting unknown
+      if (filters.sizeClass) {
+        const v = normVal(e.sizeClass);
+        if (v !== filters.sizeClass) {
+          if (!(filters.sizeClass === "unknown" && !v)) return false;
+        }
+      }
+
+      return true;
+    });
+  }
+
+  // --------------------------------------------------------------------------
+  // "Next best question" scoring (entropy-ish)
+  // --------------------------------------------------------------------------
+  function entropyFromCounts(counts) {
+    const total = counts.reduce((a, b) => a + b, 0);
+    if (!total) return 0;
+    let h = 0;
+    for (const c of counts) {
+      if (!c) continue;
+      const p = c / total;
+      h -= p * Math.log2(p);
+    }
+    return h;
+  }
+
+  function getValueBucket(entry, key) {
+    const v = normVal(entry[key]);
+    return v || "unknown";
+  }
+
+  function scoreQuestion(candidateEntries, key) {
+    const buckets = new Map();
+    for (const e of candidateEntries) {
+      const b = getValueBucket(e, key);
+      buckets.set(b, (buckets.get(b) || 0) + 1);
+    }
+
+    const counts = Array.from(buckets.values());
+    const total = counts.reduce((a, b) => a + b, 0);
+    if (!total) return -1;
+
+    // If everything is unknown, don't ask this.
+    if (buckets.size === 1 && buckets.has("unknown")) return -1;
+
+    // If essentially constant, low value.
+    const maxCount = Math.max(...counts);
+    const dominance = maxCount / total;
+    if (dominance >= 0.92) return 0;
+
+    const h = entropyFromCounts(counts);
+
+    // Penalize unknown-heavy splits
+    const unknownFrac = (buckets.get("unknown") || 0) / total;
+    const penalty = unknownFrac * 0.35 + Math.max(0, buckets.size - 3) * 0.1;
+
+    return h - penalty;
+  }
+
+  function getAnsweredKeys() {
+    const answered = new Set();
+    if (normVal(elType.value)) answered.add("type");
+    for (const s of STEPS) {
+      if (s.key === "type") continue;
+      if (normVal(s.el.value)) answered.add(s.key);
+    }
+    return answered;
+  }
+
+  /**
+   * Behavior:
+   * - Prefer remaining structural questions first (if useful).
+   * - Only offer Size when results still big and no good structural left.
+   */
+  function pickNextQuestion(candidateEntries, answeredKeys) {
+    if (candidateEntries.length <= 1) return null;
+
+    const remaining = STEPS.filter((s) => s.key !== "type" && !answeredKeys.has(s.key));
+
+    const structural = [];
+    let sizeCandidate = null;
+
+    for (const s of remaining) {
+      const sc = scoreQuestion(candidateEntries, s.key);
+      if (sc <= 0) continue;
+
+      if (s.kind === "structural") structural.push({ step: s, score: sc });
+      else if (s.kind === "size") sizeCandidate = { step: s, score: sc };
+    }
+
+    structural.sort((a, b) => b.score - a.score);
+
+    if (structural.length) return structural[0].step;
+
+    if (
+      sizeCandidate &&
+      candidateEntries.length > SIZE_ONLY_IF_MORE_THAN &&
+      !answeredKeys.has("sizeClass")
+    ) {
+      return sizeCandidate.step;
+    }
+
+    return null;
+  }
+
+  // --------------------------------------------------------------------------
+  // Step card UI (no injected CSS)
+  // --------------------------------------------------------------------------
+  function getLabelFor(selectEl) {
+    return (
+      root.querySelector(`label[for="${selectEl.id}"]`) ||
+      document.querySelector(`label[for="${selectEl.id}"]`)
+    );
+  }
+
+  function buildStepCard(step) {
+    const selectEl = step.el;
+    const labelEl = getLabelFor(selectEl);
+
+    const card = document.createElement("section");
+    card.className = "id-step";
+    card.dataset.stepKey = step.key;
+
+    const top = document.createElement("div");
+    top.className = "id-step__top";
+
+    const img = document.createElement("div");
+    img.className = "id-step__img";
+    img.setAttribute("aria-hidden", "true");
+    img.textContent = "Image soon";
+
+    const text = document.createElement("div");
+    const h = document.createElement("p");
+    h.className = "id-step__title";
+    h.textContent = step.title;
+
+    const d = document.createElement("p");
+    d.className = "id-step__desc";
+    d.textContent = step.desc;
+
+    text.appendChild(h);
+    text.appendChild(d);
+
+    top.appendChild(img);
+    top.appendChild(text);
+
+    const control = document.createElement("div");
+    control.className = "id-step__control";
+
+    // Keep existing label semantics if your HTML wraps select inside label.
+    if (labelEl && labelEl.contains(selectEl)) {
+      control.appendChild(labelEl);
+    } else {
+      if (labelEl) control.appendChild(labelEl);
+      control.appendChild(selectEl);
+    }
+
+    card.appendChild(top);
+    card.appendChild(control);
+
+    return card;
+  }
+
+  let stepsContainer = null;
+  let stepCardByKey = new Map();
+
+  function buildStepsUI() {
+    // If we already built cards, reuse them.
+    const existing = root.querySelector(".id-steps");
+    if (existing) {
+      stepsContainer = existing;
+      stepCardByKey = new Map();
+      for (const el of stepsContainer.querySelectorAll(".id-step")) {
+        stepCardByKey.set(el.dataset.stepKey, el);
+      }
+      return;
+    }
+
+    stepsContainer = document.createElement("div");
+    stepsContainer.className = "id-steps";
+
+    for (const step of STEPS) {
+      const card = buildStepCard(step);
+      stepsContainer.appendChild(card);
+      stepCardByKey.set(step.key, card);
+    }
+
+    // Place steps above the status block if possible.
+    if (elStatus && elStatus.parentNode) {
+      elStatus.parentNode.insertBefore(stepsContainer, elStatus);
+    } else {
+      root.appendChild(stepsContainer);
+    }
+  }
+
+  function setStepVisible(key, visible) {
+    const card = stepCardByKey.get(key);
+    if (!card) return;
+    card.hidden = !visible;
+  }
+
+  function hideAllStepsExceptType() {
+    for (const s of STEPS) setStepVisible(s.key, s.key === "type");
+  }
+
+  function showAnsweredAndNextStep(nextStepKey) {
+    const answered = getAnsweredKeys();
+
+    for (const s of STEPS) {
+      if (s.key === "type") {
+        setStepVisible("type", true);
+        continue;
+      }
+      setStepVisible(s.key, answered.has(s.key));
+    }
+
+    if (nextStepKey && !answered.has(nextStepKey)) {
+      setStepVisible(nextStepKey, true);
+    }
+  }
+
+  function clearFieldsAfter(changedKey) {
+    const order = STEPS.map((s) => s.key);
+    const idx = order.indexOf(changedKey);
+    if (idx === -1) return;
+
+    for (let i = idx + 1; i < order.length; i++) {
+      const key = order[i];
+      const step = STEPS.find((s) => s.key === key);
+      if (step) step.el.value = "";
+    }
+  }
+
+  function removeBlankTypeOptions() {
+    const typeCounts = new Map();
+    for (const e of entries) {
+      const t = normVal(e.type);
+      if (!t) continue;
+      typeCounts.set(t, (typeCounts.get(t) || 0) + 1);
+    }
+
+    const opts = Array.from(elType.options || []);
+    for (const opt of opts) {
+      const v = normVal(opt.value);
+      if (!v) continue;
+      if (!typeCounts.get(v)) opt.remove();
+    }
+  }
+
+  function updateUI() {
+    if (!loaded) return;
+
+    const filters = getFilterState();
+
+    if (!filters.type) {
+      hideAllStepsExceptType();
+      setStatus(`Choose a Type to start narrowing down from ${entries.length} shapes.`);
+      clearResults();
+      return;
+    }
+
+    const results = applyAllFilters(entries, filters);
+
+    if (!results.length) {
+      setStatus("No matches with those answers. Try changing your last selection.");
+      clearResults();
+      showAnsweredAndNextStep(null);
+      return;
+    }
+
+    const answeredKeys = getAnsweredKeys();
+    const nextStep = pickNextQuestion(results, answeredKeys);
+
+    setStatus(`${results.length} match${results.length === 1 ? "" : "es"}.`);
+    render(results);
+
+    showAnsweredAndNextStep(nextStep ? nextStep.key : null);
+  }
+
+  function reset() {
+    elType.value = "";
+    for (const s of STEPS) {
+      if (s.key === "type") continue;
+      s.el.value = "";
+    }
+    hideAllStepsExceptType();
+    setStatus("Choose a Type to start.");
+    clearResults();
+  }
+
+  async function init() {
+    setStatus("Loading feature index...");
+
+    buildStepsUI();
+    hideAllStepsExceptType();
+
+    try {
+      const res = await fetch("/api/pasta-features.json", { cache: "force-cache" });
+      if (!res.ok) throw new Error(`Fetch failed: ${res.status}`);
+      const json = await res.json();
+
+      entries = Array.isArray(json.entries) ? json.entries : [];
+      loaded = true;
+
+      removeBlankTypeOptions();
+
+      setStatus(`Choose a Type to start narrowing down from ${entries.length} shapes.`);
+    } catch (e) {
+      setStatus("Identify-by-shape is unavailable right now.");
+      loaded = false;
+    }
+  }
+
+  // Events
+  elType.addEventListener("change", () => {
+    clearFieldsAfter("type");
+    updateUI();
+  });
+
+  for (const s of STEPS) {
+    if (s.key === "type") continue;
+    s.el.addEventListener("change", () => {
+      clearFieldsAfter(s.key);
+      updateUI();
+    });
+  }
+
+  elReset.addEventListener("click", reset);
+
+  init();
 })();
