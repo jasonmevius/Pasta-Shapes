@@ -4,18 +4,17 @@
 //
 // 1) Recently Viewed (localStorage)
 //
-// 2) Homepage Search Filtering (Option B: show nothing until typing)
+// 2) Homepage Search (restaurant-first UX)
 //
-// IMPORTANT UX RULES (restaurant-friendly):
-// - 0 chars: show nothing
-// - 1 char: show nothing (too noisy) BUT show "keep typing" status
-// - 2+ chars: show matches immediately (includes aliases via data-search)
+// KEY UX RULE (per your request)
+// - Typing "r" should show pasta names that START with "r".
+// - We do NOT show everything containing "r" because that's too noisy.
+// - We only fall back to alias/metadata searching if name-prefix produces 0 hits.
 //
-// WHY THIS UPDATE
-// - You observed "r / ra / ravio -> nothing" then "raviol -> 1 result".
-// - That feels broken to users.
-// - This version makes the short-query behavior explicit and consistent,
-//   and ensures 2+ chars always filters correctly.
+// WHY THIS VERSION
+// - Your results showed "ra" and "raviol" returning "No matches found".
+// - That indicates our dependency on data-search/searchBlob is unreliable.
+// - This version searches from the DOM (visible name) first, so it cannot drift.
 // ============================================================================
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -71,7 +70,6 @@
     const nextBtn = $("#pasta-toggle-all");
 
     const PAGE_N = 10;
-    const MIN_CHARS = 2; // <-- Restaurant-friendly: avoids 1-letter noise
     let visibleLimit = PAGE_N;
 
     // -------------------------------------------------------------------------
@@ -94,7 +92,7 @@
     }
 
     // -------------------------------------------------------------------------
-    // Normalization helpers
+    // Normalization
     // -------------------------------------------------------------------------
     function normalize(s) {
       return String(s || "")
@@ -116,56 +114,42 @@
     }
 
     // -------------------------------------------------------------------------
-    // Ranking helpers (name-first ordering, then blob)
+    // Build a reliable per-card search cache from the DOM
+    // - nameNorm: normalized visible name (primary)
+    // - aliasNorm: normalized "Also:" line + data-search (secondary)
+    //
+    // This avoids issues where data-search/searchBlob might be missing or stale.
     // -------------------------------------------------------------------------
-    function cardNameNorm(card) {
-      const el = card.querySelector(".result-name");
-      return normalize(el ? el.textContent : "");
-    }
+    const cache = cards.map((card) => {
+      const nameEl = card.querySelector(".result-name");
+      const alsoEl = card.querySelector(".result-also");
+      const descEl = card.querySelector(".result-desc");
 
-    function cardBlobNorm(card) {
-      // data-search should include name + aliases + type bits
-      return normalize(card.getAttribute("data-search") || "");
-    }
+      const nameText = nameEl ? nameEl.textContent : "";
+      const alsoText = alsoEl ? alsoEl.textContent : "";
+      const descText = descEl ? descEl.textContent : "";
 
-    function cardSlugNorm(card) {
-      return normalize(card.getAttribute("data-slug") || "");
-    }
+      const dataSearch = card.getAttribute("data-search") || "";
+      const slug = card.getAttribute("data-slug") || "";
 
-    function scoreCard(card, q) {
-      const name = cardNameNorm(card);
-      const slug = cardSlugNorm(card);
-      const blob = cardBlobNorm(card);
+      const nameNorm = normalize(nameText);
+      const aliasNorm = normalize([alsoText, descText, dataSearch, slug].join(" "));
 
-      // Lower bucket = better match
-      let bucket = 50;
-
-      if (name && name.startsWith(q)) bucket = 0;
-      else if (name && name.split(" ").some((t) => t.startsWith(q))) bucket = 1;
-      else if (slug && slug.startsWith(q)) bucket = 2;
-      else if (blob && blob.startsWith(q)) bucket = 3;
-      else if (name && name.includes(q)) bucket = 4;
-      else if (blob && blob.includes(q)) bucket = 5;
-
-      // Tie-breakers: earlier position and shorter name wins
-      let pos = 9999;
-      if (bucket <= 3) pos = 0;
-      else if (bucket === 4) pos = name.indexOf(q);
-      else if (bucket === 5) pos = blob.indexOf(q);
-
-      const len = name ? name.length : 9999;
-      return { bucket, pos, len, name };
-    }
+      return { card, nameNorm, aliasNorm, nameText };
+    });
 
     function reorderCards(order) {
-      for (const card of order) list.appendChild(card);
+      for (const item of order) list.appendChild(item.card);
     }
 
-    // -------------------------------------------------------------------------
-    // UI helpers
-    // -------------------------------------------------------------------------
     function setStatusText(text) {
       status.textContent = text || "";
+    }
+
+    function countShown(items) {
+      let n = 0;
+      for (const it of items) if (!it.card.hidden) n++;
+      return n;
     }
 
     function setNoteAndNext(matchCount, shownCount) {
@@ -194,14 +178,8 @@
       showEl(nextBtn);
     }
 
-    function countShown(arr) {
-      let n = 0;
-      for (const el of arr) if (!el.hidden) n++;
-      return n;
-    }
-
     // -------------------------------------------------------------------------
-    // Core filter
+    // Core matching
     // -------------------------------------------------------------------------
     function filterNow() {
       const raw = input.value || "";
@@ -209,9 +187,9 @@
 
       // Option B: 0 chars -> show nothing
       if (!q) {
-        reorderCards(originalOrder);
+        reorderCards(cache);
         hideAllCards();
-        setStatusText("Start typing to see matches (aliases included).");
+        setStatusText("Start typing to see matches.");
         if (note) note.textContent = "";
         if (nextBtn) {
           nextBtn.textContent = "";
@@ -221,32 +199,46 @@
         return;
       }
 
-      // Restaurant UX: 1 char is too broad/noisy -> show nothing, but explain
-      if (q.length < MIN_CHARS) {
-        reorderCards(originalOrder);
-        hideAllCards();
-        setStatusText(`Keep typing - enter at least ${MIN_CHARS} characters.`);
-        if (note) note.textContent = "";
-        if (nextBtn) {
-          nextBtn.textContent = "";
-          hideEl(nextBtn);
-        }
-        visibleLimit = PAGE_N;
+      // STEP 1 (primary): Name-prefix match ONLY
+      // - This is the restaurant-friendly behavior you want.
+      // - "r" shows only names starting with r.
+      const nameMatches = [];
+      const nonNameMatches = [];
+
+      for (const it of cache) {
+        if (it.nameNorm && it.nameNorm.startsWith(q)) nameMatches.push(it);
+        else nonNameMatches.push(it);
+      }
+
+      // If we have name-prefix matches, show ONLY those (sorted by shortest name first)
+      if (nameMatches.length) {
+        nameMatches.sort((a, b) => a.nameNorm.length - b.nameNorm.length || a.nameNorm.localeCompare(b.nameNorm));
+
+        reorderCards(nameMatches.concat(nonNameMatches));
+
+        const requestedShown = Math.min(visibleLimit, nameMatches.length);
+        for (let i = 0; i < nameMatches.length; i++) nameMatches[i].card.hidden = i >= requestedShown;
+        for (const it of nonNameMatches) it.card.hidden = true;
+
+        const actualShown = countShown(nameMatches);
+
+        setStatusText(`${actualShown} of ${nameMatches.length} matches (name starts with "${q}")`);
+        setNoteAndNext(nameMatches.length, actualShown);
         return;
       }
 
-      // Direct match: scan data-search blob
-      const matched = [];
-      const nonMatched = [];
+      // STEP 2 (fallback): Alias/metadata includes
+      // - This catches cases like misspellings, synonyms, or alternate names.
+      const aliasMatches = [];
+      const nonAliasMatches = [];
 
-      for (const card of originalOrder) {
-        const blob = cardBlobNorm(card);
-        if (blob.includes(q)) matched.push(card);
-        else nonMatched.push(card);
+      for (const it of cache) {
+        if (it.aliasNorm && it.aliasNorm.includes(q)) aliasMatches.push(it);
+        else nonAliasMatches.push(it);
       }
 
-      if (!matched.length) {
-        reorderCards(originalOrder);
+      if (!aliasMatches.length) {
+        reorderCards(cache);
         hideAllCards();
         setStatusText("No matches found.");
         if (note) note.textContent = "";
@@ -257,32 +249,21 @@
         return;
       }
 
-      // Rank (name-first)
-      const ranked = matched
-        .map((c) => ({ c, s: scoreCard(c, q) }))
-        .sort((a, b) => {
-          if (a.s.bucket !== b.s.bucket) return a.s.bucket - b.s.bucket;
-          if (a.s.pos !== b.s.pos) return a.s.pos - b.s.pos;
-          if (a.s.len !== b.s.len) return a.s.len - b.s.len;
-          return a.s.name.localeCompare(b.s.name);
-        })
-        .map((x) => x.c);
+      aliasMatches.sort((a, b) => a.aliasNorm.length - b.aliasNorm.length || a.nameNorm.localeCompare(b.nameNorm));
+      reorderCards(aliasMatches.concat(nonAliasMatches));
 
-      reorderCards(ranked.concat(nonMatched));
+      const requestedShown = Math.min(visibleLimit, aliasMatches.length);
+      for (let i = 0; i < aliasMatches.length; i++) aliasMatches[i].card.hidden = i >= requestedShown;
+      for (const it of nonAliasMatches) it.card.hidden = true;
 
-      // Show first PAGE_N (or expanded via Next)
-      const requestedShown = Math.min(visibleLimit, ranked.length);
+      const actualShown = countShown(aliasMatches);
 
-      for (let i = 0; i < ranked.length; i++) ranked[i].hidden = i >= requestedShown;
-      for (const c of nonMatched) c.hidden = true;
-
-      const actualShown = countShown(ranked);
-      setStatusText(`${actualShown} of ${ranked.length} matches`);
-      setNoteAndNext(ranked.length, actualShown);
+      setStatusText(`${actualShown} of ${aliasMatches.length} matches (aliases and metadata)`);
+      setNoteAndNext(aliasMatches.length, actualShown);
     }
 
     // -------------------------------------------------------------------------
-    // Throttle filtering (keeps typing snappy)
+    // Throttle filtering to animation frames (keeps typing snappy)
     // -------------------------------------------------------------------------
     let rafPending = false;
     function requestFilter() {
@@ -335,7 +316,8 @@
         return;
       }
 
-      const bySlug = new Map(cards.map((c) => [c.getAttribute("data-slug"), c]));
+      // Build a map from slug to card for reliable linking
+      const bySlug = new Map(cache.map((it) => [it.card.getAttribute("data-slug"), it.card]));
       const items = slugs
         .map((s) => bySlug.get(s))
         .filter(Boolean)
@@ -367,9 +349,9 @@
     }
 
     // Initial state
-    reorderCards(originalOrder);
+    reorderCards(cache);
     hideAllCards();
-    setStatusText("Start typing to see matches (aliases included).");
+    setStatusText("Start typing to see matches.");
     if (note) note.textContent = "";
     if (nextBtn) {
       nextBtn.textContent = "";
