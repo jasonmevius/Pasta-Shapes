@@ -1,0 +1,22 @@
+{# =============================================================================
+  partials/bottom-nav.njk
+  ------------------------------------------------------------------------------
+  PURPOSE
+  - Mobile-only bottom navigation.
+  - Thumb-friendly access to Search and Identify.
+  - Hidden on wider screens via CSS.
+============================================================================= #}
+
+<nav class="bottom-nav" aria-label="Primary (mobile)">
+  <a class="bottom-nav-link" href="/" {% if page and page.url == "/" %}aria-current="page"{% endif %}>
+    Search
+  </a>
+
+  <a class="bottom-nav-link" href="/identify/" {% if page and page.url and page.url.startsWith("/identify") %}aria-current="page"{% endif %}>
+    Identify
+  </a>
+
+  {# Optional later:
+  <a class="bottom-nav-link" href="/saved/">Saved</a>
+  #}
+</nav>
