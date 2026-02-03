@@ -1,35 +1,63 @@
+{# =============================================================================
+  layout.njk
+  ------------------------------------------------------------------------------
+  PURPOSE
+  - Single global layout for every page.
+  - Provides:
+      1) Sticky top bar (hamburger menu on tablet/desktop)
+      2) Main content container
+      3) Footer for "less important" links
+      4) Mobile bottom navigation (thumb-friendly)
+
+  IMPORTANT RULES
+  - NO inline CSS in templates. All styling lives in /src/css/styles.css
+  - Keep this file stable. Most iteration happens in page templates + CSS.
+
+  NOTES
+  - You already have the appleTouchIconUrl filter working.
+============================================================================= #}
+
 <!doctype html>
 <html lang="en">
 <head>
+  {# --- Basics -------------------------------------------------------------- #}
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  {# --- Icons --------------------------------------------------------------- #}
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="apple-touch-icon" href="{{ 180 | appleTouchIconUrl }}">
+
+  {# --- Title + meta description ------------------------------------------- #}
   <title>{{ title or "Pasta Shapes" }}</title>
 
   {% if description %}
     <meta name="description" content="{{ description }}" />
   {% endif %}
 
+  {# --- Global CSS + JS ----------------------------------------------------- #}
   <link rel="stylesheet" href="/css/styles.css" />
   <script src="/js/scripts.js" defer></script>
 </head>
 
 <body>
+  {# --- Accessibility: skip link ------------------------------------------- #}
   <a class="skip" href="#main">Skip to content</a>
 
-  <header class="topbar">
-    <div class="topbar-inner">
-      <a class="brand" href="/">Pasta Shapes</a>
-      <nav class="nav" aria-label="Primary">
-        <a href="/" {% if page and page.url == "/" %}aria-current="page"{% endif %}>Search</a>
-        <a href="/identify/" {% if page and page.url and page.url.startsWith("/identify") %}aria-current="page"{% endif %}>Identify</a>
-      </nav>
-    </div>
-  </header>
+  {# --- Top header (hamburger nav) ----------------------------------------- #}
+  {# NOTE: This is a partial to keep layout.njk clean and reusable. #}
+  {% include "partials/site-header.njk" %}
 
+  {# --- Main content -------------------------------------------------------- #}
   <main id="main" class="container">
     {{ content | safe }}
   </main>
+
+  {# --- Footer -------------------------------------------------------------- #}
+  {% include "partials/site-footer.njk" %}
+
+  {# --- Mobile bottom navigation ------------------------------------------- #}
+  {# NOTE: Visible only on small screens (CSS controls visibility). #}
+  {% include "partials/bottom-nav.njk" %}
 </body>
 </html>
