@@ -1,4 +1,22 @@
 // src/js/pasta-identify.js
+// ============================================================================
+// Identify-by-features workflow (select-based UI).
+//
+// This script ONLY runs if it finds #pasta-identify.
+// It expects these elements to exist (your current identify template provides them):
+// - #id-type, #id-hollow, #id-ridged, #id-twisted, #id-curved, #id-size
+// - #id-reset, #id-status, #id-results
+//
+// IMPORTANT CONSTRAINTS
+// - Do NOT inject <style> tags.
+// - Do NOT set inline styles.
+// - All styling must live in /src/css/styles.css.
+//
+// UX GOALS
+// - Question cards show in a fixed order visually.
+// - The “next best question” logic determines which card to reveal next,
+//   but the visual order remains stable.
+// ============================================================================
 (function () {
   const root = document.getElementById("pasta-identify");
   if (!root) return;
@@ -88,6 +106,9 @@
     elStatus.textContent = text;
   }
 
+  // --------------------------------------------------------------------------
+  // Rendering results without inline styles
+  // --------------------------------------------------------------------------
   function render(results) {
     clearResults();
 
@@ -95,6 +116,7 @@
 
     for (const r of show) {
       const li = document.createElement("li");
+      li.className = "id-result";
 
       const a = document.createElement("a");
       a.href = r.url;
@@ -103,8 +125,7 @@
 
       if (r.description) {
         const div = document.createElement("div");
-        div.style.marginTop = "0.2rem";
-        div.style.fontSize = "0.95em";
+        div.className = "id-result-desc";
         div.textContent = r.description;
         li.appendChild(div);
       }
@@ -114,6 +135,7 @@
 
     if (results.length > MAX_SHOW) {
       const li = document.createElement("li");
+      li.className = "id-result id-result-note";
       li.textContent = `Showing ${MAX_SHOW} of ${results.length}. Add more answers to narrow it down.`;
       elResults.appendChild(li);
     }
@@ -157,8 +179,9 @@
     });
   }
 
-  // ----- Choose the next best question (adaptive), but reveal it in fixed order -----
-
+  // --------------------------------------------------------------------------
+  // "Next best question" scoring (entropy-ish)
+  // --------------------------------------------------------------------------
   function entropyFromCounts(counts) {
     const total = counts.reduce((a, b) => a + b, 0);
     if (!total) return 0;
@@ -216,12 +239,8 @@
 
   /**
    * Behavior:
-   * - Always pick the best remaining structural question first (if useful).
-   * - Only offer Size when:
-   *    - there are no useful structural questions left, AND
-   *    - results.length > 25, AND
-   *    - size is not already answered.
-   * - Otherwise stop asking and just show results.
+   * - Prefer remaining structural questions first (if useful).
+   * - Only offer Size when results still big and no good structural left.
    */
   function pickNextQuestion(candidateEntries, answeredKeys) {
     if (candidateEntries.length <= 1) return null;
@@ -241,10 +260,8 @@
 
     structural.sort((a, b) => b.score - a.score);
 
-    // 1) Structural questions first, if any are useful
     if (structural.length) return structural[0].step;
 
-    // 2) Size only as the last question, and only if results are still big
     if (
       sizeCandidate &&
       candidateEntries.length > SIZE_ONLY_IF_MORE_THAN &&
@@ -253,46 +270,17 @@
       return sizeCandidate.step;
     }
 
-    // 3) Nothing else worth asking
     return null;
   }
 
-  // ----- UI: wrap each question into a "step card", sequential layout -----
-
+  // --------------------------------------------------------------------------
+  // Step card UI (no injected CSS)
+  // --------------------------------------------------------------------------
   function getLabelFor(selectEl) {
     return (
       root.querySelector(`label[for="${selectEl.id}"]`) ||
       document.querySelector(`label[for="${selectEl.id}"]`)
     );
-  }
-
-  function injectIdentifyStylesOnce() {
-    if (document.getElementById("pasta-identify-inline-styles")) return;
-
-    const style = document.createElement("style");
-    style.id = "pasta-identify-inline-styles";
-    style.textContent = `
-      .id-steps { display: grid; gap: 0.85rem; margin-top: 0.75rem; }
-      .id-step { border: 1px solid rgba(0,0,0,0.12); border-radius: 10px; padding: 0.8rem; }
-      .id-step[hidden] { display: none !important; }
-
-      .id-step__top { display: grid; grid-template-columns: 64px 1fr; gap: 0.75rem; align-items: start; }
-      .id-step__img {
-        width: 64px; height: 64px; border-radius: 10px;
-        border: 1px dashed rgba(0,0,0,0.25);
-        display: grid; place-items: center;
-        font-size: 0.72rem; line-height: 1.1;
-        opacity: 0.8; user-select: none;
-        text-align: center; padding: 0.35rem;
-      }
-      .id-step__title { font-weight: 700; margin: 0; }
-      .id-step__desc { margin: 0.25rem 0 0; font-size: 0.95em; opacity: 0.85; }
-
-      .id-step__control { margin-top: 0.65rem; }
-      .id-step__control label { display: none !important; }
-      .id-step__control select { width: 100%; max-width: 420px; }
-    `;
-    document.head.appendChild(style);
   }
 
   function buildStepCard(step) {
@@ -309,7 +297,7 @@
     const img = document.createElement("div");
     img.className = "id-step__img";
     img.setAttribute("aria-hidden", "true");
-    img.textContent = "Image\nsoon";
+    img.textContent = "Image soon";
 
     const text = document.createElement("div");
     const h = document.createElement("p");
@@ -329,6 +317,7 @@
     const control = document.createElement("div");
     control.className = "id-step__control";
 
+    // Keep existing label semantics if your HTML wraps select inside label.
     if (labelEl && labelEl.contains(selectEl)) {
       control.appendChild(labelEl);
     } else {
@@ -346,10 +335,10 @@
   let stepCardByKey = new Map();
 
   function buildStepsUI() {
-    injectIdentifyStylesOnce();
-
-    if (root.querySelector(".id-steps")) {
-      stepsContainer = root.querySelector(".id-steps");
+    // If we already built cards, reuse them.
+    const existing = root.querySelector(".id-steps");
+    if (existing) {
+      stepsContainer = existing;
       stepCardByKey = new Map();
       for (const el of stepsContainer.querySelectorAll(".id-step")) {
         stepCardByKey.set(el.dataset.stepKey, el);
@@ -366,6 +355,7 @@
       stepCardByKey.set(step.key, card);
     }
 
+    // Place steps above the status block if possible.
     if (elStatus && elStatus.parentNode) {
       elStatus.parentNode.insertBefore(stepsContainer, elStatus);
     } else {
@@ -376,14 +366,11 @@
   function setStepVisible(key, visible) {
     const card = stepCardByKey.get(key);
     if (!card) return;
-    if (visible) card.removeAttribute("hidden");
-    else card.setAttribute("hidden", "hidden");
+    card.hidden = !visible;
   }
 
   function hideAllStepsExceptType() {
-    for (const s of STEPS) {
-      setStepVisible(s.key, s.key === "type");
-    }
+    for (const s of STEPS) setStepVisible(s.key, s.key === "type");
   }
 
   function showAnsweredAndNextStep(nextStepKey) {
@@ -426,7 +413,7 @@
     for (const opt of opts) {
       const v = normVal(opt.value);
       if (!v) continue;
-      if (!typeCounts.get(v)) opt.remove(); // removes "Other" if blank, etc.
+      if (!typeCounts.get(v)) opt.remove();
     }
   }
 
