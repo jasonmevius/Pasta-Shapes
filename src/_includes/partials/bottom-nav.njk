@@ -3,11 +3,15 @@
   ------------------------------------------------------------------------------
   PURPOSE
   - Mobile-only bottom navigation.
-  - Acts like a fast two-way toggle between the two primary flows:
+  - Styled like a 2-option segmented control ("slider") between:
       1) Search
       2) Identify
-  - Implemented as normal links for reliability + accessibility, but styled as a
-    segmented control with a sliding indicator ("slider") behind the active tab.
+
+  WHY THIS FILE WAS UPDATED
+  - Some Nunjucks environments choke on JS-style expressions like:
+      page.url.startsWith(...)
+      condition ? a : b
+  - This version avoids method calls and ternaries completely.
 
   IMPORTANT
   - No inline CSS.
@@ -16,13 +20,19 @@
       * CSS transform on .bottom-nav-indicator
 ============================================================================= #}
 
-{# Determine which tab is active based on current URL. #}
-{% set isIdentify = page and page.url and page.url.startsWith("/identify") %}
+{# ---------------------------------------------------------------------------
+  Determine whether we are on an Identify page.
+  We avoid startsWith() and use replace() + compare instead:
+    If replacing "/identify/" changes the string, then it contained "/identify/".
+--------------------------------------------------------------------------- #}
+{% set currentUrl = page and page.url ? page.url : "" %}
+{% set urlWithoutIdentify = currentUrl | replace("/identify/", "") %}
+{% set isIdentify = (currentUrl != urlWithoutIdentify) %}
 
 <nav
   class="bottom-nav"
   aria-label="Primary (mobile)"
-  data-active="{{ isIdentify ? "identify" : "search" }}"
+  data-active="{% if isIdentify %}identify{% else %}search{% endif %}"
 >
   {# Sliding background indicator (purely presentational) #}
   <span class="bottom-nav-indicator" aria-hidden="true"></span>
@@ -30,7 +40,7 @@
   <a
     class="bottom-nav-link"
     href="/"
-    {% if page and page.url == "/" %}aria-current="page"{% endif %}
+    {% if currentUrl == "/" %}aria-current="page"{% endif %}
   >
     Search
   </a>
@@ -42,8 +52,4 @@
   >
     Identify
   </a>
-
-  {# Optional later:
-  <a class="bottom-nav-link" href="/saved/">Saved</a>
-  #}
 </nav>
