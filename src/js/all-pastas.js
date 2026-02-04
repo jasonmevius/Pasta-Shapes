@@ -2,9 +2,11 @@
    /js/all-pastas.js
 
    Enhances the /all/ table:
+   - Default sort by Name (A-Z) on load
    - Text search (Name + Category)
-   - Category dropdown filter (auto-populated from rows)
+   - Category dropdown filter (auto-populated)
    - Click-to-sort on Name + Category headers
+   - Thumbnail fallback (keeps <img>, swaps src on error)
 
    Safe to load globally:
    - No-ops unless it finds #allPastaTable
@@ -23,16 +25,14 @@
   const visibleCountEl = document.getElementById("allPastaVisibleCount");
 
   const sortState = {
-    key: null, // "name" | "category"
-    dir: "asc", // "asc" | "desc"
+    key: "name", // default
+    dir: "asc",  // default A-Z
   };
 
   function normalize(str) {
     return String(str || "").trim().toLowerCase();
   }
 
-  // Search should behave like a quick Excel filter:
-  // - include Name + Category (simple and useful)
   function rowSearchText(row) {
     const name = row.dataset.name || "";
     const category = row.dataset.category || "";
@@ -85,10 +85,18 @@
     });
   }
 
-  function sortBy(th) {
-    const key = th.getAttribute("data-sort-key");
+  function sortByKey(key, dir, thForAria) {
+    sortState.key = key;
+    sortState.dir = dir;
 
-    // Only allow sorting on known keys
+    const sorted = rows.slice().sort((a, b) => compareRows(a, b, key, dir));
+    sorted.forEach((row) => tbody.appendChild(row));
+
+    if (thForAria) setAriaSort(thForAria);
+  }
+
+  function sortByHeader(th) {
+    const key = th.getAttribute("data-sort-key");
     if (key !== "name" && key !== "category") return;
 
     if (sortState.key === key) {
@@ -98,25 +106,14 @@
       sortState.dir = "asc";
     }
 
-    const sorted = rows.slice().sort((a, b) => compareRows(a, b, key, sortState.dir));
-    sorted.forEach((row) => tbody.appendChild(row));
-
-    setAriaSort(th);
+    sortByKey(sortState.key, sortState.dir, th);
   }
-
-  /* ------------------------------------------------------------
-     Populate Category dropdown from rendered rows
-     - Uses normalized value for filtering
-     - Uses visible cell text for label (preserves capitalization)
-  ------------------------------------------------------------- */
 
   function populateCategoryDropdown() {
     if (!categorySelect) return;
-
-    // Avoid double-populating
     if (categorySelect.options.length > 1) return;
 
-    const map = new Map(); // normalized -> display label
+    const map = new Map(); // normalized -> label
 
     rows.forEach((row) => {
       const key = normalize(row.dataset.category);
@@ -138,6 +135,38 @@
   }
 
   /* ------------------------------------------------------------
+     Thumbnail fallback handling
+     - If ImageKit thumb is missing, show a simple inline SVG placeholder
+     - We do NOT remove the <img> because that makes debugging harder
+  ------------------------------------------------------------- */
+
+  function wireThumbFallbacks() {
+    const imgs = table.querySelectorAll(".thumb img");
+    if (!imgs.length) return;
+
+    // Tiny grey placeholder SVG (data URI), sized to 56x56
+    const fallbackSvg =
+      "data:image/svg+xml;charset=utf-8," +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="56" height="56">' +
+          '<rect width="56" height="56" fill="rgba(0,0,0,0.06)"/>' +
+        "</svg>"
+      );
+
+    imgs.forEach((img) => {
+      img.addEventListener("error", () => {
+        const wrap = img.closest(".thumb");
+        if (wrap) wrap.classList.add("thumb--placeholder");
+
+        // Prevent infinite loop if fallback also errors
+        img.onerror = null;
+
+        img.src = fallbackSvg;
+      });
+    });
+  }
+
+  /* ------------------------------------------------------------
      Events
   ------------------------------------------------------------- */
 
@@ -145,13 +174,19 @@
   if (categorySelect) categorySelect.addEventListener("change", applyFilters);
   if (clearBtn) clearBtn.addEventListener("click", clearFilters);
 
-  // Click-to-sort headers (Name, Category)
   const sortableHeaders = table.querySelectorAll("th.data-table__sortable");
   sortableHeaders.forEach((th) => {
     th.style.cursor = "pointer";
-    th.addEventListener("click", () => sortBy(th));
+    th.addEventListener("click", () => sortByHeader(th));
   });
 
   populateCategoryDropdown();
-  updateVisibleCount();
+  wireThumbFallbacks();
+
+  // Default sort: Name A-Z
+  // We also align aria-sort by locating the Name header.
+  const nameHeader = table.querySelector('th.data-table__sortable[data-sort-key="name"]');
+  sortByKey("name", "asc", nameHeader);
+
+  applyFilters(); // sets visible count correctly after initial sort
 })();
