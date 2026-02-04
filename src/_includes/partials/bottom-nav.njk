@@ -2,71 +2,48 @@
   partials/bottom-nav.njk
   ------------------------------------------------------------------------------
   PURPOSE
-  - Mobile-only bottom navigation.
-  - Styled like a 2-option segmented control ("slider") between:
-      1) Search
-      2) Identify
+  - Mobile-only bottom navigation (thumb-friendly).
+  - Acts like a segmented control between:
+      1) Search  (homepage)
+      2) Identify (decision-tree questions)
 
-  WHY THIS VERSION
-  - Netlify/Eleventy Nunjucks error: "expected block end in set statement"
-  - Some Nunjucks configurations are strict about expressions inside {% set %}.
-  - This version avoids ALL complex set expressions:
-      * no ternary
-      * no comparisons in set
-      * no method calls
-      * no parentheses in set
-  - Uses only a simple set + if blocks.
+  ENHANCEMENTS
+  - Links are normal <a> tags for accessibility and reliability.
+  - /src/js/scripts.js adds an OPTIONAL swipe gesture:
+      - Swipe left on the bottom nav: Search -> Identify
+      - Swipe right on the bottom nav: Identify -> Search
 
-  IMPORTANT
-  - No inline CSS.
-  - Slider effect is driven by:
-      * data-active attribute on <nav>
-      * CSS transform on .bottom-nav-indicator
+  IMPORTANT RULES
+  - NO inline CSS. All styling is in /src/css/styles.css
 ============================================================================= #}
 
-{# ---------------------------------------------------------------------------
-  Get current URL safely.
-  - If page/url is missing, default to empty string.
---------------------------------------------------------------------------- #}
-{% set currentUrl = "" %}
-{% if page and page.url %}
-  {% set currentUrl = page.url %}
-{% endif %}
+{# Determine which tab is active so CSS can position the indicator pill #}
+{% set isIdentify = (page and page.url and page.url.startsWith("/identify")) %}
+{% set activeTab = "identify" if isIdentify else "search" %}
 
-{# ---------------------------------------------------------------------------
-  Determine whether this is an Identify page.
-  - We treat any URL that starts with "/identify" as Identify.
-  - We avoid startsWith() and avoid complex expressions in set.
+<nav class="bottom-nav" aria-label="Primary (mobile)" data-swipe-nav="1" data-active="{{ activeTab }}">
+  <div class="bottom-nav-inner">
+    {# Sliding indicator pill (purely decorative) #}
+    <span class="bottom-nav-indicator" aria-hidden="true"></span>
 
-  Approach:
-  - If URL contains "/identify", we flip isIdentify to true.
---------------------------------------------------------------------------- #}
-{% set isIdentify = false %}
-{% if currentUrl and (currentUrl | replace("/identify", "")) != currentUrl %}
-  {% set isIdentify = true %}
-{% endif %}
+    {# Search tab #}
+    <a class="bottom-nav-link"
+       href="/"
+       {% if page and page.url == "/" %}aria-current="page"{% endif %}>
+      Search
+    </a>
 
-<nav
-  class="bottom-nav"
-  aria-label="Primary (mobile)"
-  data-active="{% if isIdentify %}identify{% else %}search{% endif %}"
->
-  {# Sliding background indicator (purely presentational) #}
-  <span class="bottom-nav-indicator" aria-hidden="true"></span>
+    {# Identify tab #}
+    <a class="bottom-nav-link"
+       href="/identify/"
+       {% if isIdentify %}aria-current="page"{% endif %}>
+      Identify
+    </a>
+  </div>
 
-  <a
-    class="bottom-nav-link"
-    href="/"
-    {% if currentUrl == "/" %}aria-current="page"{% endif %}
-  >
-    Search
-  </a>
-
-  <a
-    class="bottom-nav-link"
-    href="/identify/"
-    {% if isIdentify %}aria-current="page"{% endif %}
-  >
-    Identify
-  </a>
+  {# NOTE
+     - We intentionally do NOT show extra links here.
+     - This nav is reserved for the two primary flows.
+     - Secondary links belong in the footer.
+  #}
 </nav>
