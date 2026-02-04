@@ -1,10 +1,10 @@
 /* ------------------------------------------------------------
    /js/all-pastas.js
 
-   Adds “Excel-ish” behavior to the /all/ pasta table:
-   - Text search across all columns
-   - Category dropdown filter (auto-populated from table rows)
-   - Click-to-sort on table headers
+   Enhances the /all/ table:
+   - Text search (Name + Category)
+   - Category dropdown filter (auto-populated from rows)
+   - Click-to-sort on Name + Category headers
 
    Safe to load globally:
    - No-ops unless it finds #allPastaTable
@@ -12,7 +12,7 @@
 
 (function () {
   const table = document.getElementById("allPastaTable");
-  if (!table) return; // Not on /all/ page
+  if (!table) return;
 
   const tbody = table.querySelector("tbody");
   const rows = Array.from(tbody.querySelectorAll("tr.data-row"));
@@ -23,7 +23,7 @@
   const visibleCountEl = document.getElementById("allPastaVisibleCount");
 
   const sortState = {
-    key: null, // "name" | "category" | "type" | "geometry"
+    key: null, // "name" | "category"
     dir: "asc", // "asc" | "desc"
   };
 
@@ -31,12 +31,12 @@
     return String(str || "").trim().toLowerCase();
   }
 
+  // Search should behave like a quick Excel filter:
+  // - include Name + Category (simple and useful)
   function rowSearchText(row) {
     const name = row.dataset.name || "";
     const category = row.dataset.category || "";
-    const type = row.dataset.type || "";
-    const geometry = row.dataset.geometry || "";
-    return `${name} ${category} ${type} ${geometry}`.trim();
+    return `${name} ${category}`.trim();
   }
 
   function updateVisibleCount() {
@@ -87,7 +87,9 @@
 
   function sortBy(th) {
     const key = th.getAttribute("data-sort-key");
-    if (!key) return;
+
+    // Only allow sorting on known keys
+    if (key !== "name" && key !== "category") return;
 
     if (sortState.key === key) {
       sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
@@ -103,26 +105,23 @@
   }
 
   /* ------------------------------------------------------------
-     Category dropdown auto-population
-     - Reads each row's category text from the rendered cell
-     - Stores unique categories as:
-       value = lowercase normalized
-       label = original display text
+     Populate Category dropdown from rendered rows
+     - Uses normalized value for filtering
+     - Uses visible cell text for label (preserves capitalization)
   ------------------------------------------------------------- */
 
   function populateCategoryDropdown() {
     if (!categorySelect) return;
 
-    // If it already has more than the default option, don’t duplicate.
+    // Avoid double-populating
     if (categorySelect.options.length > 1) return;
 
-    const map = new Map(); // key: normalized, value: display label
+    const map = new Map(); // normalized -> display label
 
     rows.forEach((row) => {
       const key = normalize(row.dataset.category);
       if (!key) return;
 
-      // Prefer the visible cell label so you preserve capitalization, etc.
       const cell = row.querySelector(".cell-category");
       const label = cell ? String(cell.textContent || "").trim() : key;
 
@@ -130,7 +129,6 @@
     });
 
     const keys = Array.from(map.keys()).sort((a, b) => a.localeCompare(b));
-
     keys.forEach((k) => {
       const opt = document.createElement("option");
       opt.value = k;
@@ -140,13 +138,14 @@
   }
 
   /* ------------------------------------------------------------
-     Wire up events
+     Events
   ------------------------------------------------------------- */
 
   if (searchInput) searchInput.addEventListener("input", applyFilters);
   if (categorySelect) categorySelect.addEventListener("change", applyFilters);
   if (clearBtn) clearBtn.addEventListener("click", clearFilters);
 
+  // Click-to-sort headers (Name, Category)
   const sortableHeaders = table.querySelectorAll("th.data-table__sortable");
   sortableHeaders.forEach((th) => {
     th.style.cursor = "pointer";
