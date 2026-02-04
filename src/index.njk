@@ -8,62 +8,38 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   index.njk (Homepage - Search)
   ------------------------------------------------------------------------------
   PURPOSE
-  - Mobile-first homepage optimized for the "restaurant use case":
-      1) User types a pasta name from a menu
-      2) They immediately see matches (including aliases)
-      3) They tap into the detail page (later) or validate the shape quickly
+  - Mobile-first homepage optimized for the restaurant use case.
+  - Server-renders the full list (fast first paint, works without JS).
+  - Client-side JS filters results as the user types.
 
-  KEY UI SECTIONS
-  - Hero: quick context on what this site does
-  - Search input: primary action on the page
-  - Status line: micro-feedback about search behavior
-  - Suggestions: optional (JS can populate; blank by default)
-  - Recently viewed: JS populates per-browser
-  - Results list: populated server-side, then filtered client-side by JS
-
-  THUMBNAILS (THIS FIX)
-  - Previously, the homepage rendered an empty <span class="thumb"> with no <img>,
-    which caused grey/white "slots" instead of real thumbnails.
-  - Identify page injects <img> via JS, so it *looked* like only Search was broken.
-  - This template now renders <img> tags for thumbnails on the Search results list.
+  THUMBNAILS
+  - The Search page previously rendered an empty <span class="thumb">, which
+    created grey boxes. This template now renders an <img> inside that container.
+  - Identify page shows thumbs because its JS builds cards differently.
 
   IMPORTANT RULES
   - NO inline CSS. Styling lives in /src/css/styles.css
-  - Keep markup stable; JS should only enhance behavior (filtering, recent list, etc.)
 ============================================================================= #}
 
 {# -----------------------------------------------------------------------------
   ImageKit configuration for thumbnails
-  - Keep it explicit and easy to change later.
-  - This is only for "search results" thumbnails (small square images).
 ----------------------------------------------------------------------------- #}
 {% set IK_THUMBS_BASE = "https://ik.imagekit.io/mevius/pasta/thumbs/" %}
 {% set FALLBACK_THUMB = "pending.png" %}
-
-{# -----------------------------------------------------------------------------
-  NOTE ON THUMB DATA
-  - item.ThumbnailImage in your CSV may be:
-      1) empty
-      2) a filename like "penne.png"
-      3) a full URL (ImageKit or otherwise)
-      4) a path that included "<ImageKitPath>" placeholder historically
-  - We normalize to a final URL here so the markup always has an <img>.
------------------------------------------------------------------------------ #}
 
 <section class="hero stack">
   <h1 class="h1">Pasta Shapes</h1>
 
   <p class="muted lead">
-    Type a pasta name from a menu to see the shape, common aliases, and a short description.
-    If you have a shape in front of you, use Identify to narrow it down by questions.
+    Type a pasta name from a menu to see matches (including common aliases).
+    If you have a pasta shape in front of you, use Identify to narrow it down by questions.
   </p>
 </section>
 
 <section class="card stack" aria-label="Search pasta shapes">
   {# ---------------------------------------------------------------------------
     Search form
-    - action="/" and method="get" are fine (progressive enhancement).
-    - JS will intercept typing and filter the list without navigation.
+    - JS filters the list live as you type.
   --------------------------------------------------------------------------- #}
   <form id="pasta-search-form" class="search" action="/" method="get">
     <label class="sr-only" for="pasta-q">Search</label>
@@ -83,19 +59,14 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   <div class="results-head">
     <h2 class="h2">Results</h2>
     <p id="pasta-search-status" class="muted" aria-live="polite">
-      Start typing to see matches (aliases included).
+      Start typing to see matches.
     </p>
   </div>
 
-  {# Suggestions
-     - Empty by default.
-     - JS may choose to populate this (e.g., "Did you mean...").
-  #}
+  {# Suggestions (empty by default; JS may populate later) #}
   <ul id="pasta-search-suggestions" class="suggestions" aria-label="Suggestions"></ul>
 
-  {# Recently viewed (per-browser)
-     - Hidden by default; JS unhides and fills when items exist.
-  #}
+  {# Recently viewed (per-browser; JS populates) #}
   <div id="recently-viewed-wrap" class="recent-wrap" hidden>
     <h3 class="h3">Recently viewed</h3>
     <p id="recently-viewed" class="muted"></p>
@@ -103,15 +74,16 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 
   {# ---------------------------------------------------------------------------
     Results list
-    - Render server-side for:
-        - fast first paint
-        - working experience even if JS fails
-    - JS filters by toggling [hidden] or similar.
+    - Render server-side so users see real content even if JS is off.
+    - JS toggles [hidden] on these <li> items when filtering.
   --------------------------------------------------------------------------- #}
   <ul id="pasta-results" class="results-list" aria-label="Pasta results">
     {% for item in pasta %}
 
-      {# -- Build an "also/aliases" string for display (optional) ------------- #}
+      {# -----------------------------------------------------------------------
+        Alias / "Also" line (optional)
+        - Use whichever field exists in your data.
+      ----------------------------------------------------------------------- #}
       {% set alsoRaw =
         item.SearchAliases
         or item.Aliases
@@ -121,28 +93,34 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         or ""
       %}
 
-      {# -- Normalize thumbnail URL ------------------------------------------ #}
+      {# -----------------------------------------------------------------------
+        Thumbnail URL normalization
+
+        item.ThumbnailImage may be:
+          1) empty
+          2) a filename like "penne.png"
+          3) a full URL
+          4) an older string containing "<ImageKitPath>"
+
+        We normalize to a real URL in all cases.
+
+        NOTE
+        - JavaScript string method is startsWith() (capital W).
+      ----------------------------------------------------------------------- #}
       {% set thumbRaw = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
-      {% set thumbIsUrl = thumbRaw and thumbRaw.startswith("http") %}
+      {% set thumbIsUrl = thumbRaw and thumbRaw.startsWith("http") %}
       {% set thumbFile = (thumbRaw or "") | split("/") | last %}
       {% set thumbUrl = "" %}
 
-      {# If blank, use fallback #}
       {% if not thumbRaw %}
         {% set thumbUrl = IK_THUMBS_BASE ~ FALLBACK_THUMB %}
-      {# If a full URL, use it as-is #}
       {% elseif thumbIsUrl %}
         {% set thumbUrl = thumbRaw %}
-      {# Otherwise treat it as a filename and serve from ImageKit thumbs #}
       {% else %}
         {% set thumbUrl = IK_THUMBS_BASE ~ thumbFile %}
       {% endif %}
 
-      {# Apply a small, cheap transform for list thumbnails
-         - f-auto lets ImageKit pick best format (AVIF/WebP/etc.)
-         - w/h keep it tight and consistent
-         - q-50 keeps weight down; you can tune later
-      #}
+      {# ImageKit transform for tiny list thumbnails #}
       {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-112,h-112,f-auto,q-50" %}
 
       <li
@@ -151,10 +129,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         data-search=""
       >
         <a class="result-link" href="/pasta/{{ item.Slug }}/" data-recent="1">
-          {# Thumbnail container
-             - aria-hidden because the text label already identifies the item
-             - The <img> is deliberately decorative (alt="") for accessibility
-          #}
+          {# Thumbnail container - decorative (name text is the real label) #}
           <span class="thumb" aria-hidden="true">
             <img
               src="{{ thumbUrlTransformed }}"
@@ -169,9 +144,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
               <span class="result-name">{{ item.ShapeName }}</span>
             </span>
 
-            {# Optional "Also" line (aliases/misspellings)
-               - Only render if we have content
-            #}
             {% if alsoRaw %}
               <span class="result-also muted">
                 Also: {{ alsoRaw }}
@@ -183,11 +155,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
     {% endfor %}
   </ul>
 
-  {# ---------------------------------------------------------------------------
-    Results tools area
-    - JS controls "Next 10" / "Show more"
-    - Note text is also updated by JS
-  --------------------------------------------------------------------------- #}
+  {# Footer tools for paging (JS controls visibility/text) #}
   <div class="results-tools">
     <p id="pasta-results-note" class="muted"></p>
     <button id="pasta-toggle-all" class="btn secondary btn-small" type="button" hidden>
