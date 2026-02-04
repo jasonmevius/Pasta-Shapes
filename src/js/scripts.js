@@ -1,15 +1,21 @@
 (() => {
+  // =============================================================================
+  // Tiny selector helper
+  // =============================================================================
   const $ = (sel, root = document) => root.querySelector(sel);
 
   // =============================================================================
   // Mobile hamburger menu
+  // - Closed by default
+  // - Toggle open/close
+  // - Close on outside click, ESC, or link click
   // =============================================================================
   function initHamburgerMenu() {
     const btn = $("#nav-toggle");
     const drawer = $("#nav-drawer");
     if (!btn || !drawer) return;
 
-    // Defensive: ensure initial state is closed
+    // Safe initial state on every load.
     btn.setAttribute("aria-expanded", "false");
     drawer.hidden = true;
 
@@ -24,8 +30,8 @@
     }
 
     function toggleMenu() {
-      const expanded = btn.getAttribute("aria-expanded") === "true";
-      if (expanded) closeMenu();
+      const isOpen = btn.getAttribute("aria-expanded") === "true";
+      if (isOpen) closeMenu();
       else openMenu();
     }
 
@@ -34,30 +40,32 @@
       toggleMenu();
     });
 
-    // Close when clicking a link inside the drawer
+    // Click a link - close.
     drawer.addEventListener("click", (e) => {
       const a = e.target.closest("a[href]");
-      if (!a) return;
-      closeMenu();
+      if (a) closeMenu();
     });
 
-    // Close on ESC
+    // ESC - close.
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") closeMenu();
     });
 
-    // Close when clicking outside
+    // Click outside - close.
     document.addEventListener("click", (e) => {
       const isOpen = btn.getAttribute("aria-expanded") === "true";
       if (!isOpen) return;
 
-      const inside = e.target.closest("#nav-toggle, #nav-drawer");
-      if (!inside) closeMenu();
+      const insideToggle = e.target.closest("#nav-toggle");
+      const insideDrawer = e.target.closest("#nav-drawer");
+      if (insideToggle || insideDrawer) return;
+
+      closeMenu();
     });
   }
 
   // =============================================================================
-  // Recently viewed helpers
+  // Recently viewed (localStorage)
   // =============================================================================
   function readRecents() {
     try {
@@ -88,23 +96,37 @@
     const status = $("#pasta-search-status");
     const list = $("#pasta-results");
 
+    // Only run on pages with the search UI.
     if (!input || !status || !list) return;
 
     const resultsPanel = $("#home-results-panel");
     const identifyCard = $("#home-identify-card");
 
+    // -------------------------------------------------------------------------
+    // Home UI state toggles:
+    // - Idle: Identify card shown, Results panel hidden
+    // - Typing: Identify card hidden, Results panel shown
+    // CSS handles the layout via body.is-searching.
+    // -------------------------------------------------------------------------
     function setSearchingUI(isSearching) {
       document.body.classList.toggle("is-searching", isSearching);
 
       if (resultsPanel) resultsPanel.hidden = !isSearching;
-      if (identifyCard) identifyCard.setAttribute("aria-hidden", isSearching ? "true" : "false");
+
+      // Keep accessibility clean: the Identify card is visually removed by CSS,
+      // but we also set aria-hidden when searching.
+      if (identifyCard) {
+        identifyCard.setAttribute("aria-hidden", isSearching ? "true" : "false");
+      }
     }
 
+    // Initial UI state
     setSearchingUI(Boolean(String(input.value || "").trim()));
 
+    // -------------------------------------------------------------------------
+    // Existing search logic
+    // -------------------------------------------------------------------------
     const cards = Array.from(list.querySelectorAll("[data-search]"));
-    const originalOrder = cards.slice();
-
     const recentWrap = $("#recently-viewed-wrap");
     const recentList = $("#recently-viewed");
 
@@ -121,6 +143,9 @@
       el.setAttribute("aria-hidden", isVisible ? "false" : "true");
     }
 
+    // -------------------------------------------------------------------------
+    // Normalization helpers
+    // -------------------------------------------------------------------------
     const STOPWORDS = new Set([
       "a","ad","al","alla","alle","allo","ai","agli","all",
       "da","de","dei","degli","della","delle","del","di",
@@ -139,6 +164,7 @@
         .trim();
     }
 
+    // Collapses spaced-letter inputs like "p e n n e" -> "penne"
     function normalizeQuery(s) {
       const q = normalize(s);
       if (/^(?:[a-z0-9]\s+){2,}[a-z0-9]$/.test(q)) return q.replace(/\s+/g, "");
@@ -154,6 +180,9 @@
       return parts.join(" ").trim();
     }
 
+    // -------------------------------------------------------------------------
+    // Optional fuzzy support using /api/pasta-index.json
+    // -------------------------------------------------------------------------
     let indexLoaded = false;
     let index = null;
     let aliasKeys = null;
@@ -176,8 +205,10 @@
         for (const k of aliasKeys) {
           const stopKey = stripStopwords(k);
           if (!stopKey) continue;
+
           const slug = a2s[k];
           if (!slug) continue;
+
           if (!stopKeyToSlugs.has(stopKey)) stopKeyToSlugs.set(stopKey, new Set());
           stopKeyToSlugs.get(stopKey).add(slug);
         }
@@ -190,6 +221,7 @@
       return index;
     }
 
+    // Bounded Levenshtein for lightweight fuzzy matching
     function levenshtein(a, b, maxDist) {
       if (a === b) return 0;
       if (!a || !b) return Math.max(a.length, b.length);
@@ -227,6 +259,9 @@
       return prev[bl];
     }
 
+    // -------------------------------------------------------------------------
+    // Result show/hide helpers
+    // -------------------------------------------------------------------------
     function hideAll() {
       for (const c of cards) c.hidden = true;
     }
@@ -253,6 +288,7 @@
       setControlVisible(nextBtn, true);
     }
 
+    // Cache normalized values from DOM
     const cached = cards.map((card) => {
       const nameEl = card.querySelector(".result-name");
       const alsoEl = card.querySelector(".result-also");
@@ -265,13 +301,16 @@
       const nameNorm = normalize(nameText);
       const aliasNorm = normalize([alsoText, descText, card.getAttribute("data-search") || ""].join(" "));
 
-      return { card, nameNorm, aliasNorm, nameText };
+      return { card, nameNorm, aliasNorm };
     });
 
     function reorder(newOrder) {
       for (const it of newOrder) list.appendChild(it.card);
     }
 
+    // -------------------------------------------------------------------------
+    // Main filter function
+    // -------------------------------------------------------------------------
     async function applyFilter() {
       const q = normalizeQuery(input.value || "");
       const hasQuery = Boolean(q);
@@ -286,6 +325,7 @@
         return;
       }
 
+      // 1) Name-prefix matches
       const nameMatches = [];
       const nonName = [];
 
@@ -310,6 +350,7 @@
         return;
       }
 
+      // 2) Alias/metadata matches (includes)
       const aliasMatches = [];
       const nonAlias = [];
 
@@ -318,6 +359,7 @@
         else nonAlias.push(it);
       }
 
+      // 3) Optional fuzzy match fallback
       if (!aliasMatches.length && q.length >= 4) {
         await loadIndexIfNeeded();
 
@@ -352,6 +394,7 @@
         }
       }
 
+      // Alias matches (paged)
       if (aliasMatches.length) {
         reorder(aliasMatches.concat(nonAlias));
 
@@ -364,12 +407,16 @@
         return;
       }
 
+      // Nothing found
       hideAll();
       status.textContent = "No matches found.";
       updateFooter(0, 0);
       setControlVisible(nextBtn, false);
     }
 
+    // -------------------------------------------------------------------------
+    // Events
+    // -------------------------------------------------------------------------
     let rafPending = false;
     function requestFilter() {
       if (rafPending) return;
@@ -393,6 +440,7 @@
       });
     }
 
+    // Recently viewed: render comma-separated list (max 5)
     function renderRecents() {
       if (!recentWrap || !recentList) return;
 
@@ -433,14 +481,17 @@
       setControlVisible(recentWrap, true);
     }
 
+    // Record recents on click (detail pages also record on load)
     list.addEventListener("click", (e) => {
       const a = e.target.closest("a[data-recent]");
       if (!a) return;
+
       const href = a.getAttribute("href") || "";
       const m = href.match(/\/pasta\/([^\/]+)\//);
       if (m && m[1]) addRecent(m[1]);
     });
 
+    // Initial state
     hideAll();
     renderRecents();
     requestFilter();
@@ -455,12 +506,15 @@
     if (m && m[1]) addRecent(m[1]);
   }
 
+  // =============================================================================
+  // Identify page hook (kept for compatibility)
+  // =============================================================================
   function initIdentifyPage() {
     return;
   }
 
   // =============================================================================
-  // Mobile Bottom Nav: swipe-to-switch between Search and Identify
+  // Mobile bottom nav: swipe to switch Search <-> Identify
   // =============================================================================
   function initSwipeBottomNav() {
     const nav = document.querySelector(".bottom-nav[data-swipe-nav='1']");
