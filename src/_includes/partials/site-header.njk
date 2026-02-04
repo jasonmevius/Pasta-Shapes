@@ -17,8 +17,19 @@
 
     {# Desktop nav - visible on >= 720px via CSS #}
     <nav class="nav nav-desktop" aria-label="Primary navigation">
-      <a href="/" {% if page and page.url == "/" %}aria-current="page"{% endif %}>Search</a>
-      <a href="/identify/" {% if page and page.url and page.url.startsWith("/identify") %}aria-current="page"{% endif %}>Identify</a>
+      <a href="/"
+        {% if page and page.url == "/" %}aria-current="page"{% endif %}
+      >Search</a>
+
+      <a href="/identify/"
+        {% if page and page.url and page.url.startsWith("/identify") %}aria-current="page"{% endif %}
+      >Identify</a>
+
+      {# New: All Pastas table view #}
+      <a href="/all/"
+        {% if page and page.url and page.url.startsWith("/all") %}aria-current="page"{% endif %}
+      >All Pastas</a>
+
       {# Add more items here later as the site grows #}
     </nav>
 
@@ -41,7 +52,17 @@
 
   {# Mobile drawer - MUST start hidden to prevent "open by default" #}
   <nav id="nav-drawer" class="nav-drawer" aria-label="Menu" hidden>
-    <a href="/" {% if page and page.url == "/" %}aria-current="page"{% endif %}>Search</a>
-    <a href="/identify/" {% if page and page.url and page.url.startsWith("/identify") %}aria-current="page"{% endif %}>Identify</a>
+    <a href="/"
+      {% if page and page.url == "/" %}aria-current="page"{% endif %}
+    >Search</a>
+
+    <a href="/identify/"
+      {% if page and page.url and page.url.startsWith("/identify") %}aria-current="page"{% endif %}
+    >Identify</a>
+
+    {# New: All Pastas table view #}
+    <a href="/all/"
+      {% if page and page.url and page.url.startsWith("/all") %}aria-current="page"{% endif %}
+    >All Pastas</a>
   </nav>
 </header>
