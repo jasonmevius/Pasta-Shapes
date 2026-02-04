@@ -779,3 +779,58 @@ body.is-searching #home-results-panel{ display: grid; }
   white-space: nowrap !important;
   border: 0 !important;
 }
+
+/* ------------------------------------------------------------
+   All Pastas table tweaks
+------------------------------------------------------------- */
+
+/* Left-align selected headers/cells */
+.data-table__left,
+.data-table__name,
+.data-table__detail {
+  text-align: left;
+}
+
+/* Thumb column stays centered */
+.data-table__thumb {
+  text-align: center;
+}
+
+/* Match Search page thumbnail wrapper structure */
+.thumb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.thumb img {
+  display: block;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+}
+
+.thumb--placeholder {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* Make sure the Clear filters button is visibly a button */
+.btn {
+  color: inherit; /* protects against global button color resets */
+  line-height: 1.1;
+}
+
+.btn--secondary {
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.18);
+}
+
+.btn--secondary:hover {
+  background: rgba(0, 0, 0, 0.07);
+  border-color: rgba(0, 0, 0, 0.28);
+}
+
