@@ -7,67 +7,49 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 {# =============================================================================
   index.njk (Homepage)
   ------------------------------------------------------------------------------
-  GOAL (per your latest mobile-first simplification)
-  - Keep the top bar + bottom nav as-is (handled by layout + partials).
-  - The "middle" content becomes TWO chunky actions:
+  Mobile-first simplified home:
 
-    DEFAULT (idle, no query):
-      TOP:    Search by Name (big input)
-      BOTTOM: Identify by Shape (entire card is one big button to /identify/)
+  DEFAULT (idle, no query):
+    TOP:    Search by Name (big input)
+    BOTTOM: Identify by Shape (entire card is one big button to /identify/)
 
-    ACTIVE SEARCH (user starts typing):
-      TOP:    Search card shrinks to ~top third-ish of the screen
-      BOTTOM: Identify card disappears and is replaced by live search results
+  ACTIVE SEARCH (user types):
+    TOP:    Search card shrinks
+    BOTTOM: Identify card disappears and is replaced by live results
 
-  IMPORTANT RULES
-  - NO inline CSS. All styling lives in /src/css/styles.css
-  - Keep templates heavily commented for future-proofing.
-
-  NOTE ON EXISTING JS
-  - Your scripts.js already contains the full filtering logic (prefix -> alias -> optional fuzzy).
-  - We keep the same element IDs the JS expects:
-      #pasta-q
-      #pasta-search-status
-      #pasta-results
-      #pasta-results-note
-      #pasta-toggle-all
-      #recently-viewed-wrap / #recently-viewed
+  Revisions in this version:
+  - Removed Search subtitle sentence.
+  - Centered "Search by Name" heading.
+  - Centered "Identify by Shape" heading.
+  - Identify image now uses favicon.png and is centered in both axes.
+  - Removed Identify subtitle and the "Tap anywhere" button.
 ============================================================================= #}
 
 {# -----------------------------------------------------------------------------
   ImageKit configuration
-  - Used for list thumbnails AND the Identify card image.
 ----------------------------------------------------------------------------- #}
-{% set IK_THUMBS_BASE = "https://ik.imagekit.io/mevius/pasta/thumbs/" %}
+{% set IK_BASE = "https://ik.imagekit.io/mevius" %}
+{% set IK_THUMBS_BASE = IK_BASE ~ "/pasta/thumbs/" %}
 {% set FALLBACK_THUMB = "pending.png" %}
 
 {# -----------------------------------------------------------------------------
-  Identify card hero image
-  - You asked for a single bowtie image.
-  - "Farfalle" is the canonical bowtie pasta name; we use farfalle.png in thumbs.
-  - If your thumbs folder uses a different filename, update it here ONLY.
+  Identify card image
+  - Per your note: use pasta/favicon.png
 ----------------------------------------------------------------------------- #}
-{% set IDENTIFY_IMAGE_FILE = "farfalle.png" %}
-{% set identifyImgUrl = IK_THUMBS_BASE ~ IDENTIFY_IMAGE_FILE ~ "?tr=w-512,h-512,f-auto,q-60" %}
+{% set identifyImgUrl = IK_BASE ~ "/pasta/favicon.png?tr=w-512,h-512,f-auto,q-70" %}
 
 <section class="home-shell" aria-label="Homepage actions">
   <div class="home-panels">
 
     {# =========================================================================
       PANEL 1: Search by Name
-      - This panel shrinks when user types (CSS via body.is-searching).
-      - We keep the form + input IDs so the existing JS continues to work.
     ========================================================================= #}
     <section id="home-search-card" class="home-card card stack" aria-label="Search by name">
       <header class="home-card-head">
         <h1 class="h2 home-card-title">Search by Name</h1>
-        <p class="muted home-card-subtitle">
-          Start typing a pasta name from a menu.
-        </p>
       </header>
 
       <form id="pasta-search-form" class="search" action="/" method="get" novalidate>
-        {# sr-only class is defined in styles.css (added below) #}
         <label class="sr-only" for="pasta-q">Search by pasta name</label>
         <input
           id="pasta-q"
@@ -82,7 +64,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         />
       </form>
 
-      {# This status line is updated by JS while filtering #}
       <p id="pasta-search-status" class="muted home-search-status" aria-live="polite">
         Start typing to see matches.
       </p>
@@ -90,8 +71,8 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 
     {# =========================================================================
       PANEL 2A: Identify by Shape (idle state)
-      - Entire card is one big tap target (a single <a> wraps everything).
-      - When user types, JS/CSS hides this and shows results panel instead.
+      - Entire card is one big tap target
+      - Image is centered both horizontally and vertically
     ========================================================================= #}
     <a
       id="home-identify-card"
@@ -101,9 +82,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
     >
       <header class="home-card-head">
         <h2 class="h2 home-card-title">Identify by Shape</h2>
-        <p class="muted home-card-subtitle">
-          Use shape questions to narrow it down.
-        </p>
       </header>
 
       <div class="identify-hero" aria-hidden="true">
@@ -114,18 +92,11 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
           decoding="async"
         />
       </div>
-
-      <span class="home-card-cta">Tap anywhere to start</span>
     </a>
 
     {# =========================================================================
       PANEL 2B: Results panel (active typing state)
-      - Hidden by default; shown when user types.
-      - Contains:
-          - Suggestions (currently unused but retained)
-          - Recently viewed
-          - Results list (server-rendered; JS hides/shows items)
-          - Paging controls (Next 10)
+      - Hidden by default; shown when user types
     ========================================================================= #}
     <section
       id="home-results-panel"
@@ -133,26 +104,16 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       aria-label="Search results"
       hidden
     >
-      {# Suggestions (empty by default; JS may populate later) #}
       <ul id="pasta-search-suggestions" class="suggestions" aria-label="Suggestions"></ul>
 
-      {# Recently viewed (per-browser; JS populates) #}
       <div id="recently-viewed-wrap" class="recent-wrap" hidden>
         <h3 class="h3">Recently viewed</h3>
         <p id="recently-viewed" class="muted"></p>
       </div>
 
-      {# -----------------------------------------------------------------------
-        Results list
-        - Server-rendered so:
-            - content exists without JS
-            - thumbnails exist without JS
-        - JS shows/hides items live as you type.
-      ----------------------------------------------------------------------- #}
       <ul id="pasta-results" class="results-list" aria-label="Pasta results">
         {% for item in pasta %}
 
-          {# "Also" line (aliases) - pick the first matching field in your data #}
           {% set alsoRaw =
             item.SearchAliases
             or item.Aliases
@@ -184,7 +145,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
             {% set thumbUrl = IK_THUMBS_BASE ~ thumbClean %}
           {% endif %}
 
-          {# Small list thumbnail #}
           {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
 
           <li class="result-card" data-slug="{{ item.Slug }}" data-search="">
@@ -214,7 +174,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         {% endfor %}
       </ul>
 
-      {# Paging tools (JS controls visibility/text) #}
       <div class="results-tools">
         <p id="pasta-results-note" class="muted"></p>
         <button id="pasta-toggle-all" class="btn secondary btn-small" type="button" hidden>
