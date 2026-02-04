@@ -6,44 +6,22 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 
 {# =============================================================================
   index.njk (Homepage)
-  ------------------------------------------------------------------------------
-  Mobile-first simplified home:
 
-  DEFAULT (idle, no query):
-    TOP:    Search by Name (big input)
-    BOTTOM: Identify by Shape (entire card is one big button to /identify/)
-
-  ACTIVE SEARCH (user types):
-    TOP:    Search card shrinks
-    BOTTOM: Identify card disappears and is replaced by live results
-
-  Revisions in this version:
-  - Removed Search subtitle sentence.
-  - Centered "Search by Name" heading.
-  - Centered "Identify by Shape" heading.
-  - Identify image now uses favicon.png and is centered in both axes.
-  - Removed Identify subtitle and the "Tap anywhere" button.
+  Changes in this version:
+  - Recently Viewed moved to the bottom of the results panel.
+  - Everything else stays aligned with the simplified mobile layout.
 ============================================================================= #}
 
-{# -----------------------------------------------------------------------------
-  ImageKit configuration
------------------------------------------------------------------------------ #}
 {% set IK_BASE = "https://ik.imagekit.io/mevius" %}
 {% set IK_THUMBS_BASE = IK_BASE ~ "/pasta/thumbs/" %}
 {% set FALLBACK_THUMB = "pending.png" %}
 
-{# -----------------------------------------------------------------------------
-  Identify card image
-  - Per your note: use pasta/favicon.png
------------------------------------------------------------------------------ #}
-{% set identifyImgUrl = IK_BASE ~ "/pasta/favicon.png?tr=w-512,h-512,f-auto,q-70" %}
+{# Identify icon per your note #}
+{% set identifyImgUrl = IK_BASE ~ "/pasta/favicon.png?tr=w-256,h-256,f-auto,q-70" %}
 
 <section class="home-shell" aria-label="Homepage actions">
   <div class="home-panels">
 
-    {# =========================================================================
-      PANEL 1: Search by Name
-    ========================================================================= #}
     <section id="home-search-card" class="home-card card stack" aria-label="Search by name">
       <header class="home-card-head">
         <h1 class="h2 home-card-title">Search by Name</h1>
@@ -69,11 +47,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       </p>
     </section>
 
-    {# =========================================================================
-      PANEL 2A: Identify by Shape (idle state)
-      - Entire card is one big tap target
-      - Image is centered both horizontally and vertically
-    ========================================================================= #}
     <a
       id="home-identify-card"
       class="home-card home-card-link card stack"
@@ -94,10 +67,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       </div>
     </a>
 
-    {# =========================================================================
-      PANEL 2B: Results panel (active typing state)
-      - Hidden by default; shown when user types
-    ========================================================================= #}
     <section
       id="home-results-panel"
       class="home-results card stack"
@@ -105,11 +74,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       hidden
     >
       <ul id="pasta-search-suggestions" class="suggestions" aria-label="Suggestions"></ul>
-
-      <div id="recently-viewed-wrap" class="recent-wrap" hidden>
-        <h3 class="h3">Recently viewed</h3>
-        <p id="recently-viewed" class="muted"></p>
-      </div>
 
       <ul id="pasta-results" class="results-list" aria-label="Pasta results">
         {% for item in pasta %}
@@ -123,7 +87,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
             or ""
           %}
 
-          {# --- Thumbnail normalization (no split filter) --------------------- #}
           {% set thumbRaw = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
           {% set thumbIsUrl = thumbRaw and thumbRaw.startsWith("http") %}
 
@@ -179,6 +142,12 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         <button id="pasta-toggle-all" class="btn secondary btn-small" type="button" hidden>
           Next 10
         </button>
+      </div>
+
+      {# MOVED: Recently Viewed now lives at the bottom of the results panel #}
+      <div id="recently-viewed-wrap" class="recent-wrap" hidden>
+        <h3 class="h3">Recently viewed</h3>
+        <p id="recently-viewed" class="muted"></p>
       </div>
     </section>
 
