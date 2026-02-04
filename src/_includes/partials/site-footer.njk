@@ -1,23 +1,14 @@
 {# =============================================================================
   partials/site-footer.njk
   ------------------------------------------------------------------------------
-  PURPOSE
-  - Simple footer that holds lower-priority links.
-  - Lets you grow content over time without cluttering primary flows.
+  Footer should be minimal now that navigation lives in the hamburger menu.
+  Keep only the lightweight tagline (optional).
 ============================================================================= #}
 
-<footer id="site-footer" class="site-footer">
-  <div class="container site-footer-inner">
-    <div class="stack tight">
-      <p class="muted">
-        Built for fast, mobile-friendly pasta identification.
-      </p>
-
-      <nav class="footer-links" aria-label="Footer">
-        <a href="/about/">About</a>
-        <a href="/sources/">Sources</a>
-        <a href="/feedback/">Feedback</a>
-      </nav>
-    </div>
+<footer class="site-footer">
+  <div class="site-footer-inner container">
+    <p class="muted footer-tagline">
+      Built for fast, simple pasta lookup - mobile first.
+    </p>
   </div>
 </footer>
