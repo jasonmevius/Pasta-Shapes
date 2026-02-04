@@ -5,188 +5,223 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 ---
 
 {# =============================================================================
-  index.njk (Homepage - Search)
+  index.njk (Homepage)
   ------------------------------------------------------------------------------
-  PURPOSE
-  - Mobile-first homepage optimized for the restaurant use case:
-      - Type a pasta name (from a menu)
-      - See matching shapes quickly
-      - Tap into the detail page if needed
+  GOAL (per your latest mobile-first simplification)
+  - Keep the top bar + bottom nav as-is (handled by layout + partials).
+  - The "middle" content becomes TWO chunky actions:
 
-  IMPORTANT
-  - NO inline CSS. Styling lives in /src/css/styles.css
+    DEFAULT (idle, no query):
+      TOP:    Search by Name (big input)
+      BOTTOM: Identify by Shape (entire card is one big button to /identify/)
 
-  THUMBNAILS (WHY THIS FILE CHANGED)
-  - Your rendered homepage HTML showed:
-      <span class="thumb"></span>
-    ...with NO <img>, which produces grey boxes.
-  - Identify page shows thumbs because its JS injects images there.
-  - This template now renders an <img> inside .thumb for each result.
+    ACTIVE SEARCH (user starts typing):
+      TOP:    Search card shrinks to ~top third-ish of the screen
+      BOTTOM: Identify card disappears and is replaced by live search results
 
-  NOTE ON NUNJUCKS FILTERS
-  - Your environment does NOT provide a `split` filter.
-  - So we avoid `split("/") | last` and instead strip known prefixes using `replace`.
+  IMPORTANT RULES
+  - NO inline CSS. All styling lives in /src/css/styles.css
+  - Keep templates heavily commented for future-proofing.
+
+  NOTE ON EXISTING JS
+  - Your scripts.js already contains the full filtering logic (prefix -> alias -> optional fuzzy).
+  - We keep the same element IDs the JS expects:
+      #pasta-q
+      #pasta-search-status
+      #pasta-results
+      #pasta-results-note
+      #pasta-toggle-all
+      #recently-viewed-wrap / #recently-viewed
 ============================================================================= #}
 
 {# -----------------------------------------------------------------------------
-  ImageKit configuration for list thumbnails
-  - You can change the folder in one place later if needed.
+  ImageKit configuration
+  - Used for list thumbnails AND the Identify card image.
 ----------------------------------------------------------------------------- #}
 {% set IK_THUMBS_BASE = "https://ik.imagekit.io/mevius/pasta/thumbs/" %}
 {% set FALLBACK_THUMB = "pending.png" %}
 
-<section class="hero stack">
-  <h1 class="h1">Pasta Shapes</h1>
+{# -----------------------------------------------------------------------------
+  Identify card hero image
+  - You asked for a single bowtie image.
+  - "Farfalle" is the canonical bowtie pasta name; we use farfalle.png in thumbs.
+  - If your thumbs folder uses a different filename, update it here ONLY.
+----------------------------------------------------------------------------- #}
+{% set IDENTIFY_IMAGE_FILE = "farfalle.png" %}
+{% set identifyImgUrl = IK_THUMBS_BASE ~ IDENTIFY_IMAGE_FILE ~ "?tr=w-512,h-512,f-auto,q-60" %}
 
-  <p class="muted lead">
-    Type a pasta name from a menu to see matches (including common aliases).
-    If you have a pasta shape in front of you, use Identify to narrow it down by questions.
-  </p>
-</section>
+<section class="home-shell" aria-label="Homepage actions">
+  <div class="home-panels">
 
-<section class="card stack" aria-label="Search pasta shapes">
-  {# ---------------------------------------------------------------------------
-    Search form
-    - JS filters the list live as you type.
-  --------------------------------------------------------------------------- #}
-  <form id="pasta-search-form" class="search" action="/" method="get">
-    <label class="sr-only" for="pasta-q">Search</label>
-    <input
-      id="pasta-q"
-      name="q"
-      class="search-input"
-      type="search"
-      inputmode="search"
-      autocomplete="off"
-      autocapitalize="none"
-      spellcheck="false"
-      placeholder="Start typing - e.g., ravioli, rigatoni, bucatini"
-    />
-  </form>
+    {# =========================================================================
+      PANEL 1: Search by Name
+      - This panel shrinks when user types (CSS via body.is-searching).
+      - We keep the form + input IDs so the existing JS continues to work.
+    ========================================================================= #}
+    <section id="home-search-card" class="home-card card stack" aria-label="Search by name">
+      <header class="home-card-head">
+        <h1 class="h2 home-card-title">Search by Name</h1>
+        <p class="muted home-card-subtitle">
+          Start typing a pasta name from a menu.
+        </p>
+      </header>
 
-  <div class="results-head">
-    <h2 class="h2">Results</h2>
-    <p id="pasta-search-status" class="muted" aria-live="polite">
-      Start typing to see matches.
-    </p>
-  </div>
+      <form id="pasta-search-form" class="search" action="/" method="get" novalidate>
+        {# sr-only class is defined in styles.css (added below) #}
+        <label class="sr-only" for="pasta-q">Search by pasta name</label>
+        <input
+          id="pasta-q"
+          name="q"
+          class="search-input"
+          type="search"
+          inputmode="search"
+          autocomplete="off"
+          autocapitalize="none"
+          spellcheck="false"
+          placeholder="Start typing - e.g., ravioli, rigatoni, bucatini"
+        />
+      </form>
 
-  {# Suggestions (empty by default; JS may populate later) #}
-  <ul id="pasta-search-suggestions" class="suggestions" aria-label="Suggestions"></ul>
+      {# This status line is updated by JS while filtering #}
+      <p id="pasta-search-status" class="muted home-search-status" aria-live="polite">
+        Start typing to see matches.
+      </p>
+    </section>
 
-  {# Recently viewed (per-browser; JS populates) #}
-  <div id="recently-viewed-wrap" class="recent-wrap" hidden>
-    <h3 class="h3">Recently viewed</h3>
-    <p id="recently-viewed" class="muted"></p>
-  </div>
+    {# =========================================================================
+      PANEL 2A: Identify by Shape (idle state)
+      - Entire card is one big tap target (a single <a> wraps everything).
+      - When user types, JS/CSS hides this and shows results panel instead.
+    ========================================================================= #}
+    <a
+      id="home-identify-card"
+      class="home-card home-card-link card stack"
+      href="/identify/"
+      aria-label="Identify by Shape - go to Identify page"
+    >
+      <header class="home-card-head">
+        <h2 class="h2 home-card-title">Identify by Shape</h2>
+        <p class="muted home-card-subtitle">
+          Use shape questions to narrow it down.
+        </p>
+      </header>
 
-  {# ---------------------------------------------------------------------------
-    Results list
-    - Server-rendered so thumbnails and content exist even without JS.
-    - JS simply shows/hides items.
-  --------------------------------------------------------------------------- #}
-  <ul id="pasta-results" class="results-list" aria-label="Pasta results">
-    {% for item in pasta %}
+      <div class="identify-hero" aria-hidden="true">
+        <img
+          src="{{ identifyImgUrl }}"
+          alt=""
+          loading="lazy"
+          decoding="async"
+        />
+      </div>
+
+      <span class="home-card-cta">Tap anywhere to start</span>
+    </a>
+
+    {# =========================================================================
+      PANEL 2B: Results panel (active typing state)
+      - Hidden by default; shown when user types.
+      - Contains:
+          - Suggestions (currently unused but retained)
+          - Recently viewed
+          - Results list (server-rendered; JS hides/shows items)
+          - Paging controls (Next 10)
+    ========================================================================= #}
+    <section
+      id="home-results-panel"
+      class="home-results card stack"
+      aria-label="Search results"
+      hidden
+    >
+      {# Suggestions (empty by default; JS may populate later) #}
+      <ul id="pasta-search-suggestions" class="suggestions" aria-label="Suggestions"></ul>
+
+      {# Recently viewed (per-browser; JS populates) #}
+      <div id="recently-viewed-wrap" class="recent-wrap" hidden>
+        <h3 class="h3">Recently viewed</h3>
+        <p id="recently-viewed" class="muted"></p>
+      </div>
 
       {# -----------------------------------------------------------------------
-        "Also" line (aliases)
-        - Pick the first existing field that matches your dataset.
+        Results list
+        - Server-rendered so:
+            - content exists without JS
+            - thumbnails exist without JS
+        - JS shows/hides items live as you type.
       ----------------------------------------------------------------------- #}
-      {% set alsoRaw =
-        item.SearchAliases
-        or item.Aliases
-        or item.Synonyms
-        or item.Also
-        or item.Misspellings
-        or ""
-      %}
+      <ul id="pasta-results" class="results-list" aria-label="Pasta results">
+        {% for item in pasta %}
 
-      {# -----------------------------------------------------------------------
-        THUMBNAIL URL NORMALIZATION (NO split FILTER!)
+          {# "Also" line (aliases) - pick the first matching field in your data #}
+          {% set alsoRaw =
+            item.SearchAliases
+            or item.Aliases
+            or item.Synonyms
+            or item.Also
+            or item.Misspellings
+            or ""
+          %}
 
-        item.ThumbnailImage may be:
-          1) empty
-          2) filename: "penne.png"
-          3) full URL: "https://ik.imagekit.io/.../penne.png"
-          4) older string containing "<ImageKitPath>"
+          {# --- Thumbnail normalization (no split filter) --------------------- #}
+          {% set thumbRaw = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
+          {% set thumbIsUrl = thumbRaw and thumbRaw.startsWith("http") %}
 
-        We normalize using only safe operations:
-          - replace
-          - trim
-          - startsWith (string method available in your Nunjucks runtime)
+          {% set thumbClean = thumbRaw %}
+          {% if thumbClean %}
+            {% set thumbClean = thumbClean | replace("https://ik.imagekit.io/mevius/pasta/thumbs/", "") %}
+            {% set thumbClean = thumbClean | replace("https://ik.imagekit.io/mevius/", "") %}
+            {% set thumbClean = thumbClean | replace("/pasta/thumbs/", "") %}
+            {% set thumbClean = thumbClean | replace("pasta/thumbs/", "") %}
+            {% set thumbClean = thumbClean | replace("/thumbs/", "") %}
+            {% set thumbClean = thumbClean | replace("thumbs/", "") %}
+          {% endif %}
 
-        Strategy:
-          A) If empty -> use FALLBACK_THUMB in IK_THUMBS_BASE
-          B) If starts with http -> use as-is
-          C) Else -> treat as a filename (or relative path) and append to IK_THUMBS_BASE
-              - But first strip common prefixes if present, so we don't double-prefix.
-      ----------------------------------------------------------------------- #}
+          {% if not thumbRaw %}
+            {% set thumbUrl = IK_THUMBS_BASE ~ FALLBACK_THUMB %}
+          {% elseif thumbIsUrl %}
+            {% set thumbUrl = thumbRaw %}
+          {% else %}
+            {% set thumbUrl = IK_THUMBS_BASE ~ thumbClean %}
+          {% endif %}
 
-      {# Raw thumb string from data (cleaned) #}
-      {% set thumbRaw = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
+          {# Small list thumbnail #}
+          {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
 
-      {# Determine if it's a full URL #}
-      {% set thumbIsUrl = thumbRaw and thumbRaw.startsWith("http") %}
-
-      {# If it's not a URL, clean it to be a simple filename/relative path #}
-      {% set thumbClean = thumbRaw %}
-      {% if thumbClean %}
-        {# Strip ImageKit base if someone pasted full path without http #}
-        {% set thumbClean = thumbClean | replace("https://ik.imagekit.io/mevius/pasta/thumbs/", "") %}
-        {% set thumbClean = thumbClean | replace("https://ik.imagekit.io/mevius/", "") %}
-
-        {# Strip known folder prefixes so we can safely re-add IK_THUMBS_BASE #}
-        {% set thumbClean = thumbClean | replace("/pasta/thumbs/", "") %}
-        {% set thumbClean = thumbClean | replace("pasta/thumbs/", "") %}
-        {% set thumbClean = thumbClean | replace("/thumbs/", "") %}
-        {% set thumbClean = thumbClean | replace("thumbs/", "") %}
-      {% endif %}
-
-      {# Build the final URL #}
-      {% if not thumbRaw %}
-        {% set thumbUrl = IK_THUMBS_BASE ~ FALLBACK_THUMB %}
-      {% elseif thumbIsUrl %}
-        {% set thumbUrl = thumbRaw %}
-      {% else %}
-        {% set thumbUrl = IK_THUMBS_BASE ~ thumbClean %}
-      {% endif %}
-
-      {# ImageKit transform for small list thumbnails #}
-      {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
-
-      <li class="result-card" data-slug="{{ item.Slug }}" data-search="">
-        <a class="result-link" href="/pasta/{{ item.Slug }}/" data-recent="1">
-          {# Thumbnail container - decorative, since name text is present #}
-          <span class="thumb" aria-hidden="true">
-            <img
-              src="{{ thumbUrlTransformed }}"
-              alt=""
-              loading="lazy"
-              decoding="async"
-            />
-          </span>
-
-          <span class="result-body">
-            <span class="result-title-row">
-              <span class="result-name">{{ item.ShapeName }}</span>
-            </span>
-
-            {% if alsoRaw %}
-              <span class="result-also muted">
-                Also: {{ alsoRaw }}
+          <li class="result-card" data-slug="{{ item.Slug }}" data-search="">
+            <a class="result-link" href="/pasta/{{ item.Slug }}/" data-recent="1">
+              <span class="thumb" aria-hidden="true">
+                <img
+                  src="{{ thumbUrlTransformed }}"
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                />
               </span>
-            {% endif %}
-          </span>
-        </a>
-      </li>
-    {% endfor %}
-  </ul>
 
-  {# Footer tools for paging (JS controls visibility/text) #}
-  <div class="results-tools">
-    <p id="pasta-results-note" class="muted"></p>
-    <button id="pasta-toggle-all" class="btn secondary btn-small" type="button" hidden>
-      Next 10
-    </button>
+              <span class="result-body">
+                <span class="result-title-row">
+                  <span class="result-name">{{ item.ShapeName }}</span>
+                </span>
+
+                {% if alsoRaw %}
+                  <span class="result-also muted">
+                    Also: {{ alsoRaw }}
+                  </span>
+                {% endif %}
+              </span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+
+      {# Paging tools (JS controls visibility/text) #}
+      <div class="results-tools">
+        <p id="pasta-results-note" class="muted"></p>
+        <button id="pasta-toggle-all" class="btn secondary btn-small" type="button" hidden>
+          Next 10
+        </button>
+      </div>
+    </section>
+
   </div>
 </section>
