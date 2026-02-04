@@ -3,16 +3,16 @@
 
    Adds “Excel-ish” behavior to the /all/ pasta table:
    - Text search across all columns
-   - Category dropdown filter
+   - Category dropdown filter (auto-populated from table rows)
    - Click-to-sort on table headers
 
-   This script is defensive:
-   - It does nothing unless it finds #allPastaTable on the page
+   Safe to load globally:
+   - No-ops unless it finds #allPastaTable
 ------------------------------------------------------------- */
 
 (function () {
   const table = document.getElementById("allPastaTable");
-  if (!table) return; // Not on /all/ page - safe to load globally
+  if (!table) return; // Not on /all/ page
 
   const tbody = table.querySelector("tbody");
   const rows = Array.from(tbody.querySelectorAll("tr.data-row"));
@@ -22,21 +22,15 @@
   const clearBtn = document.getElementById("allPastaClear");
   const visibleCountEl = document.getElementById("allPastaVisibleCount");
 
-  // Track current sort state
   const sortState = {
     key: null, // "name" | "category" | "type" | "geometry"
     dir: "asc", // "asc" | "desc"
   };
 
-  /* -----------------------------------------
-     Helpers
-  ------------------------------------------ */
-
   function normalize(str) {
     return String(str || "").trim().toLowerCase();
   }
 
-  // Build a “searchable” string for a row by concatenating key fields
   function rowSearchText(row) {
     const name = row.dataset.name || "";
     const category = row.dataset.category || "";
@@ -55,11 +49,9 @@
     const selectedCategory = normalize(categorySelect ? categorySelect.value : "");
 
     rows.forEach((row) => {
-      // Category filter
       const rowCategory = normalize(row.dataset.category);
       const categoryPass = !selectedCategory || rowCategory === selectedCategory;
 
-      // Text search filter
       const text = rowSearchText(row);
       const searchPass = !q || text.includes(q);
 
@@ -78,8 +70,6 @@
   function compareRows(a, b, key, dir) {
     const av = normalize(a.dataset[key]);
     const bv = normalize(b.dataset[key]);
-
-    // Locale compare gives nicer alphabetical ordering
     const cmp = av.localeCompare(bv, undefined, { sensitivity: "base" });
     return dir === "asc" ? cmp : -cmp;
   }
@@ -99,7 +89,6 @@
     const key = th.getAttribute("data-sort-key");
     if (!key) return;
 
-    // Toggle direction if sorting same column; otherwise default to ascending
     if (sortState.key === key) {
       sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
     } else {
@@ -107,39 +96,63 @@
       sortState.dir = "asc";
     }
 
-    // Sort only currently-rendered rows; keep hidden status as-is
     const sorted = rows.slice().sort((a, b) => compareRows(a, b, key, sortState.dir));
-
-    // Re-append in sorted order (this updates DOM order)
     sorted.forEach((row) => tbody.appendChild(row));
 
-    // Update aria-sort for accessibility
     setAriaSort(th);
   }
 
-  /* -----------------------------------------
+  /* ------------------------------------------------------------
+     Category dropdown auto-population
+     - Reads each row's category text from the rendered cell
+     - Stores unique categories as:
+       value = lowercase normalized
+       label = original display text
+  ------------------------------------------------------------- */
+
+  function populateCategoryDropdown() {
+    if (!categorySelect) return;
+
+    // If it already has more than the default option, don’t duplicate.
+    if (categorySelect.options.length > 1) return;
+
+    const map = new Map(); // key: normalized, value: display label
+
+    rows.forEach((row) => {
+      const key = normalize(row.dataset.category);
+      if (!key) return;
+
+      // Prefer the visible cell label so you preserve capitalization, etc.
+      const cell = row.querySelector(".cell-category");
+      const label = cell ? String(cell.textContent || "").trim() : key;
+
+      if (!map.has(key)) map.set(key, label);
+    });
+
+    const keys = Array.from(map.keys()).sort((a, b) => a.localeCompare(b));
+
+    keys.forEach((k) => {
+      const opt = document.createElement("option");
+      opt.value = k;
+      opt.textContent = map.get(k);
+      categorySelect.appendChild(opt);
+    });
+  }
+
+  /* ------------------------------------------------------------
      Wire up events
-  ------------------------------------------ */
+  ------------------------------------------------------------- */
 
-  if (searchInput) {
-    searchInput.addEventListener("input", applyFilters);
-  }
+  if (searchInput) searchInput.addEventListener("input", applyFilters);
+  if (categorySelect) categorySelect.addEventListener("change", applyFilters);
+  if (clearBtn) clearBtn.addEventListener("click", clearFilters);
 
-  if (categorySelect) {
-    categorySelect.addEventListener("change", applyFilters);
-  }
-
-  if (clearBtn) {
-    clearBtn.addEventListener("click", clearFilters);
-  }
-
-  // Click-to-sort on sortable headers
   const sortableHeaders = table.querySelectorAll("th.data-table__sortable");
   sortableHeaders.forEach((th) => {
     th.style.cursor = "pointer";
     th.addEventListener("click", () => sortBy(th));
   });
 
-  // Initial count
+  populateCategoryDropdown();
   updateVisibleCount();
 })();
