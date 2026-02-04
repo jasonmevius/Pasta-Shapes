@@ -4,17 +4,22 @@ layout: layout.njk
 permalink: /all/
 ---
 
-{# ------------------------------------------------------------
-  All Pasta Shapes (table view)
-  - Build-time renders a complete HTML table from pasta.csv data
-  - Client-side JS adds sort + filter behavior (Excel-ish)
-  - Keep this page simple: HTML first, JS enhances it
-------------------------------------------------------------- #}
+{# =============================================================================
+  src/all/index.njk
+
+  Build-safe Nunjucks template:
+  - Renders a full HTML table from pasta.csv at build time
+  - Keeps Nunjucks logic simple (no ternary operators, no array concat)
+  - JS enhances with:
+    - Search (all columns)
+    - Category dropdown (auto-populated from rows)
+    - Click-to-sort headers
+============================================================================= #}
 
 <header class="page-header">
   <h1>All Pasta Shapes</h1>
   <p class="page-subtitle">
-    Browse {{ pasta.length }} pasta shapes. Use the filters to quickly narrow results.
+    Browse {{ pasta.length }} pasta shapes. Use the filters to narrow results.
   </p>
 </header>
 
@@ -34,21 +39,9 @@ permalink: /all/
 
     <div class="field">
       <label class="field__label" for="allPastaCategory">Category</label>
+      {# Options will be populated by JS by scanning table rows #}
       <select id="allPastaCategory" class="field__select">
         <option value="">All categories</option>
-
-        {# Build a unique list of categories from the pasta data #}
-        {% set categories = [] %}
-        {% for item in pasta %}
-          {% if item.Category and (item.Category not in categories) %}
-            {% set categories = categories.concat([item.Category]) %}
-          {% endif %}
-        {% endfor %}
-
-        {# Sort categories alphabetically for a predictable dropdown #}
-        {% for cat in categories | sort %}
-          <option value="{{ cat | escape }}">{{ cat }}</option>
-        {% endfor %}
       </select>
       <p class="field__hint">Quickly isolate a pasta family.</p>
     </div>
@@ -70,21 +63,20 @@ permalink: /all/
 
     <thead>
       <tr>
-        {# Thumbnail is not sortable (usually not meaningful) #}
         <th scope="col" class="data-table__thumb">Thumb</th>
 
-        {# Sortable headers:
-           - data-sort-key maps to dataset values on each row
-           - JS will toggle asc/desc and update aria-sort #}
         <th scope="col" class="data-table__sortable" data-sort-key="name" aria-sort="none">
           Name <span class="sort-indicator" aria-hidden="true"></span>
         </th>
+
         <th scope="col" class="data-table__sortable" data-sort-key="category" aria-sort="none">
           Category <span class="sort-indicator" aria-hidden="true"></span>
         </th>
+
         <th scope="col" class="data-table__sortable" data-sort-key="type" aria-sort="none">
           Type <span class="sort-indicator" aria-hidden="true"></span>
         </th>
+
         <th scope="col" class="data-table__sortable" data-sort-key="geometry" aria-sort="none">
           Primary geometry <span class="sort-indicator" aria-hidden="true"></span>
         </th>
@@ -92,22 +84,26 @@ permalink: /all/
     </thead>
 
     <tbody>
-      {# ------------------------------------------------------------
-        Render one row per pasta
-        Assumptions based on your existing site:
-        - item.ShapeName exists
-        - item.slug exists (or you have a slug filter)
-        - item.ThumbUrl exists (ImageKit url)
-        - item.Category / item.Type / item.PrimaryGeometry exist
-      ------------------------------------------------------------- #}
-
       {% for item in pasta %}
-        {% set slugVal = item.slug or (item.ShapeName | slug) %}
 
-        {# Thumbnail transform: keep small for table performance #}
-        {% set thumbUrl = item.ThumbUrl or item.thumbUrl or "" %}
-        {% set thumbUrlTransformed = thumbUrl ? (thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50") : "" %}
+        {# Slug: use item.slug if present, otherwise generate from ShapeName #}
+        {% set slugVal = item.slug %}
+        {% if not slugVal %}
+          {% set slugVal = item.ShapeName | slug %}
+        {% endif %}
 
+        {# Thumbnail: safe build-time composition #}
+        {% set thumbUrl = item.ThumbUrl %}
+        {% if not thumbUrl %}
+          {% set thumbUrl = item.thumbUrl %}
+        {% endif %}
+
+        {% set thumbUrlTransformed = "" %}
+        {% if thumbUrl %}
+          {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
+        {% endif %}
+
+        {# Safe, normalized data attributes for JS filtering/sorting #}
         <tr
           class="data-row"
           data-name="{{ (item.ShapeName or '') | lower | escape }}"
@@ -134,7 +130,7 @@ permalink: /all/
             <a href="/pasta/{{ slugVal }}/">{{ item.ShapeName }}</a>
           </th>
 
-          <td>{{ item.Category or "" }}</td>
+          <td class="cell-category">{{ item.Category or "" }}</td>
           <td>{{ item.Type or "" }}</td>
           <td>{{ item.PrimaryGeometry or "" }}</td>
         </tr>
@@ -142,8 +138,3 @@ permalink: /all/
     </tbody>
   </table>
 </section>
-
-{# JS enhancement: loaded globally or just for this page, your choice.
-   If you prefer only-on-this-page loading, add a layout hook later.
-   For now, this assumes you’ll include /js/all-pastas.js site-wide
-   and it will no-op unless it sees #allPastaTable. #}
