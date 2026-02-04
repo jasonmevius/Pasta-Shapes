@@ -2,9 +2,63 @@
   const $ = (sel, root = document) => root.querySelector(sel);
 
   // =============================================================================
+  // Mobile hamburger menu
+  // =============================================================================
+  function initHamburgerMenu() {
+    const btn = $("#nav-toggle");
+    const drawer = $("#nav-drawer");
+    if (!btn || !drawer) return;
+
+    // Defensive: ensure initial state is closed
+    btn.setAttribute("aria-expanded", "false");
+    drawer.hidden = true;
+
+    function closeMenu() {
+      btn.setAttribute("aria-expanded", "false");
+      drawer.hidden = true;
+    }
+
+    function openMenu() {
+      btn.setAttribute("aria-expanded", "true");
+      drawer.hidden = false;
+    }
+
+    function toggleMenu() {
+      const expanded = btn.getAttribute("aria-expanded") === "true";
+      if (expanded) closeMenu();
+      else openMenu();
+    }
+
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      toggleMenu();
+    });
+
+    // Close when clicking a link inside the drawer
+    drawer.addEventListener("click", (e) => {
+      const a = e.target.closest("a[href]");
+      if (!a) return;
+      closeMenu();
+    });
+
+    // Close on ESC
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeMenu();
+    });
+
+    // Close when clicking outside
+    document.addEventListener("click", (e) => {
+      const isOpen = btn.getAttribute("aria-expanded") === "true";
+      if (!isOpen) return;
+
+      const inside = e.target.closest("#nav-toggle, #nav-drawer");
+      if (!inside) closeMenu();
+    });
+  }
+
+  // =============================================================================
   // Recently viewed helpers
   // =============================================================================
-
   function readRecents() {
     try {
       return JSON.parse(localStorage.getItem("pasta:recent") || "[]");
@@ -29,45 +83,25 @@
   // =============================================================================
   // Home/Search page behavior
   // =============================================================================
-
   function initSearchPage() {
     const input = $("#pasta-q");
     const status = $("#pasta-search-status");
     const list = $("#pasta-results");
 
-    // Only run on pages that have the search UI
     if (!input || !status || !list) return;
 
-    // -------------------------------------------------------------------------
-    // NEW: Home UI state toggles (Identify card <-> Results panel)
-    //
-    // Your new homepage behavior:
-    // - Idle (empty input): show Identify card, hide Results panel, search card expanded
-    // - Typing (non-empty): hide Identify card, show Results panel, search card shrinks
-    //
-    // We implement this via a single body class:
-    //   body.is-searching
-    // CSS handles the actual layout changes.
-    // -------------------------------------------------------------------------
     const resultsPanel = $("#home-results-panel");
     const identifyCard = $("#home-identify-card");
 
     function setSearchingUI(isSearching) {
       document.body.classList.toggle("is-searching", isSearching);
 
-      // For robustness: also toggle [hidden] on the results panel if it exists.
-      // This prevents “blank results card” flashes on initial load.
       if (resultsPanel) resultsPanel.hidden = !isSearching;
-      // Identify card visibility is handled primarily by CSS, but we keep it safe.
       if (identifyCard) identifyCard.setAttribute("aria-hidden", isSearching ? "true" : "false");
     }
 
-    // Default UI state on load (empty input)
     setSearchingUI(Boolean(String(input.value || "").trim()));
 
-    // -------------------------------------------------------------------------
-    // Existing search logic (kept)
-    // -------------------------------------------------------------------------
     const cards = Array.from(list.querySelectorAll("[data-search]"));
     const originalOrder = cards.slice();
 
@@ -75,53 +109,22 @@
     const recentList = $("#recently-viewed");
 
     const note = $("#pasta-results-note");
-    const nextBtn = $("#pasta-toggle-all"); // reused - now "Next 10"
+    const nextBtn = $("#pasta-toggle-all");
 
     const PAGE_N = 10;
     let visibleLimit = PAGE_N;
 
     function setControlVisible(el, isVisible) {
       if (!el) return;
-      // Some CSS can override [hidden], so force display none as well.
       el.hidden = !isVisible;
       el.style.display = isVisible ? "" : "none";
       el.setAttribute("aria-hidden", isVisible ? "false" : "true");
     }
 
-    // -----------------------------------------------------------------------------
-    // Normalization
-    // -----------------------------------------------------------------------------
     const STOPWORDS = new Set([
-      "a",
-      "ad",
-      "al",
-      "alla",
-      "alle",
-      "allo",
-      "ai",
-      "agli",
-      "all",
-      "da",
-      "de",
-      "dei",
-      "degli",
-      "della",
-      "delle",
-      "del",
-      "di",
-      "e",
-      "ed",
-      "in",
-      "con",
-      "per",
-      "su",
-      "lo",
-      "la",
-      "le",
-      "il",
-      "un",
-      "una",
-      "uno",
+      "a","ad","al","alla","alle","allo","ai","agli","all",
+      "da","de","dei","degli","della","delle","del","di",
+      "e","ed","in","con","per","su","lo","la","le","il","un","una","uno",
     ]);
 
     function normalize(s) {
@@ -136,7 +139,6 @@
         .trim();
     }
 
-    // Collapses spaced-letter inputs like "p e n n e" -> "penne"
     function normalizeQuery(s) {
       const q = normalize(s);
       if (/^(?:[a-z0-9]\s+){2,}[a-z0-9]$/.test(q)) return q.replace(/\s+/g, "");
@@ -152,9 +154,6 @@
       return parts.join(" ").trim();
     }
 
-    // -----------------------------------------------------------------------------
-    // Optional fuzzy support using /api/pasta-index.json
-    // -----------------------------------------------------------------------------
     let indexLoaded = false;
     let index = null;
     let aliasKeys = null;
@@ -228,9 +227,6 @@
       return prev[bl];
     }
 
-    // -----------------------------------------------------------------------------
-    // Result rendering helpers (show/hide)
-    // -----------------------------------------------------------------------------
     function hideAll() {
       for (const c of cards) c.hidden = true;
     }
@@ -257,9 +253,6 @@
       setControlVisible(nextBtn, true);
     }
 
-    // -----------------------------------------------------------------------------
-    // Name-prefix search + fallback alias search + optional fuzzy
-    // -----------------------------------------------------------------------------
     const cached = cards.map((card) => {
       const nameEl = card.querySelector(".result-name");
       const alsoEl = card.querySelector(".result-also");
@@ -283,10 +276,8 @@
       const q = normalizeQuery(input.value || "");
       const hasQuery = Boolean(q);
 
-      // NEW: Toggle the home UI based on whether user is typing
       setSearchingUI(hasQuery);
 
-      // If empty: hide results (home shows Identify card instead)
       if (!hasQuery) {
         hideAll();
         status.textContent = "Start typing to see matches.";
@@ -295,7 +286,6 @@
         return;
       }
 
-      // 1) Name-prefix matches
       const nameMatches = [];
       const nonName = [];
 
@@ -320,7 +310,6 @@
         return;
       }
 
-      // 2) Alias/metadata search (includes)
       const aliasMatches = [];
       const nonAlias = [];
 
@@ -329,7 +318,6 @@
         else nonAlias.push(it);
       }
 
-      // 3) Optional fuzzy match (only if alias/metadata is empty AND query long enough)
       if (!aliasMatches.length && q.length >= 4) {
         await loadIndexIfNeeded();
 
@@ -364,7 +352,6 @@
         }
       }
 
-      // Alias matches (paged)
       if (aliasMatches.length) {
         reorder(aliasMatches.concat(nonAlias));
 
@@ -377,16 +364,12 @@
         return;
       }
 
-      // Nothing found
       hideAll();
       status.textContent = "No matches found.";
       updateFooter(0, 0);
       setControlVisible(nextBtn, false);
     }
 
-    // -----------------------------------------------------------------------------
-    // Event wiring
-    // -----------------------------------------------------------------------------
     let rafPending = false;
     function requestFilter() {
       if (rafPending) return;
@@ -410,7 +393,6 @@
       });
     }
 
-    // Recently viewed: render comma-separated list (max 5)
     function renderRecents() {
       if (!recentWrap || !recentList) return;
 
@@ -451,7 +433,6 @@
       setControlVisible(recentWrap, true);
     }
 
-    // Record recents on click (detail pages also record on load)
     list.addEventListener("click", (e) => {
       const a = e.target.closest("a[data-recent]");
       if (!a) return;
@@ -460,25 +441,19 @@
       if (m && m[1]) addRecent(m[1]);
     });
 
-    // Initial state
     hideAll();
     renderRecents();
-    requestFilter(); // ensures UI matches any prefilled query
+    requestFilter();
   }
 
   // =============================================================================
   // Detail page: store recent on load
   // =============================================================================
-
   function initDetailPage() {
     const path = window.location.pathname || "";
     const m = path.match(/^\/pasta\/([^\/]+)\/?$/);
     if (m && m[1]) addRecent(m[1]);
   }
-
-  // =============================================================================
-  // Identify page behavior hook (kept for compatibility with your existing setup)
-  // =============================================================================
 
   function initIdentifyPage() {
     return;
@@ -565,10 +540,10 @@
   // =============================================================================
   // Init
   // =============================================================================
-
   document.addEventListener(
     "DOMContentLoaded",
     () => {
+      initHamburgerMenu();
       initSearchPage();
       initDetailPage();
       initIdentifyPage();
