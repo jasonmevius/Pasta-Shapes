@@ -12,6 +12,9 @@
       2) Search result styling
       3) Identify styling
       4) Fixed bottom navigation (segmented control) on mobile
+      5) NEW: Simplified mobile-first home layout (2 large panels)
+         - Identify card replaced by results while typing
+         - Search panel shrinks while typing
 ============================================================================= */
 
 :root{
@@ -64,6 +67,22 @@ a:hover{ text-decoration: underline; }
   color: var(--bg);
   border-radius: 10px;
   z-index: 1000;
+}
+
+/* -----------------------------------------------------------------------------
+  Accessibility: screen-reader-only utility
+  - Used for labels on inputs so they remain accessible but not visible.
+----------------------------------------------------------------------------- */
+.sr-only{
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0,0,0,0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
 /* -----------------------------------------------------------------------------
@@ -214,9 +233,165 @@ a:hover{ text-decoration: underline; }
   outline-offset: 2px;
 }
 
-/* -----------------------------------------------------------------------------
-  Results list
------------------------------------------------------------------------------ */
+/* =============================================================================
+  NEW: Simplified home layout (2 big panels)
+  -----------------------------------------------------------------------------
+  WHY
+  - Mobile-first home should present only two actions:
+      1) Search by Name
+      2) Identify by Shape
+  - When user types:
+      - Search area shrinks to give more room to results
+      - Identify area disappears and is replaced by results
+============================================================================= */
+
+.home-shell{
+  /* Keep the home content feeling “app-like” without forcing fixed heights. */
+  display: block;
+}
+
+/* Two panels: Search + (Identify OR Results) */
+.home-panels{
+  display: grid;
+  gap: var(--gap);
+
+  /* Mobile portrait default: stacked halves-ish (we use min-heights below). */
+  grid-template-columns: 1fr;
+}
+
+/* Landscape phones: split side-by-side to use the wide viewport better */
+@media (max-width: 719px) and (orientation: landscape){
+  .home-panels{
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+}
+
+/* Common home card styling refinements (chunky, tappable) */
+.home-card{
+  border-radius: calc(var(--radius) + 4px);
+  padding: 1rem;
+}
+
+/* Head row inside home cards */
+.home-card-head{
+  display: grid;
+  gap: 0.25rem;
+}
+
+.home-card-title{
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+}
+
+.home-card-subtitle{
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+/* Search card behavior:
+   - Expanded by default
+   - Collapsed while typing (body.is-searching)
+*/
+#home-search-card{
+  /* “Half-ish” feel on mobile: give it a solid presence. */
+  min-height: 42svh;
+
+  /* Smooth transitions when toggling to searching state. */
+  transition: min-height 180ms ease, padding 180ms ease;
+}
+
+/* While typing: shrink search card to top third-ish */
+body.is-searching #home-search-card{
+  min-height: 24svh;
+  padding: 0.85rem;
+}
+
+/* On landscape split layout, don’t force tall svh cards */
+@media (max-width: 719px) and (orientation: landscape){
+  #home-search-card{
+    min-height: 0;
+  }
+  body.is-searching #home-search-card{
+    min-height: 0;
+  }
+}
+
+/* Status line under the search input */
+.home-search-status{
+  margin: 0;
+}
+
+/* Identify card as one big button */
+.home-card-link{
+  text-decoration: none;
+  cursor: pointer;
+  position: relative;
+}
+.home-card-link:hover{
+  text-decoration: none;
+  background: rgba(17,24,39,0.02);
+}
+
+/* CTA line inside Identify card */
+.home-card-cta{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #fff;
+  font-weight: 650;
+  color: var(--fg);
+}
+
+/* Identify image presentation */
+.identify-hero{
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 6px);
+  background: #fff;
+  overflow: hidden;
+
+  /* Keep it chunky */
+  min-height: 9rem;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.identify-hero img{
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Results panel:
+   - hidden by default via [hidden]
+   - when shown, it should scroll if needed
+*/
+.home-results[hidden]{ display: none; }
+
+.home-results{
+  /* Allow results to take remaining space on portrait phones */
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* While searching, hide identify card and show results panel */
+body.is-searching #home-identify-card{
+  display: none;
+}
+body.is-searching #home-results-panel{
+  display: grid;
+}
+
+/* =============================================================================
+  Results list (shared)
+============================================================================= */
+
 .results-head{
   display: grid;
   gap: 0.25rem;
@@ -332,19 +507,15 @@ a:hover{ text-decoration: underline; }
 
 /* =============================================================================
   Mobile bottom navigation (Search / Identify) - FIXED + SEGMENTED
-  -----------------------------------------------------------------------------
-  This is the piece that was missing/overwritten, which caused the bottom nav
-  to appear as plain links in the document flow (and feel “broken”).
 ============================================================================= */
 
 .bottom-nav{
-  position: fixed;             /* CRITICAL: take it out of the document flow */
+  position: fixed;
   left: 0;
   right: 0;
   bottom: 0;
   z-index: 70;
 
-  /* iOS safe-area support (prevents the bar from sitting under the home indicator) */
   padding: 0.6rem var(--pad) calc(0.6rem + env(safe-area-inset-bottom));
 
   background: rgba(255,255,255,0.92);
@@ -379,7 +550,7 @@ a:hover{ text-decoration: underline; }
   background: rgba(17,24,39,0.06);
 
   transition: transform 160ms ease;
-  pointer-events: none; /* never block taps on links */
+  pointer-events: none;
 }
 
 .bottom-nav[data-active="identify"] .bottom-nav-indicator{
