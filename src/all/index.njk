@@ -7,18 +7,15 @@ permalink: /all/
 {# =============================================================================
   src/all/index.njk
 
-  Fix: Thumbnails were blank because the dataset does not include ThumbUrl/thumbUrl,
-  so the template always fell back to the placeholder (confirmed in rendered HTML).
-
-  This version computes thumbnail URLs using the same pattern as the Search page:
-  {{ paths.imagekitBase }}/pasta/thumbs/{{ slug }}.png?tr=w-56,h-56,f-auto,q-50
-
-  Columns:
-  - Thumb
-  - Name (sortable)
-  - Category (sortable)
-  - Detail (link)
+  Key fixes:
+  - Thumbnails use the known-good ImageKit endpoint used on Search:
+    https://ik.imagekit.io/mevius/pasta/thumbs/<slug>.png
+  - Do NOT remove the <img> on error; instead swap to a tiny inline SVG placeholder.
+  - Columns: Thumb, Name (sortable), Category (sortable), Detail (link)
 ============================================================================= #}
+
+{# Known-good ImageKit base for this project (matches your Search page snippet) #}
+{% set imagekitBase = "https://ik.imagekit.io/mevius" %}
 
 <header class="page-header">
   <h1>All Pasta Shapes</h1>
@@ -72,7 +69,7 @@ permalink: /all/
         <th scope="col"
             class="data-table__sortable data-table__left"
             data-sort-key="name"
-            aria-sort="none">
+            aria-sort="ascending">
           Name <span class="sort-indicator" aria-hidden="true"></span>
         </th>
 
@@ -90,17 +87,16 @@ permalink: /all/
     <tbody>
       {% for item in pasta %}
 
-        {# Prefer an explicit slug if your data provides it; otherwise generate from ShapeName #}
+        {# Slug: use item.slug if present, otherwise generate from ShapeName #}
         {% set slugVal = item.slug %}
         {% if not slugVal %}
           {% set slugVal = item.ShapeName | slug %}
         {% endif %}
 
-        {# Detail URL #}
         {% set detailUrl = "/pasta/" ~ slugVal ~ "/" %}
 
-        {# Thumbnail URL - mimic Search page pattern exactly #}
-        {% set thumbUrl = paths.imagekitBase ~ "/pasta/thumbs/" ~ slugVal ~ ".png" %}
+        {# Thumbnail URL: match Search page structure exactly #}
+        {% set thumbUrl = imagekitBase ~ "/pasta/thumbs/" ~ slugVal ~ ".png" %}
         {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
 
         <tr
@@ -117,8 +113,6 @@ permalink: /all/
                 decoding="async"
                 width="56"
                 height="56"
-                {# If a thumb is missing on ImageKit, this will swap in the placeholder styling #}
-                onerror="this.closest('.thumb')?.classList.add('thumb--placeholder'); this.remove();"
               />
             </span>
           </td>
