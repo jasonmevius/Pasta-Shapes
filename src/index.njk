@@ -8,21 +8,29 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   index.njk (Homepage - Search)
   ------------------------------------------------------------------------------
   PURPOSE
-  - Mobile-first homepage optimized for the restaurant use case.
-  - Server-renders the full list (fast first paint, works without JS).
-  - Client-side JS filters results as the user types.
+  - Mobile-first homepage optimized for the restaurant use case:
+      - Type a pasta name (from a menu)
+      - See matching shapes quickly
+      - Tap into the detail page if needed
 
-  THUMBNAILS
-  - The Search page previously rendered an empty <span class="thumb">, which
-    created grey boxes. This template now renders an <img> inside that container.
-  - Identify page shows thumbs because its JS builds cards differently.
-
-  IMPORTANT RULES
+  IMPORTANT
   - NO inline CSS. Styling lives in /src/css/styles.css
+
+  THUMBNAILS (WHY THIS FILE CHANGED)
+  - Your rendered homepage HTML showed:
+      <span class="thumb"></span>
+    ...with NO <img>, which produces grey boxes.
+  - Identify page shows thumbs because its JS injects images there.
+  - This template now renders an <img> inside .thumb for each result.
+
+  NOTE ON NUNJUCKS FILTERS
+  - Your environment does NOT provide a `split` filter.
+  - So we avoid `split("/") | last` and instead strip known prefixes using `replace`.
 ============================================================================= #}
 
 {# -----------------------------------------------------------------------------
-  ImageKit configuration for thumbnails
+  ImageKit configuration for list thumbnails
+  - You can change the folder in one place later if needed.
 ----------------------------------------------------------------------------- #}
 {% set IK_THUMBS_BASE = "https://ik.imagekit.io/mevius/pasta/thumbs/" %}
 {% set FALLBACK_THUMB = "pending.png" %}
@@ -74,15 +82,15 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 
   {# ---------------------------------------------------------------------------
     Results list
-    - Render server-side so users see real content even if JS is off.
-    - JS toggles [hidden] on these <li> items when filtering.
+    - Server-rendered so thumbnails and content exist even without JS.
+    - JS simply shows/hides items.
   --------------------------------------------------------------------------- #}
   <ul id="pasta-results" class="results-list" aria-label="Pasta results">
     {% for item in pasta %}
 
       {# -----------------------------------------------------------------------
-        Alias / "Also" line (optional)
-        - Use whichever field exists in your data.
+        "Also" line (aliases)
+        - Pick the first existing field that matches your dataset.
       ----------------------------------------------------------------------- #}
       {% set alsoRaw =
         item.SearchAliases
@@ -94,42 +102,61 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       %}
 
       {# -----------------------------------------------------------------------
-        Thumbnail URL normalization
+        THUMBNAIL URL NORMALIZATION (NO split FILTER!)
 
         item.ThumbnailImage may be:
           1) empty
-          2) a filename like "penne.png"
-          3) a full URL
-          4) an older string containing "<ImageKitPath>"
+          2) filename: "penne.png"
+          3) full URL: "https://ik.imagekit.io/.../penne.png"
+          4) older string containing "<ImageKitPath>"
 
-        We normalize to a real URL in all cases.
+        We normalize using only safe operations:
+          - replace
+          - trim
+          - startsWith (string method available in your Nunjucks runtime)
 
-        NOTE
-        - JavaScript string method is startsWith() (capital W).
+        Strategy:
+          A) If empty -> use FALLBACK_THUMB in IK_THUMBS_BASE
+          B) If starts with http -> use as-is
+          C) Else -> treat as a filename (or relative path) and append to IK_THUMBS_BASE
+              - But first strip common prefixes if present, so we don't double-prefix.
       ----------------------------------------------------------------------- #}
-      {% set thumbRaw = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
-      {% set thumbIsUrl = thumbRaw and thumbRaw.startsWith("http") %}
-      {% set thumbFile = (thumbRaw or "") | split("/") | last %}
-      {% set thumbUrl = "" %}
 
+      {# Raw thumb string from data (cleaned) #}
+      {% set thumbRaw = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
+
+      {# Determine if it's a full URL #}
+      {% set thumbIsUrl = thumbRaw and thumbRaw.startsWith("http") %}
+
+      {# If it's not a URL, clean it to be a simple filename/relative path #}
+      {% set thumbClean = thumbRaw %}
+      {% if thumbClean %}
+        {# Strip ImageKit base if someone pasted full path without http #}
+        {% set thumbClean = thumbClean | replace("https://ik.imagekit.io/mevius/pasta/thumbs/", "") %}
+        {% set thumbClean = thumbClean | replace("https://ik.imagekit.io/mevius/", "") %}
+
+        {# Strip known folder prefixes so we can safely re-add IK_THUMBS_BASE #}
+        {% set thumbClean = thumbClean | replace("/pasta/thumbs/", "") %}
+        {% set thumbClean = thumbClean | replace("pasta/thumbs/", "") %}
+        {% set thumbClean = thumbClean | replace("/thumbs/", "") %}
+        {% set thumbClean = thumbClean | replace("thumbs/", "") %}
+      {% endif %}
+
+      {# Build the final URL #}
       {% if not thumbRaw %}
         {% set thumbUrl = IK_THUMBS_BASE ~ FALLBACK_THUMB %}
       {% elseif thumbIsUrl %}
         {% set thumbUrl = thumbRaw %}
       {% else %}
-        {% set thumbUrl = IK_THUMBS_BASE ~ thumbFile %}
+        {% set thumbUrl = IK_THUMBS_BASE ~ thumbClean %}
       {% endif %}
 
-      {# ImageKit transform for tiny list thumbnails #}
+      {# ImageKit transform for small list thumbnails #}
       {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-112,h-112,f-auto,q-50" %}
 
-      <li
-        class="result-card"
-        data-slug="{{ item.Slug }}"
-        data-search=""
-      >
+      <li class="result-card" data-slug="{{ item.Slug }}" data-search="">
         <a class="result-link" href="/pasta/{{ item.Slug }}/" data-recent="1">
-          {# Thumbnail container - decorative (name text is the real label) #}
+          {# Thumbnail container - decorative, since name text is present #}
           <span class="thumb" aria-hidden="true">
             <img
               src="{{ thumbUrlTransformed }}"
