@@ -609,3 +609,173 @@ body.is-searching #home-results-panel{ display: grid; }
 @media (min-width: 720px){
   .bottom-nav{ display: none; }
 }
+
+/* ------------------------------------------------------------
+   /all/ table page styling
+   - Mobile-first
+   - Table remains readable on small screens
+   - Enhances “Excel-ish” interaction affordances
+------------------------------------------------------------- */
+
+.page-header {
+  margin: 0 0 1rem 0;
+}
+
+.page-subtitle {
+  margin: 0.25rem 0 0 0;
+  opacity: 0.85;
+}
+
+/* Filters / controls */
+.table-tools {
+  margin: 1rem 0;
+}
+
+.table-tools__row {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  align-items: end;
+}
+
+.field__label {
+  display: inline-block;
+  font-weight: 600;
+  margin-bottom: 0.25rem;
+}
+
+.field__input,
+.field__select {
+  width: 100%;
+  max-width: 100%;
+  padding: 0.6rem 0.7rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+}
+
+.field__hint {
+  margin: 0.35rem 0 0 0;
+  font-size: 0.9rem;
+  opacity: 0.75;
+}
+
+.table-meta {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.table-meta__count {
+  font-size: 0.95rem;
+}
+
+/* Button (lightweight; adapt to your existing button system if you have one) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.55rem 0.8rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  background: transparent;
+  font: inherit;
+}
+
+.btn:hover {
+  border-color: rgba(0, 0, 0, 0.35);
+}
+
+.btn--secondary {
+  opacity: 0.95;
+}
+
+/* Table wrapper for horizontal scroll on small screens */
+.table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border-radius: 0.8rem;
+}
+
+/* Data table */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px; /* forces horizontal scroll on narrow screens */
+}
+
+.data-table th,
+.data-table td {
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  vertical-align: middle;
+}
+
+.data-table thead th {
+  position: sticky;
+  top: 0;
+  background: white;
+  z-index: 1;
+}
+
+.data-table__thumb {
+  width: 72px;
+  text-align: center;
+}
+
+.thumb-img {
+  display: inline-block;
+  border-radius: 0.5rem;
+}
+
+.thumb-placeholder {
+  display: inline-block;
+  width: 56px;
+  height: 56px;
+  border-radius: 0.5rem;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.data-table__name a {
+  text-decoration: none;
+}
+
+.data-table__name a:hover {
+  text-decoration: underline;
+}
+
+/* Sort affordance */
+.data-table__sortable {
+  user-select: none;
+}
+
+.data-table__sortable:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.sort-indicator {
+  display: inline-block;
+  margin-left: 0.35rem;
+  opacity: 0.5;
+}
+
+/* Simple responsive improvement for the filter row */
+@media (min-width: 860px) {
+  .table-tools__row {
+    grid-template-columns: 1.2fr 0.8fr 0.8fr;
+  }
+}
+
+/* Screen-reader only utility (if you already have one, keep yours) */
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
