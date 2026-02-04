@@ -7,18 +7,17 @@ permalink: /all/
 {# =============================================================================
   src/all/index.njk
 
-  All Pastas table:
-  - Build-time renders the table from pasta.csv
-  - Client-side JS adds:
-    - Search across Name + Category
-    - Category dropdown (auto-populated from rows)
-    - Sorting on Name + Category
+  Fix: Thumbnails were blank because the dataset does not include ThumbUrl/thumbUrl,
+  so the template always fell back to the placeholder (confirmed in rendered HTML).
 
-  Changes in this version:
-  1) Thumbnail markup now matches Search page structure: <span class="thumb"><img ...></span>
-  2) Removed Type + Primary geometry columns
-  3) Left-justified headers for Name, Category, Detail
-  4) Detail column added with a link to the pasta detail page
+  This version computes thumbnail URLs using the same pattern as the Search page:
+  {{ paths.imagekitBase }}/pasta/thumbs/{{ slug }}.png?tr=w-56,h-56,f-auto,q-50
+
+  Columns:
+  - Thumb
+  - Name (sortable)
+  - Category (sortable)
+  - Detail (link)
 ============================================================================= #}
 
 <header class="page-header">
@@ -44,7 +43,6 @@ permalink: /all/
 
     <div class="field">
       <label class="field__label" for="allPastaCategory">Category</label>
-      {# Options will be populated by JS by scanning table rows #}
       <select id="allPastaCategory" class="field__select">
         <option value="">All categories</option>
       </select>
@@ -55,6 +53,7 @@ permalink: /all/
       <div class="table-meta__count">
         Showing <strong id="allPastaVisibleCount">{{ pasta.length }}</strong> of <strong>{{ pasta.length }}</strong>
       </div>
+
       <button id="allPastaClear" class="btn btn--secondary" type="button">
         Clear filters
       </button>
@@ -70,77 +69,71 @@ permalink: /all/
       <tr>
         <th scope="col" class="data-table__thumb">Thumb</th>
 
-        {# Sortable #}
-        <th scope="col" class="data-table__sortable data-table__left" data-sort-key="name" aria-sort="none">
+        <th scope="col"
+            class="data-table__sortable data-table__left"
+            data-sort-key="name"
+            aria-sort="none">
           Name <span class="sort-indicator" aria-hidden="true"></span>
         </th>
 
-        {# Sortable #}
-        <th scope="col" class="data-table__sortable data-table__left" data-sort-key="category" aria-sort="none">
+        <th scope="col"
+            class="data-table__sortable data-table__left"
+            data-sort-key="category"
+            aria-sort="none">
           Category <span class="sort-indicator" aria-hidden="true"></span>
         </th>
 
-        {# Not sortable (sorting a constant "View" link isn't very meaningful) #}
-        <th scope="col" class="data-table__left">
-          Detail
-        </th>
+        <th scope="col" class="data-table__left">Detail</th>
       </tr>
     </thead>
 
     <tbody>
       {% for item in pasta %}
 
-        {# Slug: use item.slug if present, otherwise generate from ShapeName #}
+        {# Prefer an explicit slug if your data provides it; otherwise generate from ShapeName #}
         {% set slugVal = item.slug %}
         {% if not slugVal %}
           {% set slugVal = item.ShapeName | slug %}
         {% endif %}
 
-        {# Thumbnail URL: try common fields #}
-        {% set thumbUrl = item.ThumbUrl %}
-        {% if not thumbUrl %}
-          {% set thumbUrl = item.thumbUrl %}
-        {% endif %}
+        {# Detail URL #}
+        {% set detailUrl = "/pasta/" ~ slugVal ~ "/" %}
 
-        {# ImageKit transform for thumbnails #}
-        {% set thumbUrlTransformed = "" %}
-        {% if thumbUrl %}
-          {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
-        {% endif %}
+        {# Thumbnail URL - mimic Search page pattern exactly #}
+        {% set thumbUrl = paths.imagekitBase ~ "/pasta/thumbs/" ~ slugVal ~ ".png" %}
+        {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
 
-        {# Normalized data attributes for filtering/sorting #}
         <tr
           class="data-row"
           data-name="{{ (item.ShapeName or '') | lower | escape }}"
           data-category="{{ (item.Category or '') | lower | escape }}"
         >
           <td class="data-table__thumb">
-            {% if thumbUrlTransformed %}
-              <span class="thumb" aria-hidden="true">
-                <img
-                  src="{{ thumbUrlTransformed }}"
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                  width="56"
-                  height="56"
-                />
-              </span>
-            {% else %}
-              <span class="thumb thumb--placeholder" aria-hidden="true"></span>
-            {% endif %}
+            <span class="thumb" aria-hidden="true">
+              <img
+                src="{{ thumbUrlTransformed }}"
+                alt=""
+                loading="lazy"
+                decoding="async"
+                width="56"
+                height="56"
+                {# If a thumb is missing on ImageKit, this will swap in the placeholder styling #}
+                onerror="this.closest('.thumb')?.classList.add('thumb--placeholder'); this.remove();"
+              />
+            </span>
           </td>
 
           <th scope="row" class="data-table__name">
-            <a href="/pasta/{{ slugVal }}/">{{ item.ShapeName }}</a>
+            <a href="{{ detailUrl }}">{{ item.ShapeName }}</a>
           </th>
 
           <td class="cell-category">{{ item.Category or "" }}</td>
 
           <td class="data-table__detail">
-            <a href="/pasta/{{ slugVal }}/">View</a>
+            <a href="{{ detailUrl }}">View</a>
           </td>
         </tr>
+
       {% endfor %}
     </tbody>
   </table>
