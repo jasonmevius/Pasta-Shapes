@@ -7,13 +7,18 @@ permalink: /all/
 {# =============================================================================
   src/all/index.njk
 
-  Build-safe Nunjucks template:
-  - Renders a full HTML table from pasta.csv at build time
-  - Keeps Nunjucks logic simple (no ternary operators, no array concat)
-  - JS enhances with:
-    - Search (all columns)
+  All Pastas table:
+  - Build-time renders the table from pasta.csv
+  - Client-side JS adds:
+    - Search across Name + Category
     - Category dropdown (auto-populated from rows)
-    - Click-to-sort headers
+    - Sorting on Name + Category
+
+  Changes in this version:
+  1) Thumbnail markup now matches Search page structure: <span class="thumb"><img ...></span>
+  2) Removed Type + Primary geometry columns
+  3) Left-justified headers for Name, Category, Detail
+  4) Detail column added with a link to the pasta detail page
 ============================================================================= #}
 
 <header class="page-header">
@@ -31,10 +36,10 @@ permalink: /all/
         id="allPastaSearch"
         class="field__input"
         type="search"
-        placeholder="Type a name, category, type…"
+        placeholder="Type a name or category…"
         autocomplete="off"
       />
-      <p class="field__hint">Filters across all columns.</p>
+      <p class="field__hint">Filters across Name and Category.</p>
     </div>
 
     <div class="field">
@@ -58,27 +63,26 @@ permalink: /all/
 </section>
 
 <section class="table-wrap" aria-label="All pasta shapes table">
-  <table id="allPastaTable" class="data-table">
+  <table id="allPastaTable" class="data-table data-table--all">
     <caption class="sr-only">All pasta shapes with sortable columns</caption>
 
     <thead>
       <tr>
         <th scope="col" class="data-table__thumb">Thumb</th>
 
-        <th scope="col" class="data-table__sortable" data-sort-key="name" aria-sort="none">
+        {# Sortable #}
+        <th scope="col" class="data-table__sortable data-table__left" data-sort-key="name" aria-sort="none">
           Name <span class="sort-indicator" aria-hidden="true"></span>
         </th>
 
-        <th scope="col" class="data-table__sortable" data-sort-key="category" aria-sort="none">
+        {# Sortable #}
+        <th scope="col" class="data-table__sortable data-table__left" data-sort-key="category" aria-sort="none">
           Category <span class="sort-indicator" aria-hidden="true"></span>
         </th>
 
-        <th scope="col" class="data-table__sortable" data-sort-key="type" aria-sort="none">
-          Type <span class="sort-indicator" aria-hidden="true"></span>
-        </th>
-
-        <th scope="col" class="data-table__sortable" data-sort-key="geometry" aria-sort="none">
-          Primary geometry <span class="sort-indicator" aria-hidden="true"></span>
+        {# Not sortable (sorting a constant "View" link isn't very meaningful) #}
+        <th scope="col" class="data-table__left">
+          Detail
         </th>
       </tr>
     </thead>
@@ -92,37 +96,38 @@ permalink: /all/
           {% set slugVal = item.ShapeName | slug %}
         {% endif %}
 
-        {# Thumbnail: safe build-time composition #}
+        {# Thumbnail URL: try common fields #}
         {% set thumbUrl = item.ThumbUrl %}
         {% if not thumbUrl %}
           {% set thumbUrl = item.thumbUrl %}
         {% endif %}
 
+        {# ImageKit transform for thumbnails #}
         {% set thumbUrlTransformed = "" %}
         {% if thumbUrl %}
           {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
         {% endif %}
 
-        {# Safe, normalized data attributes for JS filtering/sorting #}
+        {# Normalized data attributes for filtering/sorting #}
         <tr
           class="data-row"
           data-name="{{ (item.ShapeName or '') | lower | escape }}"
           data-category="{{ (item.Category or '') | lower | escape }}"
-          data-type="{{ (item.Type or '') | lower | escape }}"
-          data-geometry="{{ (item.PrimaryGeometry or '') | lower | escape }}"
         >
           <td class="data-table__thumb">
             {% if thumbUrlTransformed %}
-              <img
-                src="{{ thumbUrlTransformed }}"
-                alt=""
-                loading="lazy"
-                width="56"
-                height="56"
-                class="thumb-img"
-              />
+              <span class="thumb" aria-hidden="true">
+                <img
+                  src="{{ thumbUrlTransformed }}"
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  width="56"
+                  height="56"
+                />
+              </span>
             {% else %}
-              <span class="thumb-placeholder" aria-hidden="true"></span>
+              <span class="thumb thumb--placeholder" aria-hidden="true"></span>
             {% endif %}
           </td>
 
@@ -131,8 +136,10 @@ permalink: /all/
           </th>
 
           <td class="cell-category">{{ item.Category or "" }}</td>
-          <td>{{ item.Type or "" }}</td>
-          <td>{{ item.PrimaryGeometry or "" }}</td>
+
+          <td class="data-table__detail">
+            <a href="/pasta/{{ slugVal }}/">View</a>
+          </td>
         </tr>
       {% endfor %}
     </tbody>
