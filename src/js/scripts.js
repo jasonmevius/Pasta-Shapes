@@ -6,15 +6,21 @@
 //
 // 2) Homepage Search (restaurant-first UX)
 //
-// KEY UX RULE (per your request)
-// - Typing "r" should show pasta names that START with "r".
-// - We do NOT show everything containing "r" because that's too noisy.
-// - We only fall back to alias/metadata searching if name-prefix produces 0 hits.
+// KEY UX RULES
+// - 0 chars: show nothing
+// - 1+ chars: show pasta names that START with the query (name-prefix match)
+// - If 0 name-prefix matches: fallback to alias/metadata includes
 //
-// WHY THIS VERSION
-// - Your results showed "ra" and "raviol" returning "No matches found".
-// - That indicates our dependency on data-search/searchBlob is unreliable.
-// - This version searches from the DOM (visible name) first, so it cannot drift.
+// THUMBNAIL FIX
+// - On initial page load, we hide all cards (Option B).
+// - Thumbnails use <img loading="lazy">.
+// - Some browsers won't reliably kick off lazy-load when elements are revealed
+//   later, so you see grey boxes.
+// - We "prime" thumbnails for visible cards by setting loading="eager" and
+//   re-assigning src once.
+//
+// IMPORTANT
+// - No inline CSS.
 // ============================================================================
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -53,10 +59,9 @@
     const status = $("#pasta-search-status");
     const list = $("#pasta-results");
 
-    // Only run on pages that have the search + results list.
     if (!input || !status || !list) return;
 
-    // Prevent double-init (safe on bfcache restore)
+    // Prevent double-init
     if (window.__pastaSearchInit) return;
     window.__pastaSearchInit = true;
 
@@ -114,11 +119,9 @@
     }
 
     // -------------------------------------------------------------------------
-    // Build a reliable per-card search cache from the DOM
+    // Build a per-card search cache from the DOM
     // - nameNorm: normalized visible name (primary)
-    // - aliasNorm: normalized "Also:" line + data-search (secondary)
-    //
-    // This avoids issues where data-search/searchBlob might be missing or stale.
+    // - aliasNorm: normalized "Also:" line + data-search + description + slug
     // -------------------------------------------------------------------------
     const cache = cards.map((card) => {
       const nameEl = card.querySelector(".result-name");
@@ -179,6 +182,34 @@
     }
 
     // -------------------------------------------------------------------------
+    // Thumbnail priming (fixes grey boxes after reveal)
+    // -------------------------------------------------------------------------
+    function primeThumbs(items, max = 12) {
+      // We only need to prime a handful (visible results).
+      const n = Math.min(max, items.length);
+      for (let i = 0; i < n; i++) {
+        const card = items[i].card;
+        const img = card.querySelector(".thumb img");
+        if (!img) continue;
+
+        // If the image was hidden at load, native lazy-loading can be flaky.
+        // Force visible results to load immediately.
+        try {
+          img.loading = "eager";
+
+          // If the browser hasn't started fetching yet, re-assign src.
+          // This is a safe no-op if it already loaded.
+          if (!img.complete || img.naturalWidth === 0) {
+            const src = img.getAttribute("src");
+            if (src) img.src = src;
+          }
+        } catch {
+          // ignore
+        }
+      }
+    }
+
+    // -------------------------------------------------------------------------
     // Core matching
     // -------------------------------------------------------------------------
     function filterNow() {
@@ -200,8 +231,6 @@
       }
 
       // STEP 1 (primary): Name-prefix match ONLY
-      // - This is the restaurant-friendly behavior you want.
-      // - "r" shows only names starting with r.
       const nameMatches = [];
       const nonNameMatches = [];
 
@@ -210,9 +239,11 @@
         else nonNameMatches.push(it);
       }
 
-      // If we have name-prefix matches, show ONLY those (sorted by shortest name first)
       if (nameMatches.length) {
-        nameMatches.sort((a, b) => a.nameNorm.length - b.nameNorm.length || a.nameNorm.localeCompare(b.nameNorm));
+        // Shorter name wins, then alpha
+        nameMatches.sort(
+          (a, b) => a.nameNorm.length - b.nameNorm.length || a.nameNorm.localeCompare(b.nameNorm)
+        );
 
         reorderCards(nameMatches.concat(nonNameMatches));
 
@@ -222,13 +253,15 @@
 
         const actualShown = countShown(nameMatches);
 
+        // Prime thumbs for visible results
+        primeThumbs(nameMatches);
+
         setStatusText(`${actualShown} of ${nameMatches.length} matches (name starts with "${q}")`);
         setNoteAndNext(nameMatches.length, actualShown);
         return;
       }
 
       // STEP 2 (fallback): Alias/metadata includes
-      // - This catches cases like misspellings, synonyms, or alternate names.
       const aliasMatches = [];
       const nonAliasMatches = [];
 
@@ -249,7 +282,10 @@
         return;
       }
 
-      aliasMatches.sort((a, b) => a.aliasNorm.length - b.aliasNorm.length || a.nameNorm.localeCompare(b.nameNorm));
+      aliasMatches.sort(
+        (a, b) => a.aliasNorm.length - b.aliasNorm.length || a.nameNorm.localeCompare(b.nameNorm)
+      );
+
       reorderCards(aliasMatches.concat(nonAliasMatches));
 
       const requestedShown = Math.min(visibleLimit, aliasMatches.length);
@@ -258,12 +294,15 @@
 
       const actualShown = countShown(aliasMatches);
 
+      // Prime thumbs for visible results
+      primeThumbs(aliasMatches);
+
       setStatusText(`${actualShown} of ${aliasMatches.length} matches (aliases and metadata)`);
       setNoteAndNext(aliasMatches.length, actualShown);
     }
 
     // -------------------------------------------------------------------------
-    // Throttle filtering to animation frames (keeps typing snappy)
+    // Throttle filtering (keeps typing snappy)
     // -------------------------------------------------------------------------
     let rafPending = false;
     function requestFilter() {
@@ -316,7 +355,6 @@
         return;
       }
 
-      // Build a map from slug to card for reliable linking
       const bySlug = new Map(cache.map((it) => [it.card.getAttribute("data-slug"), it.card]));
       const items = slugs
         .map((s) => bySlug.get(s))
