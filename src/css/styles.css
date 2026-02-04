@@ -1,12 +1,10 @@
 /* =============================================================================
   styles.css
-  -----------------------------------------------------------------------------
-  Single global stylesheet for the entire site.
 
-  Revisions in this version:
-  - Center headings inside the home "Search by Name" and "Identify by Shape" cards
-  - Identify hero image uses "contain" and is centered both axes (favicon.png)
-  - Removed Identify CTA styles (no longer used, safe to keep but removed for clarity)
+  Changes in this version:
+  - Add mobile hamburger button + drawer styling
+  - Constrain Identify icon (favicon) to 60x60 on mobile
+  - Recently viewed already moved in index.njk (CSS remains compatible)
 ============================================================================= */
 
 :root{
@@ -91,9 +89,10 @@ a:hover{ text-decoration: underline; }
   }
 }
 
-/* -----------------------------------------------------------------------------
-  Top header (sticky)
------------------------------------------------------------------------------ */
+/* =============================================================================
+  Top header (sticky) + mobile hamburger
+============================================================================= */
+
 .topbar{
   position: sticky;
   top: 0;
@@ -133,11 +132,87 @@ a:hover{ text-decoration: underline; }
   font-weight: 600;
 }
 
+/* Desktop nav shown only on wider screens */
 @media (max-width: 719px){
   .nav-desktop{ display: none; }
 }
 @media (min-width: 720px){
   .nav-desktop{ display: flex; }
+}
+
+/* ---------------------------------------------------------------------------
+  Mobile hamburger button (shown only on small screens)
+--------------------------------------------------------------------------- */
+.nav-toggle{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 42px;
+  height: 42px;
+
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--fg);
+
+  cursor: pointer;
+}
+
+.nav-toggle:hover{
+  background: rgba(17,24,39,0.03);
+}
+
+.nav-toggle-bars{
+  display: grid;
+  gap: 5px;
+}
+
+.nav-toggle-bars span{
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: var(--fg);
+  border-radius: 999px;
+}
+
+@media (min-width: 720px){
+  .nav-toggle{ display: none; }
+}
+
+/* ---------------------------------------------------------------------------
+  Mobile drawer menu
+--------------------------------------------------------------------------- */
+.nav-drawer{
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 0 var(--pad) 0.75rem;
+
+  display: grid;
+  gap: 0.35rem;
+
+  /* Slight separation from the header */
+  border-bottom: 1px solid var(--border);
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(10px);
+}
+
+.nav-drawer a{
+  text-decoration: none;
+  padding: 0.85rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  color: var(--fg);
+  font-weight: 650;
+}
+
+.nav-drawer a:hover{
+  background: rgba(17,24,39,0.03);
+}
+
+@media (min-width: 720px){
+  .nav-drawer{ display: none !important; }
 }
 
 /* -----------------------------------------------------------------------------
@@ -214,9 +289,7 @@ a:hover{ text-decoration: underline; }
   Simplified home layout (2 big panels)
 ============================================================================= */
 
-.home-shell{
-  display: block;
-}
+.home-shell{ display: block; }
 
 .home-panels{
   display: grid;
@@ -239,9 +312,6 @@ a:hover{ text-decoration: underline; }
 .home-card-head{
   display: grid;
   gap: 0.25rem;
-
-  /* REVISION:
-     Center-align the card headings per your request. */
   text-align: center;
 }
 
@@ -265,11 +335,9 @@ body.is-searching #home-search-card{
   body.is-searching #home-search-card{ min-height: 0; }
 }
 
-.home-search-status{
-  margin: 0;
-}
+.home-search-status{ margin: 0; }
 
-/* Identify card as one big button */
+/* Identify card is one big button */
 .home-card-link{
   text-decoration: none;
   cursor: pointer;
@@ -280,17 +348,13 @@ body.is-searching #home-search-card{
   background: rgba(17,24,39,0.02);
 }
 
-/* Identify image presentation
-   - REVISION:
-     Use "contain" so favicon isn't cropped, and center it both axes. */
+/* Identify icon container */
 .identify-hero{
   width: 100%;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 6px);
   background: #fff;
-  overflow: hidden;
 
-  /* Chunky space for the icon */
   min-height: 10rem;
 
   display: flex;
@@ -300,32 +364,37 @@ body.is-searching #home-search-card{
 
 .identify-hero img{
   display: block;
+  object-fit: contain;
 
-  /* Make sure the favicon stays fully visible */
+  /* Desktop/tablet default: allow some scaling */
   max-width: 72%;
   max-height: 72%;
   width: auto;
   height: auto;
-  object-fit: contain;
+}
+
+/* NEW: Mobile size constraint for the identify icon */
+@media (max-width: 719px){
+  .identify-hero img{
+    width: 60px;
+    height: 60px;
+    max-width: none;
+    max-height: none;
+  }
 }
 
 /* Results panel */
 .home-results[hidden]{ display: none; }
-
 .home-results{
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-body.is-searching #home-identify-card{
-  display: none;
-}
-body.is-searching #home-results-panel{
-  display: grid;
-}
+body.is-searching #home-identify-card{ display: none; }
+body.is-searching #home-results-panel{ display: grid; }
 
 /* =============================================================================
-  Results list (shared)
+  Results list
 ============================================================================= */
 
 .suggestions{
@@ -336,12 +405,6 @@ body.is-searching #home-results-panel{
   gap: 0.5rem;
 }
 .suggestions:empty{ display: none; }
-
-.recent-wrap{
-  border-top: 1px dashed var(--border);
-  padding-top: 0.75rem;
-}
-.recent-wrap[hidden]{ display: none; }
 
 .results-list{
   list-style: none;
@@ -413,6 +476,13 @@ body.is-searching #home-results-panel{
   flex-wrap: wrap;
 }
 
+/* Recently viewed now sits at the bottom of results panel */
+.recent-wrap{
+  border-top: 1px dashed var(--border);
+  padding-top: 0.75rem;
+}
+.recent-wrap[hidden]{ display: none; }
+
 /* -----------------------------------------------------------------------------
   Footer
 ----------------------------------------------------------------------------- */
@@ -432,12 +502,10 @@ body.is-searching #home-results-panel{
   color: var(--muted);
   text-decoration: none;
 }
-.footer-links a:hover{
-  text-decoration: underline;
-}
+.footer-links a:hover{ text-decoration: underline; }
 
 /* =============================================================================
-  Mobile bottom navigation (Search / Identify) - FIXED + SEGMENTED
+  Mobile bottom navigation (Search / Identify)
 ============================================================================= */
 
 .bottom-nav{
