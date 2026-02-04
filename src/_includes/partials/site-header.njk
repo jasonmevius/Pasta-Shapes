@@ -2,45 +2,63 @@
   partials/site-header.njk
   ------------------------------------------------------------------------------
   PURPOSE
-  - Global top header used by layout.njk on every page.
-  - Mobile-first approach:
-      - Mobile ( < 720px ): show ONLY the brand (clean + minimal)
-        * Primary navigation is handled by the bottom nav (Search / Identify).
-      - Tablet/Desktop ( >= 720px ): show a traditional top navigation row.
-
-  WHY THIS CHANGE
-  - Your screenshot shows a "Menu" control plus multiple links wrapping.
-  - That header pattern clashes with the new mobile bottom nav and creates
-    visual noise on small screens.
+  - Sticky top bar with:
+      - Brand (left)
+      - Desktop nav links (right, >= 720px)
+      - Mobile hamburger (right, < 720px) that toggles a drawer menu
 
   IMPORTANT RULES
   - NO inline CSS. Styling lives in /src/css/styles.css
-  - Keep markup stable and predictable for future tweaks.
+  - Keep markup accessible:
+      - button has aria-expanded + aria-controls
+      - drawer has role="menu" semantics via list + links
 ============================================================================= #}
 
-<header class="topbar" role="banner">
+<header class="topbar">
   <div class="topbar-inner">
-    {# -------------------------------------------------------------------------
-      Brand
-      - Always visible.
-      - Keep it short for mobile.
-    ------------------------------------------------------------------------- #}
-    <a class="brand" href="/" aria-label="Pasta Shapes home">
-      Pasta Shapes
-    </a>
+    <a class="brand" href="/">Pasta Shapes</a>
 
     {# -------------------------------------------------------------------------
-      Desktop / Tablet navigation
-      - Hidden on mobile via CSS.
-      - We keep these as plain links for simplicity and reliability.
-      - Bottom nav remains the primary navigation on mobile.
+      Desktop nav (visible >= 720px)
+      NOTE:
+      - Keep this list aligned with your site’s “real” pages.
+      - If you add more pages later, update BOTH lists below (desktop + drawer).
     ------------------------------------------------------------------------- #}
     <nav class="nav nav-desktop" aria-label="Primary navigation">
       <a href="/" {% if page and page.url == "/" %}aria-current="page"{% endif %}>Search</a>
       <a href="/identify/" {% if page and page.url and page.url.startsWith("/identify") %}aria-current="page"{% endif %}>Identify</a>
       <a href="/about/" {% if page and page.url and page.url.startsWith("/about") %}aria-current="page"{% endif %}>About</a>
-      <a href="/sources/" {% if page and page.url and page.url.startsWith("/sources") %}aria-current="page"{% endif %}>Sources</a>
-      <a href="/feedback/" {% if page and page.url and page.url.startsWith("/feedback") %}aria-current="page"{% endif %}>Feedback</a>
     </nav>
+
+    {# -------------------------------------------------------------------------
+      Mobile hamburger button (visible < 720px)
+      - JS toggles [hidden] on the drawer and aria-expanded on the button.
+    ------------------------------------------------------------------------- #}
+    <button
+      id="nav-toggle"
+      class="nav-toggle"
+      type="button"
+      aria-label="Open menu"
+      aria-expanded="false"
+      aria-controls="nav-drawer"
+    >
+      {# Simple “hamburger” icon using spans (no inline SVG needed) #}
+      <span class="nav-toggle-bars" aria-hidden="true">
+        <span></span>
+        <span></span>
+        <span></span>
+      </span>
+    </button>
   </div>
+
+  {# ---------------------------------------------------------------------------
+    Mobile drawer
+    - Hidden by default
+    - Positioned under the top bar
+  --------------------------------------------------------------------------- #}
+  <nav id="nav-drawer" class="nav-drawer" aria-label="Menu" hidden>
+    <a href="/" {% if page and page.url == "/" %}aria-current="page"{% endif %}>Search</a>
+    <a href="/identify/" {% if page and page.url and page.url.startsWith("/identify") %}aria-current="page"{% endif %}>Identify</a>
+    <a href="/about/" {% if page and page.url and page.url.startsWith("/about") %}aria-current="page"{% endif %}>About</a>
+  </nav>
 </header>
