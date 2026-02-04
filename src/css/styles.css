@@ -1,20 +1,12 @@
 /* =============================================================================
   styles.css
   -----------------------------------------------------------------------------
-  PURPOSE
-  - Single global stylesheet for the entire site.
-  - Mobile-first, minimal, fast.
-  - NO inline CSS in templates.
+  Single global stylesheet for the entire site.
 
-  NOTE
-  - This file includes:
-      1) Header responsiveness (brand-only on mobile)
-      2) Search result styling
-      3) Identify styling
-      4) Fixed bottom navigation (segmented control) on mobile
-      5) NEW: Simplified mobile-first home layout (2 large panels)
-         - Identify card replaced by results while typing
-         - Search panel shrinks while typing
+  Revisions in this version:
+  - Center headings inside the home "Search by Name" and "Identify by Shape" cards
+  - Identify hero image uses "contain" and is centered both axes (favicon.png)
+  - Removed Identify CTA styles (no longer used, safe to keep but removed for clarity)
 ============================================================================= */
 
 :root{
@@ -71,7 +63,6 @@ a:hover{ text-decoration: underline; }
 
 /* -----------------------------------------------------------------------------
   Accessibility: screen-reader-only utility
-  - Used for labels on inputs so they remain accessible but not visible.
 ----------------------------------------------------------------------------- */
 .sr-only{
   position: absolute !important;
@@ -91,17 +82,12 @@ a:hover{ text-decoration: underline; }
 .container{
   max-width: var(--container);
   margin: 0 auto;
-
-  /* IMPORTANT:
-     - We leave room at the bottom for the fixed bottom nav on mobile.
-     - This avoids content being hidden under it. */
   padding: 1.25rem var(--pad) 3rem;
 }
 
-/* Add extra bottom padding on mobile so fixed bottom nav never overlaps content */
 @media (max-width: 719px){
   .container{
-    padding-bottom: 5rem; /* conservative; includes iOS safe-area nav height */
+    padding-bottom: 5rem; /* leave room for fixed bottom nav */
   }
 }
 
@@ -141,19 +127,12 @@ a:hover{ text-decoration: underline; }
   color: var(--muted);
   font-size: 0.95rem;
 }
-.nav a{
-  text-decoration: none;
-}
+.nav a{ text-decoration: none; }
 .nav a[aria-current="page"]{
   color: var(--fg);
   font-weight: 600;
 }
 
-/* -----------------------------------------------------------------------------
-  Header responsiveness
-  - Mobile: brand only (no top nav links)
-  - Tablet/Desktop: show the top nav links
------------------------------------------------------------------------------ */
 @media (max-width: 719px){
   .nav-desktop{ display: none; }
 }
@@ -177,8 +156,6 @@ a:hover{ text-decoration: underline; }
   border-radius: var(--radius);
   padding: 0.9rem;
 }
-
-.lead{ font-size: 1.02rem; }
 
 /* -----------------------------------------------------------------------------
   Buttons
@@ -234,32 +211,19 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  NEW: Simplified home layout (2 big panels)
-  -----------------------------------------------------------------------------
-  WHY
-  - Mobile-first home should present only two actions:
-      1) Search by Name
-      2) Identify by Shape
-  - When user types:
-      - Search area shrinks to give more room to results
-      - Identify area disappears and is replaced by results
+  Simplified home layout (2 big panels)
 ============================================================================= */
 
 .home-shell{
-  /* Keep the home content feeling “app-like” without forcing fixed heights. */
   display: block;
 }
 
-/* Two panels: Search + (Identify OR Results) */
 .home-panels{
   display: grid;
   gap: var(--gap);
-
-  /* Mobile portrait default: stacked halves-ish (we use min-heights below). */
   grid-template-columns: 1fr;
 }
 
-/* Landscape phones: split side-by-side to use the wide viewport better */
 @media (max-width: 719px) and (orientation: landscape){
   .home-panels{
     grid-template-columns: 1fr 1fr;
@@ -267,16 +231,18 @@ a:hover{ text-decoration: underline; }
   }
 }
 
-/* Common home card styling refinements (chunky, tappable) */
 .home-card{
   border-radius: calc(var(--radius) + 4px);
   padding: 1rem;
 }
 
-/* Head row inside home cards */
 .home-card-head{
   display: grid;
   gap: 0.25rem;
+
+  /* REVISION:
+     Center-align the card headings per your request. */
+  text-align: center;
 }
 
 .home-card-title{
@@ -284,40 +250,21 @@ a:hover{ text-decoration: underline; }
   letter-spacing: -0.01em;
 }
 
-.home-card-subtitle{
-  margin: 0;
-  font-size: 0.95rem;
-}
-
-/* Search card behavior:
-   - Expanded by default
-   - Collapsed while typing (body.is-searching)
-*/
 #home-search-card{
-  /* “Half-ish” feel on mobile: give it a solid presence. */
   min-height: 42svh;
-
-  /* Smooth transitions when toggling to searching state. */
   transition: min-height 180ms ease, padding 180ms ease;
 }
 
-/* While typing: shrink search card to top third-ish */
 body.is-searching #home-search-card{
   min-height: 24svh;
   padding: 0.85rem;
 }
 
-/* On landscape split layout, don’t force tall svh cards */
 @media (max-width: 719px) and (orientation: landscape){
-  #home-search-card{
-    min-height: 0;
-  }
-  body.is-searching #home-search-card{
-    min-height: 0;
-  }
+  #home-search-card{ min-height: 0; }
+  body.is-searching #home-search-card{ min-height: 0; }
 }
 
-/* Status line under the search input */
 .home-search-status{
   margin: 0;
 }
@@ -333,20 +280,9 @@ body.is-searching #home-search-card{
   background: rgba(17,24,39,0.02);
 }
 
-/* CTA line inside Identify card */
-.home-card-cta{
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.6rem 0.75rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: #fff;
-  font-weight: 650;
-  color: var(--fg);
-}
-
-/* Identify image presentation */
+/* Identify image presentation
+   - REVISION:
+     Use "contain" so favicon isn't cropped, and center it both axes. */
 .identify-hero{
   width: 100%;
   border: 1px solid var(--border);
@@ -354,33 +290,33 @@ body.is-searching #home-search-card{
   background: #fff;
   overflow: hidden;
 
-  /* Keep it chunky */
-  min-height: 9rem;
+  /* Chunky space for the icon */
+  min-height: 10rem;
 
   display: flex;
   align-items: center;
   justify-content: center;
 }
+
 .identify-hero img{
   display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+
+  /* Make sure the favicon stays fully visible */
+  max-width: 72%;
+  max-height: 72%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
 }
 
-/* Results panel:
-   - hidden by default via [hidden]
-   - when shown, it should scroll if needed
-*/
+/* Results panel */
 .home-results[hidden]{ display: none; }
 
 .home-results{
-  /* Allow results to take remaining space on portrait phones */
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-/* While searching, hide identify card and show results panel */
 body.is-searching #home-identify-card{
   display: none;
 }
@@ -391,11 +327,6 @@ body.is-searching #home-results-panel{
 /* =============================================================================
   Results list (shared)
 ============================================================================= */
-
-.results-head{
-  display: grid;
-  gap: 0.25rem;
-}
 
 .suggestions{
   list-style: none;
@@ -483,7 +414,7 @@ body.is-searching #home-results-panel{
 }
 
 /* -----------------------------------------------------------------------------
-  Footer (secondary links live here)
+  Footer
 ----------------------------------------------------------------------------- */
 .site-footer{
   border-top: 1px solid var(--border);
@@ -578,7 +509,6 @@ body.is-searching #home-results-panel{
   color: var(--fg);
 }
 
-/* Hide the bottom nav on tablet/desktop */
 @media (min-width: 720px){
   .bottom-nav{ display: none; }
 }
