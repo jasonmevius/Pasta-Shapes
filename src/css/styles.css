@@ -398,11 +398,12 @@ body.is-searching #home-search-card{
   height: 96px;
 }
 
-/* Mobile constraint: 60x60 */
 @media (max-width: 719px){
   .identify-hero img{
-    width: 60px;
-    height: 60px;
+    max-width: 80px;
+    max-height: 80px;
+    height: 75%;
+    width: 75%;
   }
 }
 
