@@ -27,7 +27,7 @@
   }
 
   // =============================================================================
-  // Search page behavior
+  // Home/Search page behavior
   // =============================================================================
 
   function initSearchPage() {
@@ -35,9 +35,39 @@
     const status = $("#pasta-search-status");
     const list = $("#pasta-results");
 
-    // Only run on the search page
+    // Only run on pages that have the search UI
     if (!input || !status || !list) return;
 
+    // -------------------------------------------------------------------------
+    // NEW: Home UI state toggles (Identify card <-> Results panel)
+    //
+    // Your new homepage behavior:
+    // - Idle (empty input): show Identify card, hide Results panel, search card expanded
+    // - Typing (non-empty): hide Identify card, show Results panel, search card shrinks
+    //
+    // We implement this via a single body class:
+    //   body.is-searching
+    // CSS handles the actual layout changes.
+    // -------------------------------------------------------------------------
+    const resultsPanel = $("#home-results-panel");
+    const identifyCard = $("#home-identify-card");
+
+    function setSearchingUI(isSearching) {
+      document.body.classList.toggle("is-searching", isSearching);
+
+      // For robustness: also toggle [hidden] on the results panel if it exists.
+      // This prevents “blank results card” flashes on initial load.
+      if (resultsPanel) resultsPanel.hidden = !isSearching;
+      // Identify card visibility is handled primarily by CSS, but we keep it safe.
+      if (identifyCard) identifyCard.setAttribute("aria-hidden", isSearching ? "true" : "false");
+    }
+
+    // Default UI state on load (empty input)
+    setSearchingUI(Boolean(String(input.value || "").trim()));
+
+    // -------------------------------------------------------------------------
+    // Existing search logic (kept)
+    // -------------------------------------------------------------------------
     const cards = Array.from(list.querySelectorAll("[data-search]"));
     const originalOrder = cards.slice();
 
@@ -206,15 +236,8 @@
     }
 
     function showOnly(listToShow) {
-      // Hide all first, then reveal the matches in order.
       hideAll();
       for (const c of listToShow) c.hidden = false;
-    }
-
-    function countShown() {
-      let n = 0;
-      for (const c of cards) if (!c.hidden) n++;
-      return n;
     }
 
     function updateFooter(matchCount, shownCount) {
@@ -222,14 +245,12 @@
 
       const remaining = Math.max(0, matchCount - shownCount);
 
-      // Nothing to show or nothing remaining - hide the button entirely.
       if (matchCount === 0 || remaining === 0) {
         note.textContent = matchCount ? `Showing ${shownCount} of ${matchCount}` : "";
         setControlVisible(nextBtn, false);
         return;
       }
 
-      // Otherwise show the paging button and a helpful note.
       note.textContent = `Showing ${shownCount} of ${matchCount} - ${remaining} more`;
       const nextChunk = Math.min(PAGE_N, remaining);
       nextBtn.textContent = `Next ${nextChunk} (${remaining} more)`;
@@ -237,9 +258,7 @@
     }
 
     // -----------------------------------------------------------------------------
-    // Name-prefix search (your restaurant behavior)
-    // - Typing "r" returns names that start with "r".
-    // - If that yields 0 results, we fall back to alias/metadata search.
+    // Name-prefix search + fallback alias search + optional fuzzy
     // -----------------------------------------------------------------------------
     const cached = cards.map((card) => {
       const nameEl = card.querySelector(".result-name");
@@ -260,14 +279,15 @@
       for (const it of newOrder) list.appendChild(it.card);
     }
 
-    // -----------------------------------------------------------------------------
-    // Core filter function
-    // -----------------------------------------------------------------------------
     async function applyFilter() {
       const q = normalizeQuery(input.value || "");
+      const hasQuery = Boolean(q);
 
-      // Option B: show nothing until typing begins
-      if (!q) {
+      // NEW: Toggle the home UI based on whether user is typing
+      setSearchingUI(hasQuery);
+
+      // If empty: hide results (home shows Identify card instead)
+      if (!hasQuery) {
         hideAll();
         status.textContent = "Start typing to see matches.";
         updateFooter(0, 0);
@@ -275,7 +295,7 @@
         return;
       }
 
-      // 1) Primary pass: name-prefix only
+      // 1) Name-prefix matches
       const nameMatches = [];
       const nonName = [];
 
@@ -284,7 +304,6 @@
         else nonName.push(it);
       }
 
-      // If we have name-prefix matches, show them (paged)
       if (nameMatches.length) {
         nameMatches.sort(
           (a, b) => a.nameNorm.length - b.nameNorm.length || a.nameNorm.localeCompare(b.nameNorm)
@@ -301,7 +320,7 @@
         return;
       }
 
-      // 2) Fallback: alias/metadata search (includes)
+      // 2) Alias/metadata search (includes)
       const aliasMatches = [];
       const nonAlias = [];
 
@@ -310,30 +329,25 @@
         else nonAlias.push(it);
       }
 
-      // 3) Optional fuzzy match (only if alias/metadata is empty AND query is long enough)
-      // This keeps things fast and avoids "magic" on short queries.
+      // 3) Optional fuzzy match (only if alias/metadata is empty AND query long enough)
       if (!aliasMatches.length && q.length >= 4) {
         await loadIndexIfNeeded();
 
         if (stopKeyToSlugs) {
           const qStop = stripStopwords(q);
-
-          // Small max distance: conservative fuzziness
           const maxDist = qStop.length <= 6 ? 1 : 2;
 
           const hits = new Set();
           for (const [stopKey, slugs] of stopKeyToSlugs.entries()) {
-            // Cheap early check
             if (Math.abs(stopKey.length - qStop.length) > maxDist) continue;
 
             const d = levenshtein(qStop, stopKey, maxDist);
             if (d <= maxDist) {
               for (const s of slugs) hits.add(s);
-              if (hits.size >= 25) break; // cap to avoid crazy lists
+              if (hits.size >= 25) break;
             }
           }
 
-          // Convert fuzzy slugs to cards
           const fuzzyCards = [];
           for (const slug of hits) {
             const card = cardBySlug.get(slug);
@@ -341,10 +355,10 @@
           }
 
           if (fuzzyCards.length) {
-            // Keep existing DOM order for fuzzy results (simple, predictable)
-            showOnly(fuzzyCards.slice(0, visibleLimit));
+            const shownCards = fuzzyCards.slice(0, visibleLimit);
+            showOnly(shownCards);
             status.textContent = `${Math.min(visibleLimit, fuzzyCards.length)} of ${fuzzyCards.length} matches (fuzzy)`;
-            updateFooter(fuzzyCards.length, Math.min(visibleLimit, fuzzyCards.length));
+            updateFooter(fuzzyCards.length, shownCards.length);
             return;
           }
         }
@@ -448,10 +462,8 @@
 
     // Initial state
     hideAll();
-    status.textContent = "Start typing to see matches.";
-    setControlVisible(nextBtn, false);
-    if (note) note.textContent = "";
     renderRecents();
+    requestFilter(); // ensures UI matches any prefilled query
   }
 
   // =============================================================================
@@ -469,8 +481,6 @@
   // =============================================================================
 
   function initIdentifyPage() {
-    // If Identify has its own inline JS, this can remain a no-op.
-    // Keeping this function prevents errors if other code expects it.
     return;
   }
 
@@ -478,35 +488,18 @@
   // Mobile Bottom Nav: swipe-to-switch between Search and Identify
   // =============================================================================
   function initSwipeBottomNav() {
-    // ---------------------------------------------------------------------------
-    // PURPOSE
-    // - Enable a fast "app-like" gesture on mobile:
-    //     - Swipe LEFT on the bottom nav to go from Search -> Identify
-    //     - Swipe RIGHT on the bottom nav to go from Identify -> Search
-    //
-    // WHY WE DO IT THIS WAY
-    // - We keep the bottom nav links as normal <a> tags for accessibility.
-    // - Swipe is progressive enhancement: if it fails, taps still work.
-    // - We only attach handlers on small screens and only on the nav itself
-    //   so we do NOT interfere with normal page scrolling.
-    // ---------------------------------------------------------------------------
-
     const nav = document.querySelector(".bottom-nav[data-swipe-nav='1']");
     if (!nav) return;
 
-    // Only enable on mobile-sized viewports. This should align with the CSS rule
-    // that shows the bottom nav.
     const isMobile = window.matchMedia && window.matchMedia("(max-width: 719px)").matches;
     if (!isMobile) return;
 
-    // Avoid double-initialization (safe on bfcache restores).
     if (nav.__swipeInit) return;
     nav.__swipeInit = true;
 
-    // Tuning constants (feel free to tweak later)
-    const MIN_DX = 60; // minimum horizontal distance (px) to count as swipe
-    const MAX_DT = 650; // maximum swipe time (ms)
-    const MAX_SLOPE = 1.2; // require |dx| > |dy| * MAX_SLOPE to avoid vertical scroll conflicts
+    const MIN_DX = 60;
+    const MAX_DT = 650;
+    const MAX_SLOPE = 1.2;
 
     let startX = 0;
     let startY = 0;
@@ -518,7 +511,6 @@
     }
 
     function goTo(mode) {
-      // Keep URLs canonical as you’re using trailing slash for identify.
       const target = mode === "identify" ? "/identify/" : "/";
       if (window.location.pathname === target) return;
       window.location.href = target;
@@ -527,7 +519,6 @@
     nav.addEventListener(
       "touchstart",
       (e) => {
-        // Only single-finger swipes.
         if (!e.touches || e.touches.length !== 1) return;
         const t = e.touches[0];
         startX = t.clientX;
@@ -544,8 +535,6 @@
 
         const dt = Date.now() - startT;
         startT = 0;
-
-        // If the gesture took too long, treat it as a normal interaction.
         if (dt > MAX_DT) return;
 
         const t = (e.changedTouches && e.changedTouches[0]) || null;
@@ -554,19 +543,16 @@
         const dx = t.clientX - startX;
         const dy = t.clientY - startY;
 
-        // Horizontal intent check: big dx and not too much vertical movement.
         if (Math.abs(dx) < MIN_DX) return;
         if (Math.abs(dx) <= Math.abs(dy) * MAX_SLOPE) return;
 
         const mode = pageMode();
 
-        // Swipe left = "next" (Search -> Identify)
         if (dx < 0 && mode === "search") {
           goTo("identify");
           return;
         }
 
-        // Swipe right = "previous" (Identify -> Search)
         if (dx > 0 && mode === "identify") {
           goTo("search");
           return;
