@@ -2,59 +2,45 @@
   partials/site-header.njk
   ------------------------------------------------------------------------------
   PURPOSE
-  - Sticky top bar with brand + hamburger menu.
-  - Hamburger uses a CSS-only checkbox toggle for simplicity and reliability.
-  - On mobile, bottom-nav is the primary navigation.
-  - On tablet/desktop, this header is the primary navigation.
+  - Global top header used by layout.njk on every page.
+  - Mobile-first approach:
+      - Mobile ( < 720px ): show ONLY the brand (clean + minimal)
+        * Primary navigation is handled by the bottom nav (Search / Identify).
+      - Tablet/Desktop ( >= 720px ): show a traditional top navigation row.
 
-  IMPORTANT
-  - No inline CSS.
-  - Keep markup stable - iterate via /src/css/styles.css.
-  - This file must NEVER contain page front matter (--- blocks).
+  WHY THIS CHANGE
+  - Your screenshot shows a "Menu" control plus multiple links wrapping.
+  - That header pattern clashes with the new mobile bottom nav and creates
+    visual noise on small screens.
+
+  IMPORTANT RULES
+  - NO inline CSS. Styling lives in /src/css/styles.css
+  - Keep markup stable and predictable for future tweaks.
 ============================================================================= #}
 
-<header class="topbar">
+<header class="topbar" role="banner">
   <div class="topbar-inner">
-    {# ------------------------------------------------------------------------
-      Brand / Home link
-      - Keep short and tappable.
-      - In a restaurant scenario, user can always tap this to reset to search.
-    ------------------------------------------------------------------------ #}
-    <a class="brand" href="/">Pasta Shapes</a>
+    {# -------------------------------------------------------------------------
+      Brand
+      - Always visible.
+      - Keep it short for mobile.
+    ------------------------------------------------------------------------- #}
+    <a class="brand" href="/" aria-label="Pasta Shapes home">
+      Pasta Shapes
+    </a>
 
-    {# ------------------------------------------------------------------------
-      Hamburger toggle (checkbox)
-      - The label is the visible "hamburger button".
-      - The checkbox controls the menu open/closed state in CSS.
-      - No JS required.
-    ------------------------------------------------------------------------ #}
-    <div class="menu">
-      <input
-        class="menu-toggle"
-        type="checkbox"
-        id="site-menu-toggle"
-        aria-label="Open menu"
-      />
-
-      <label class="menu-button" for="site-menu-toggle">
-        <span class="menu-icon" aria-hidden="true"></span>
-        <span class="sr-only">Menu</span>
-      </label>
-
-      {# ----------------------------------------------------------------------
-        Menu panel
-        - Keep this minimal. You can add more links later.
-        - Search is intentionally "/" because search lives on the homepage.
-      ---------------------------------------------------------------------- #}
-      <nav class="menu-panel" aria-label="Primary">
-        <a href="/" {% if page and page.url == "/" %}aria-current="page"{% endif %}>Search</a>
-
-        <a href="/identify/" {% if page and page.url and page.url.startsWith("/identify") %}aria-current="page"{% endif %}>Identify</a>
-
-        <a href="/about/">About</a>
-        <a href="/sources/">Sources</a>
-        <a href="/feedback/">Feedback</a>
-      </nav>
-    </div>
+    {# -------------------------------------------------------------------------
+      Desktop / Tablet navigation
+      - Hidden on mobile via CSS.
+      - We keep these as plain links for simplicity and reliability.
+      - Bottom nav remains the primary navigation on mobile.
+    ------------------------------------------------------------------------- #}
+    <nav class="nav nav-desktop" aria-label="Primary navigation">
+      <a href="/" {% if page and page.url == "/" %}aria-current="page"{% endif %}>Search</a>
+      <a href="/identify/" {% if page and page.url and page.url.startsWith("/identify") %}aria-current="page"{% endif %}>Identify</a>
+      <a href="/about/" {% if page and page.url and page.url.startsWith("/about") %}aria-current="page"{% endif %}>About</a>
+      <a href="/sources/" {% if page and page.url and page.url.startsWith("/sources") %}aria-current="page"{% endif %}>Sources</a>
+      <a href="/feedback/" {% if page and page.url and page.url.startsWith("/feedback") %}aria-current="page"{% endif %}>Feedback</a>
+    </nav>
   </div>
 </header>
