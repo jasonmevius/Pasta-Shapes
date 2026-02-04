@@ -1,48 +1,36 @@
 {# =============================================================================
   partials/site-header.njk
   ------------------------------------------------------------------------------
-  PURPOSE
-  - Sticky top bar with:
-      - Brand (left)
-      - Desktop nav links (right, >= 720px)
-      - Mobile hamburger (right, < 720px) that toggles a drawer menu
+  Sticky header with:
+  - Brand (left)
+  - Desktop nav (>= 720px)
+  - Mobile hamburger (< 720px) that toggles a drawer
 
-  IMPORTANT RULES
-  - NO inline CSS. Styling lives in /src/css/styles.css
-  - Keep markup accessible:
-      - button has aria-expanded + aria-controls
-      - drawer has role="menu" semantics via list + links
+  IMPORTANT:
+  - Drawer MUST start with `hidden` to avoid "open by default" on first paint.
+  - Button uses aria-expanded + aria-controls for accessibility.
 ============================================================================= #}
 
 <header class="topbar">
   <div class="topbar-inner">
     <a class="brand" href="/">Pasta Shapes</a>
 
-    {# -------------------------------------------------------------------------
-      Desktop nav (visible >= 720px)
-      NOTE:
-      - Keep this list aligned with your site’s “real” pages.
-      - If you add more pages later, update BOTH lists below (desktop + drawer).
-    ------------------------------------------------------------------------- #}
+    {# Desktop nav - visible on >= 720px via CSS #}
     <nav class="nav nav-desktop" aria-label="Primary navigation">
       <a href="/" {% if page and page.url == "/" %}aria-current="page"{% endif %}>Search</a>
       <a href="/identify/" {% if page and page.url and page.url.startsWith("/identify") %}aria-current="page"{% endif %}>Identify</a>
-      <a href="/about/" {% if page and page.url and page.url.startsWith("/about") %}aria-current="page"{% endif %}>About</a>
+      {# Add more items here later as the site grows #}
     </nav>
 
-    {# -------------------------------------------------------------------------
-      Mobile hamburger button (visible < 720px)
-      - JS toggles [hidden] on the drawer and aria-expanded on the button.
-    ------------------------------------------------------------------------- #}
+    {# Mobile hamburger - visible on < 720px via CSS #}
     <button
       id="nav-toggle"
       class="nav-toggle"
       type="button"
-      aria-label="Open menu"
+      aria-label="Menu"
       aria-expanded="false"
       aria-controls="nav-drawer"
     >
-      {# Simple “hamburger” icon using spans (no inline SVG needed) #}
       <span class="nav-toggle-bars" aria-hidden="true">
         <span></span>
         <span></span>
@@ -51,14 +39,9 @@
     </button>
   </div>
 
-  {# ---------------------------------------------------------------------------
-    Mobile drawer
-    - Hidden by default
-    - Positioned under the top bar
-  --------------------------------------------------------------------------- #}
+  {# Mobile drawer - MUST start hidden to prevent "open by default" #}
   <nav id="nav-drawer" class="nav-drawer" aria-label="Menu" hidden>
     <a href="/" {% if page and page.url == "/" %}aria-current="page"{% endif %}>Search</a>
     <a href="/identify/" {% if page and page.url and page.url.startsWith("/identify") %}aria-current="page"{% endif %}>Identify</a>
-    <a href="/about/" {% if page and page.url and page.url.startsWith("/about") %}aria-current="page"{% endif %}>About</a>
   </nav>
 </header>
