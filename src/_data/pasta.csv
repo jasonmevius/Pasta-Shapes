@@ -10,7 +10,7 @@ Pici,pici,,Strand,,,,,strand,,strand,no,no,no,no,medium,no,pici.png,,
 Canule,canule,,Strand,,,,,strand,,strand,no,no,no,no,medium,no,canule.png,,
 Busiate,busiate,busiata trapanese; busiati,Short,,,,,short,,short,yes,no,yes,no,medium,no,busiate.png,,busiati; busiata trapanese
 Bavette,bavette,,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,bavette.png,,bavete
-Fettuccine,fettuccine,,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,fettuccine.png,,fetucine
+Fettuccine,fettuccine,,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,fettuccine.png,,fetucinea
 Fettuccelli,fettuccelli,,Ribbon,,,,,ribbon,,ribbon,no,no,no,no,medium,no,fettuccelli.png,,fetuceli
 Lasagne,lasagne,lasagna (sing. in some usage),Sheet,,,,,sheet,,sheet,no,no,no,no,medium,no,lasagne.png,,lasagna
 Lasagnette,lasagnette,,Sheet,,,,,sheet,,sheet,no,no,no,no,medium,no,lasagnette.png,,lasagnete
@@ -86,8 +86,8 @@ Rigatoncini,rigatoncini,,Tube,,,,,tube,,tube,yes,yes,no,no,small,no,rigatoncini.
 Rocchetti,rocchetti,,Short,,,,,short,,short,no,yes,no,no,medium,no,rocchetti.png,,rocheti
 Sciviottini,sciviottini,,Tube,,,,,tube,,tube,yes,no,no,no,medium,no,sciviottini.png,,sciviotini
 Rotini,rotini,,Short,,,,,short,,short,no,no,yes,no,small,no,rotini.png,,
-Sorprese,sorprese,,Short,,,,,short,,short,no,no,no,no,medium,no,,,
-Sorprese Lisce,sorprese-lisce,,Short,,,,,short,,short,no,yes,yes,no,medium,no,,,lisce sorprese
+Sorprese,sorprese,,Short,,,,,short,,short,no,no,no,no,medium,no,sorprese.png,,
+Sorprese Lisce,sorprese-lisce,,Short,,,,,short,,short,no,yes,yes,no,medium,no,sorprese-lisce.png,,lisce sorprese
 Ruote,ruote,,Ring / Wheel,,,,,ring,,ring,yes,no,no,yes,medium,no,ruote.png,,
 Tufoli,tufoli,,Tube,,,,,tube,,tube,yes,yes,no,no,medium,no,tufoli.png,,
 Fazzoletti,fazzoletti,fazzoletti di seta,Sheet,,,,,sheet,,sheet,no,no,no,no,small,no,fazzoletti.png,,fazoleti; fazoleti seta; fazzoletti seta; seta fazzoletti; fazzoletti di seta
@@ -117,7 +117,7 @@ Maccheroni,maccheroni,Macaroni,Tube,,,,,tube,,tube,yes,yes,no,no,large,no,macche
 Fusilli,fusilli,fusilli napoletani; fusilli calabresi,Short,,,,,short,,short,no,no,yes,no,medium,no,fusilli.png,,fusili; fusili calabresi; calabresi fusilli; fusili napoletani; fusilli calabresi; fusilli napoletani; napoletani fusilli
 Chiocciole,chiocciole,,Short,,,,,short,,short,no,yes,no,yes,medium,no,chiocciole.png,,chiociole
 Anelli,anelli,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,anelli.png,,aneli
-Acini de Pepe,acini-de-pepe,Acini di pepe; peppercorn pasta; peppercorns,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,,,acini pepe; pepe acini; pepercorns; peppercorns; acini di pepe; pepercorn pasta; pasta peppercorn; peppercorn pasta
+Acini de Pepe,acini-de-pepe,Acini di pepe; peppercorn pasta; peppercorns,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,acini-de-pepe.png,,acini pepe; pepe acini; pepercorns; peppercorns; acini di pepe; pepercorn pasta; pasta peppercorn; peppercorn pasta
 Alfabeto,alfabeto,alphabet pasta,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,alfabeto.png,,alphabet pasta; pasta alphabet
 Anchellini,anchellini,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,anchellini.png,,anchelini
 Anellini,anellini,,Soup / Pastina,,,,,soup,,soup,no,no,no,yes,small,no,anellini.png,,anelini
@@ -127,7 +127,7 @@ Coralli,coralli,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,coralli.png,
 Farfalline,farfalline,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,farfalline.png,,farfaline
 Fregula,fregula,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,fregula.png,,
 Filini,filini,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,filini.png,,
-Cuscus,cuscus,Cuscussu; Cous Cous,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,,,cuscusu; cuscussu; cous cous
+Cuscus,cuscus,Cuscussu; Cous Cous,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,cuscus.png,,cuscusu; cuscussu; cous cous
 Grano,grano,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,grano.png,,
 Grattoni,grattoni,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,grattoni.png,,gratoni
 Grattini,grattini,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,grattini.png,,gratini
@@ -146,7 +146,7 @@ Tripolini,tripolini,,Short,,,,,short,,short,no,yes,no,yes,small,no,tripolini.png
 Risi,risi,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,small,no,risi.png,,
 Semi Di Melone,semi-di-melone,,Soup / Pastina,,,,,soup,,soup,no,no,no,no,medium,no,semi-di-melone.png,,melone semi; semi melone
 Cavatelli,cavatelli,cavati; cavateddi,Short,,,,,short,,short,yes,yes,no,yes,medium,no,cavatelli.png,,cavati; cavatedi; cavateli; cavateddi
-Assabesi,assabesi,,Filled,,,,,short,,short,no,yes,no,no,medium,no,assabesi.png,,asabesi
+Assabesi,assabesi,,Stuffed,,,,,short,,short,no,yes,no,no,medium,no,assabesi.png,,asabesi
 Ballerine,ballerine,,Short,,,,,short,,short,no,yes,yes,no,medium,no,ballerine.png,,balerine
 Capunti,capunti,cappunti,Short,,,,,short,,short,yes,yes,no,no,medium,no,capunti.png,,cappunti
 Cencioni,cencioni,,Short,,,,,short,,short,no,yes,no,yes,large,no,cencioni.png,,
