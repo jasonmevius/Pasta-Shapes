@@ -391,11 +391,27 @@ body.is-searching #home-search-card{
   justify-content: center;
 }
 
+/* -----------------------------------------------------------------------------
+  Identify icon rotator (Option A)
+  - We keep the same sizing rules you had, but add:
+    - opacity transition for crossfade
+    - reduced-motion handling (no fade animation)
+  - The JS toggles .is-fading on the <img> when swapping the src.
+----------------------------------------------------------------------------- */
 .identify-hero img{
   display: block;
   object-fit: contain;
   width: 96px;
   height: 96px;
+
+  /* Smooth crossfade when JS swaps icons */
+  opacity: 1;
+  transition: opacity 240ms ease;
+}
+
+/* JS will apply this class briefly to fade out before swapping src */
+.identify-hero img.is-fading{
+  opacity: 0;
 }
 
 @media (max-width: 719px){
@@ -404,6 +420,14 @@ body.is-searching #home-search-card{
     max-height: 80px;
     height: 75%;
     width: 75%;
+  }
+}
+
+/* Accessibility / user preference: if reduced motion is enabled,
+   keep everything static (no fades). JS also disables rotation. */
+@media (prefers-reduced-motion: reduce){
+  .identify-hero img{
+    transition: none;
   }
 }
 
@@ -833,4 +857,3 @@ body.is-searching #home-results-panel{ display: grid; }
   background: rgba(0, 0, 0, 0.07);
   border-color: rgba(0, 0, 0, 0.28);
 }
-
