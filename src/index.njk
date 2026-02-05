@@ -16,9 +16,23 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 {% set IK_THUMBS_BASE = IK_BASE ~ "/pasta/thumbs/" %}
 {% set FALLBACK_THUMB = "pending.png" %}
 
-{# Identify icon per your note #}
+{# -----------------------------------------------------------------------------
+  Home hero rotator (linked icon + example placeholder)
+  - These two rotate in sync to reinforce the "name <-> icon" connection.
+  - Icon images live in ImageKit at /pasta/carousel/
+----------------------------------------------------------------------------- #}
 {% set IK_CAROUSEL_BASE = IK_BASE ~ "/pasta/carousel/" %}
-{% set identifyIconSrcs = [
+{% set homeRotatorNames = [
+  "penne",
+  "ravioli",
+  "fusilli",
+  "conchiglie",
+  "farfalle",
+  "pasta",
+  "gnocchi",
+  "macaroni"
+] %}
+{% set homeRotatorIconSrcs = [
   IK_CAROUSEL_BASE ~ "penne.png",
   IK_CAROUSEL_BASE ~ "ravioli.png",
   IK_CAROUSEL_BASE ~ "fusilli.png",
@@ -49,10 +63,11 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
           autocapitalize="none"
           spellcheck="false"
           placeholder="Start typing - e.g., penne"
+          data-rotator-group="homeHero"
           data-placeholder-rotate="1"
-          data-placeholder-interval="4500"
-          data-placeholder-base="Start typing - e.g.,"
-          data-placeholder-examples="penne, ravioli, fusilli, conchiglie, farfalle, pasta, gnocchi, macaroni"
+          data-placeholder-template="Start typing - e.g., {example}"
+          data-placeholder-examples="penne,ravioli,fusilli,conchiglie,farfalle,pasta,gnocchi,macaroni"
+          data-rotate-interval="2500"
         />
       </form>
 
@@ -75,16 +90,18 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         <img
           id="identify-icon-rotator"
           class="identify-icon"
-          src="{{ identifyIconSrcs[0] }}"
-          width="96"
-          height="96"
-          data-rotate="1"
-          data-rotate-interval="2500"
-          data-rotate-fade="240"
-          data-rotate-srcs="{{ identifyIconSrcs | join(',') }}"
+          src="{{ homeRotatorIconSrcs[0] }}"
           alt=""
           loading="lazy"
           decoding="async"
+          width="96"
+          height="96"
+          data-rotator-group="homeHero"
+          data-rotate="1"
+          data-rotate-srcs="{{ homeRotatorIconSrcs | join(',') }}"
+          data-rotate-names="{{ homeRotatorNames | join(',') }}"
+          data-rotate-interval="2500"
+          data-rotate-fade="240"
         />
       </div>
     </a>
