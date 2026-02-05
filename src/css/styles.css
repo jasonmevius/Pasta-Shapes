@@ -397,18 +397,19 @@ body.is-searching #home-search-card{
   width: 96px;
   height: 96px;
 
-  /* ---------------------------------------------------------------------------
-     Identify icon rotator crossfade (Option A)
-     - JS toggles the .is-fading class before swapping the src
-     - Transition duration is set here (and also synced from JS if needed)
-  --------------------------------------------------------------------------- */
+  /* Smooth fade when JS swaps icons */
   opacity: 1;
   transition: opacity 240ms ease;
 }
 
-/* JS applies this class briefly to fade the icon out before swapping src */
+/* JS applies this class briefly to fade out before swapping src */
 .identify-hero img.is-fading{
   opacity: 0;
+}
+
+/* Respect reduced-motion: disable transitions (JS also disables rotation) */
+@media (prefers-reduced-motion: reduce){
+  .identify-hero img{ transition: none; }
 }
 
 @media (max-width: 719px){
@@ -417,15 +418,6 @@ body.is-searching #home-search-card{
     max-height: 80px;
     height: 75%;
     width: 75%;
-  }
-}
-
-
-/* Accessibility: if reduced motion is enabled, remove fades.
-   JS also disables the rotation in this case. */
-@media (prefers-reduced-motion: reduce){
-  .identify-hero img{
-    transition: none;
   }
 }
 
@@ -855,4 +847,3 @@ body.is-searching #home-results-panel{ display: grid; }
   background: rgba(0, 0, 0, 0.07);
   border-color: rgba(0, 0, 0, 0.28);
 }
-
