@@ -8,16 +8,34 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   index.njk (Homepage)
 
   Changes in this version:
-  - Recently Viewed moved to the bottom of the results panel.
-  - Everything else stays aligned with the simplified mobile layout.
+  - Identify card icon is now an auto-rotating "icon rotator" (Option A).
+  - Rotation is automatic (no user controls).
+  - Respects prefers-reduced-motion (rotation disabled if user requests reduced motion).
+  - Uses a single <img> and swaps src with a CSS fade for clean performance.
 ============================================================================= #}
 
 {% set IK_BASE = "https://ik.imagekit.io/mevius" %}
 {% set IK_THUMBS_BASE = IK_BASE ~ "/pasta/thumbs/" %}
 {% set FALLBACK_THUMB = "pending.png" %}
 
-{# Identify icon per your note #}
-{% set identifyImgUrl = IK_BASE ~ "/pasta/favicon.png?tr=w-256,h-256,f-auto,q-70" %}
+{# -----------------------------------------------------------------------------
+  Identify icon rotator images (ImageKit)
+  - We set an initial image (first item).
+  - We also provide a JS-readable CSV list via data-rotate-srcs.
+  - NOTE: These are untransformed URLs; if you ever want to resize on the fly,
+          we can add ?tr=w-...,h-...,f-auto,q-... later.
+----------------------------------------------------------------------------- #}
+{% set IK_CAROUSEL_BASE = IK_BASE ~ "/pasta/carousel/" %}
+{% set identifyIconSrcs = [
+  IK_CAROUSEL_BASE ~ "penne.png",
+  IK_CAROUSEL_BASE ~ "ravioli.png",
+  IK_CAROUSEL_BASE ~ "fusilli.png",
+  IK_CAROUSEL_BASE ~ "conchiglie.png",
+  IK_CAROUSEL_BASE ~ "farfalle.png",
+  IK_CAROUSEL_BASE ~ "pasta.png",
+  IK_CAROUSEL_BASE ~ "gnocchi.png",
+  IK_CAROUSEL_BASE ~ "macaroni.png"
+] %}
 
 <section class="home-shell" aria-label="Homepage actions">
   <div class="home-panels">
@@ -57,12 +75,26 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         <h2 class="h2 home-card-title">Identify by Shape</h2>
       </header>
 
+      {# ----------------------------------------------------------------------------
+        Identify hero icon:
+        - aria-hidden because the Identify card already has an aria-label
+        - alt="" because it's decorative (screen readers don't need it)
+        - data-rotate-* attributes used by scripts.js to run the rotator
+      ---------------------------------------------------------------------------- #}
       <div class="identify-hero" aria-hidden="true">
         <img
-          src="{{ identifyImgUrl }}"
+          id="identify-icon-rotator"
+          class="identify-icon"
+          src="{{ identifyIconSrcs[0] }}"
           alt=""
           loading="lazy"
           decoding="async"
+          width="96"
+          height="96"
+          data-rotate="1"
+          data-rotate-interval="2500"
+          data-rotate-fade="240"
+          data-rotate-srcs="{{ identifyIconSrcs | join(',') }}"
         />
       </div>
     </a>
