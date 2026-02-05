@@ -89,6 +89,117 @@
   }
 
   // =============================================================================
+  // Identify icon rotator (Homepage - Identify card)
+  // Option A:
+  // - Single <img>
+  // - JS swaps src every N ms
+  // - CSS transition (opacity) provides the crossfade effect
+  // - Honors prefers-reduced-motion (no rotation, no fades)
+  //
+  // Markup requirements (in index.njk):
+  // - <img id="identify-icon-rotator" data-rotate="1" data-rotate-srcs="url1,url2,...">
+  // - Optional: data-rotate-interval="2500" (ms)
+  // - Optional: data-rotate-fade="240" (ms)
+  // =============================================================================
+  function initIdentifyIconRotator() {
+    const img = $("#identify-icon-rotator");
+    if (!img) return;
+
+    // If the user prefers reduced motion, keep it static.
+    const reduceMotion =
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reduceMotion) return;
+
+    // Basic guard: only run if explicitly enabled.
+    if (img.getAttribute("data-rotate") !== "1") return;
+
+    // Parse the list of sources from data-rotate-srcs.
+    // We keep it deliberately simple: comma-separated URLs.
+    const raw = img.getAttribute("data-rotate-srcs") || "";
+    const srcs = raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (srcs.length < 2) return;
+
+    // Interval + fade timing (ms). If not set, use sane defaults.
+    const intervalMs = Math.max(1200, parseInt(img.getAttribute("data-rotate-interval") || "2500", 10));
+    const fadeMs = Math.max(120, parseInt(img.getAttribute("data-rotate-fade") || "240", 10));
+
+    // Ensure the CSS transition duration matches fadeMs if desired.
+    // This avoids drift if you adjust fade timing in the template.
+    // NOTE: inline style is acceptable here because it is a runtime value,
+    // and avoids needing to create many CSS variants.
+    img.style.transitionDuration = `${fadeMs}ms`;
+
+    // Preload images to minimize any chance of a visible "blank" swap.
+    // This is especially helpful on first load or slow connections.
+    try {
+      srcs.forEach((u) => {
+        const pre = new Image();
+        pre.decoding = "async";
+        pre.src = u;
+      });
+    } catch (e) {
+      // If Image() is blocked or fails, the rotator still works.
+    }
+
+    // Start index: match current src if possible, else 0.
+    const currentSrc = img.getAttribute("src") || "";
+    let idx = Math.max(0, srcs.indexOf(currentSrc));
+    let timer = null;
+    let swapping = false;
+
+    function nextIndex() {
+      return (idx + 1) % srcs.length;
+    }
+
+    function swapTo(newSrc) {
+      if (swapping) return;
+      swapping = true;
+
+      // 1) Fade out
+      img.classList.add("is-fading");
+
+      // 2) After fade-out completes, swap src
+      window.setTimeout(() => {
+        img.src = newSrc;
+
+        // 3) Next frame: remove fading class to fade back in
+        requestAnimationFrame(() => {
+          img.classList.remove("is-fading");
+
+          // Small safety delay to prevent rapid re-entry
+          window.setTimeout(() => {
+            swapping = false;
+          }, Math.max(0, Math.floor(fadeMs / 2)));
+        });
+      }, fadeMs);
+    }
+
+    function tick() {
+      const ni = nextIndex();
+      idx = ni;
+      swapTo(srcs[idx]);
+    }
+
+    timer = window.setInterval(tick, intervalMs);
+
+    // Optional: stop rotation when the tab is hidden to save cycles.
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        if (timer) window.clearInterval(timer);
+        timer = null;
+      } else {
+        if (!timer) timer = window.setInterval(tick, intervalMs);
+      }
+    });
+  }
+
+  // =============================================================================
   // Home/Search page behavior
   // =============================================================================
   function initSearchPage() {
@@ -598,6 +709,7 @@
     "DOMContentLoaded",
     () => {
       initHamburgerMenu();
+      initIdentifyIconRotator();   // <-- NEW
       initSearchPage();
       initDetailPage();
       initIdentifyPage();
