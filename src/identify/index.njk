@@ -238,8 +238,11 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       label: (v) => TYPE_LABELS[v] || v,
       desc: (v) => TYPE_DESCS[v] || "",
       icon: (v) => identifyIconUrlFor(`${v}.png`),
-    }
-    {
+    },
+    // NOTE:
+    // We intentionally do NOT ask "stuffed" as a follow-on discriminator.
+    // Type already encodes it (Type=stuffed => stuffed=yes; all other types => no),
+    // so asking it after Type would never narrow results.
     {
       key: "hollow",
       title: "Is it hollow?",
@@ -413,7 +416,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     };
 
     // We prefer these questions after Type (in this order).
-    // NOTE: We intentionally exclude "stuffed" because Type already encodes it.
+    // Size is included but treated as late-stage.
     const preferredOrder = ["hollow", "ridged", "twisted", "curved", "size"];
 
     const candidates = [];
