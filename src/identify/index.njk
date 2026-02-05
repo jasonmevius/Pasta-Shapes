@@ -36,7 +36,11 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
      - Could be a full URL
      We store raw and normalize in JS.
   #}
-  {% set thumbRaw = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
+  {# Prefer explicit ThumbnailImage. If blank, fall back to a slug-based filename (slug.png).
+     This keeps Identify from showing pending.png when the CSV omits ThumbnailImage,
+     while still allowing explicit overrides when needed. #}
+  {% set thumbCandidate = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
+  {% set thumbRaw = thumbCandidate if thumbCandidate else (item.Slug ~ ".png") %}
 
   {# Aliases notes:
      - Your CSV has evolved - we try multiple possible column names.
@@ -303,17 +307,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     thumb: String(r.thumb || ""),
   }));
 
-  
-  // --- Sorting --------------------------------------------------------------
-  // Always keep working results alphabetized A–Z by display name.
-  // This applies to "Show all" and every filtered state.
-  const sortByName = (arr) => {
-    return arr.sort((a, b) =>
-      String(a.name || "").localeCompare(String(b.name || ""), "en", { sensitivity: "base" })
-    );
-  };
-
-  let working = sortByName(initial.slice());
+  let working = initial.slice();
   let history = []; // [{ key, value, prevWorking }]
 
   const setText = (el, txt) => { if (el) el.textContent = txt; };
@@ -326,7 +320,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     if (!els.resultsList) return;
 
     els.resultsList.innerHTML = "";
-    for (const item of sortByName(working.slice()).slice(0, 100)) {
+    for (const item of working.slice(0, 100)) {
       const li = document.createElement("li");
       li.className = "result-card";
 
@@ -402,7 +396,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     const prev = working;
     history.push({ key, value, prevWorking: prev });
 
-    working = sortByName(working.filter((item) => {
+    working = working.filter((item) => {
       const itemVal = item[key];
       if (!itemVal) return true;
 
@@ -411,7 +405,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
       // bool values stored as "yes"/"no" in CSV
       return itemVal === value;
-    }));
+    });
 
     render();
   };
@@ -419,12 +413,12 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   const goBack = () => {
     if (!history.length) return;
     const last = history.pop();
-    working = sortByName((last.prevWorking || initial.slice()).slice());
+    working = last.prevWorking || initial.slice();
     render();
   };
 
   const reset = () => {
-    working = sortByName(initial.slice());
+    working = initial.slice();
     history = [];
     render();
   };
