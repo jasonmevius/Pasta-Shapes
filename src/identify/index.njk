@@ -310,6 +310,17 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   let working = initial.slice();
   let history = []; // [{ key, value, prevWorking }]
 
+  // Always keep any displayed results alphabetical (A–Z), regardless of how the
+  // user arrived at the current working set (Show All, filtered, back, reset).
+  // We sort by the human-readable name using a case-insensitive compare.
+  const sortWorking = () => {
+    working.sort((a, b) =>
+      String(a.name || "").localeCompare(String(b.name || ""), "en", {
+        sensitivity: "base",
+      })
+    );
+  };
+
   const setText = (el, txt) => { if (el) el.textContent = txt; };
 
   const renderMatchesCount = () => {
@@ -487,6 +498,9 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   // --- Main render ----------------------------------------------------------
   const render = () => {
     const q = nextQuestion();
+
+    // Keep results alphabetical anytime we render.
+    sortWorking();
 
     // Buttons: Back enabled only if we have history
     if (els.btnBack) els.btnBack.disabled = history.length === 0;
