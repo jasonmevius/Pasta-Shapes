@@ -91,7 +91,7 @@
   // =============================================================================
   // Identify icon rotator (Homepage - Identify card)
   // Option A:
-  // - Single <img>
+  // - Single <img> (no user controls)
   // - JS swaps src every N ms
   // - CSS transition (opacity) provides the crossfade effect
   // - Honors prefers-reduced-motion (no rotation, no fades)
@@ -105,18 +105,16 @@
     const img = $("#identify-icon-rotator");
     if (!img) return;
 
-    // If the user prefers reduced motion, keep it static.
+    // Respect user preference for reduced motion.
     const reduceMotion =
       window.matchMedia &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
     if (reduceMotion) return;
 
-    // Basic guard: only run if explicitly enabled.
+    // Guard: only run if explicitly enabled.
     if (img.getAttribute("data-rotate") !== "1") return;
 
-    // Parse the list of sources from data-rotate-srcs.
-    // We keep it deliberately simple: comma-separated URLs.
     const raw = img.getAttribute("data-rotate-srcs") || "";
     const srcs = raw
       .split(",")
@@ -125,29 +123,27 @@
 
     if (srcs.length < 2) return;
 
-    // Interval + fade timing (ms). If not set, use sane defaults.
-    const intervalMs = Math.max(1200, parseInt(img.getAttribute("data-rotate-interval") || "2500", 10));
-    const fadeMs = Math.max(120, parseInt(img.getAttribute("data-rotate-fade") || "240", 10));
+    const intervalMs = Math.max(
+      1200,
+      parseInt(img.getAttribute("data-rotate-interval") || "2500", 10)
+    );
+    const fadeMs = Math.max(
+      120,
+      parseInt(img.getAttribute("data-rotate-fade") || "240", 10)
+    );
 
-    // Ensure the CSS transition duration matches fadeMs if desired.
-    // This avoids drift if you adjust fade timing in the template.
-    // NOTE: inline style is acceptable here because it is a runtime value,
-    // and avoids needing to create many CSS variants.
+    // Keep CSS and JS in sync for fade timing.
     img.style.transitionDuration = `${fadeMs}ms`;
 
-    // Preload images to minimize any chance of a visible "blank" swap.
-    // This is especially helpful on first load or slow connections.
+    // Preload to minimize any chance of a blank frame on swap.
     try {
       srcs.forEach((u) => {
         const pre = new Image();
         pre.decoding = "async";
         pre.src = u;
       });
-    } catch (e) {
-      // If Image() is blocked or fails, the rotator still works.
-    }
+    } catch (e) {}
 
-    // Start index: match current src if possible, else 0.
     const currentSrc = img.getAttribute("src") || "";
     let idx = Math.max(0, srcs.indexOf(currentSrc));
     let timer = null;
@@ -161,18 +157,16 @@
       if (swapping) return;
       swapping = true;
 
-      // 1) Fade out
+      // Fade out, swap src after fade, then fade back in.
       img.classList.add("is-fading");
 
-      // 2) After fade-out completes, swap src
       window.setTimeout(() => {
         img.src = newSrc;
 
-        // 3) Next frame: remove fading class to fade back in
         requestAnimationFrame(() => {
           img.classList.remove("is-fading");
 
-          // Small safety delay to prevent rapid re-entry
+          // Small guard delay to avoid rapid re-entry.
           window.setTimeout(() => {
             swapping = false;
           }, Math.max(0, Math.floor(fadeMs / 2)));
@@ -181,23 +175,135 @@
     }
 
     function tick() {
-      const ni = nextIndex();
-      idx = ni;
+      idx = nextIndex();
       swapTo(srcs[idx]);
     }
 
     timer = window.setInterval(tick, intervalMs);
 
-    // Optional: stop rotation when the tab is hidden to save cycles.
+    // Pause while tab is hidden (saves cycles).
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) {
         if (timer) window.clearInterval(timer);
         timer = null;
-      } else {
-        if (!timer) timer = window.setInterval(tick, intervalMs);
+      } else if (!timer) {
+        timer = window.setInterval(tick, intervalMs);
       }
     });
   }
+
+  // =============================================================================
+  // Search placeholder rotator (Homepage - Search input)
+  // Option A:
+  // - Cycles example pasta names inside the input placeholder (not bold, not a title)
+  // - Only rotates when:
+  //     - input is empty AND
+  //     - input is NOT focused
+  // - Pauses when user focuses/starts typing
+  // - Honors prefers-reduced-motion
+  //
+  // Markup requirements (in index.njk):
+  // - <input id="pasta-q" data-placeholder-rotate="1"
+  //          data-placeholder-base="Start typing - e.g.,"
+  //          data-placeholder-examples="farfalle, penne, ..."
+  //          data-placeholder-interval="4500">
+  // =============================================================================
+  function initSearchPlaceholderRotator() {
+    const input = $("#pasta-q");
+    if (!input) return;
+
+    const reduceMotion =
+      window.matchMedia &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (reduceMotion) return;
+
+    if (input.getAttribute("data-placeholder-rotate") !== "1") return;
+
+    const base = (input.getAttribute("data-placeholder-base") || "Start typing - e.g.,").trim();
+    const raw = input.getAttribute("data-placeholder-examples") || "";
+    const examples = raw
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+
+    if (examples.length < 2) return;
+
+    const intervalMs = Math.max(
+      1800,
+      parseInt(input.getAttribute("data-placeholder-interval") || "4500", 10)
+    );
+
+    let idx = 0;
+    let timer = null;
+    let isFocused = false;
+
+    function setPlaceholder(example) {
+      // Ensure spacing: base might already end with comma.
+      const sep = base.endsWith(",") ? " " : " ";
+      input.placeholder = `${base}${sep}${example}`;
+    }
+
+    // Initialize to first example.
+    setPlaceholder(examples[idx]);
+
+    function canRotate() {
+      // Only rotate if user isn't interacting and field is empty.
+      return !isFocused && !String(input.value || "").trim();
+    }
+
+    function tick() {
+      if (!canRotate()) return;
+      idx = (idx + 1) % examples.length;
+      setPlaceholder(examples[idx]);
+    }
+
+    function start() {
+      if (timer) return;
+      timer = window.setInterval(tick, intervalMs);
+    }
+
+    function stop() {
+      if (!timer) return;
+      window.clearInterval(timer);
+      timer = null;
+    }
+
+    // Focus/blur behavior
+    input.addEventListener("focus", () => {
+      isFocused = true;
+      stop();
+    });
+
+    input.addEventListener("blur", () => {
+      isFocused = false;
+      // If the field is empty, resume and ensure placeholder is visible.
+      if (!String(input.value || "").trim()) {
+        setPlaceholder(examples[idx]);
+        start();
+      }
+    });
+
+    // If user clears the field, resume rotation.
+    input.addEventListener("input", () => {
+      if (!String(input.value || "").trim()) {
+        // Only restart if not focused (focused means user is likely about to type).
+        if (!isFocused) start();
+      } else {
+        stop();
+      }
+    });
+
+    // Pause rotation while tab hidden.
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) stop();
+      else if (canRotate()) start();
+    });
+
+    // Start immediately (idle state).
+    if (canRotate()) start();
+  }
+
 
   // =============================================================================
   // Home/Search page behavior
@@ -709,7 +815,8 @@
     "DOMContentLoaded",
     () => {
       initHamburgerMenu();
-      initIdentifyIconRotator();   // <-- NEW
+      initIdentifyIconRotator();
+      initSearchPlaceholderRotator();
       initSearchPage();
       initDetailPage();
       initIdentifyPage();
