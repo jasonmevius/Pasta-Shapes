@@ -238,15 +238,8 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       label: (v) => TYPE_LABELS[v] || v,
       desc: (v) => TYPE_DESCS[v] || "",
       icon: (v) => identifyIconUrlFor(`${v}.png`),
-    },
+    }
     {
-      key: "stuffed",
-      title: "Is it stuffed?",
-      help: "Stuffed pasta includes filled shapes like ravioli-type forms.",
-      kind: "bool",
-      descYes: "There’s a filling inside (cheese, meat, etc.).",
-      descNo: "No filling - it’s just pasta dough.",
-    },
     {
       key: "hollow",
       title: "Is it hollow?",
@@ -386,20 +379,62 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   const questionAlreadyAnswered = (key) => history.some((h) => h.key === key);
 
   const nextQuestion = () => {
-    // Always start with Type.
-    if (!questionAlreadyAnswered("type")) return QUESTION_DEFS[0];
+    // Type is always first.
+    if (!questionAlreadyAnswered("type")) return QUESTION_DEFS.find((q) => q.key === "type");
 
-    // Then ask the "shape discriminators" before size.
-    for (const q of QUESTION_DEFS) {
-      if (q.key === "type") continue;
-      if (q.key === "size") continue;
-      if (!questionAlreadyAnswered(q.key)) return q;
+    // Build a set of answered keys so we don't repeat questions
+    const answered = new Set(history.map((h) => h.key));
+
+    // Helper: score how well a question can split the current working set.
+    // We ignore empty/unknown values because those don't help narrow results.
+    // Score uses Gini impurity (higher => more diverse => better splitter).
+    const scoreQuestion = (key) => {
+      const counts = new Map(); // value -> count
+
+      for (const item of working) {
+        const v = String(item[key] || "").trim();
+        if (!v) continue; // ignore unknowns
+        counts.set(v, (counts.get(v) || 0) + 1);
+      }
+
+      // If there aren't at least 2 distinct known values, this question can't narrow anything.
+      if (counts.size < 2) return 0;
+
+      const total = Array.from(counts.values()).reduce((a, b) => a + b, 0);
+      if (!total) return 0;
+
+      // Gini impurity = 1 - sum(p_i^2)
+      let sumSq = 0;
+      for (const c of counts.values()) {
+        const p = c / total;
+        sumSq += p * p;
+      }
+      return 1 - sumSq;
+    };
+
+    // We prefer these questions after Type (in this order).
+    // NOTE: We intentionally exclude "stuffed" because Type already encodes it.
+    const preferredOrder = ["hollow", "ridged", "twisted", "curved", "size"];
+
+    const candidates = [];
+    for (const key of preferredOrder) {
+      if (answered.has(key)) continue;
+
+      // Keep Size late-stage: only ask when there are still many matches.
+      if (key === "size" && working.length <= 25) continue;
+
+      const q = QUESTION_DEFS.find((d) => d.key === key);
+      if (!q) continue;
+
+      const s = scoreQuestion(key);
+      if (s > 0) candidates.push({ q, s });
     }
 
-    // Size last
-    if (!questionAlreadyAnswered("size")) return QUESTION_DEFS.find((q) => q.key === "size");
+    if (!candidates.length) return null;
 
-    return null;
+    // Highest score wins. Tie-breaker is the preferredOrder sequence above.
+    candidates.sort((a, b) => b.s - a.s);
+    return candidates[0].q;
   };
 
   // --- Filtering ------------------------------------------------------------
