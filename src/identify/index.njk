@@ -17,9 +17,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   - Avoid dead ends - user can Back/Reset anytime.
 
   IMPORTANT NOTES
-  - You currently embed JS in this template (existing behavior).
-  - If you later want to move this into /js/scripts.js, we can do it safely,
-    but for now we preserve your working implementation to avoid breakage.
+  - Identify JS is intentionally embedded in this template (existing behavior).
   - No inline CSS - all styling remains in /src/css/styles.css.
 ============================================================================= #}
 
@@ -135,8 +133,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 </script>
 
 {# -----------------------------------------------------------------------------
-  Existing identify JS (preserved)
-  - If/when you want, we can move this into scripts.js for cleanliness.
+  Identify JS (embedded by design for now)
 ----------------------------------------------------------------------------- #}
 <script>
 (function () {
@@ -205,6 +202,9 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     return;
   }
 
+  // ---------------------------------------------------------------------------
+  // TYPE LABELS (UPDATED per your new category naming)
+  // ---------------------------------------------------------------------------
   const TYPE_LABELS = {
     strand: "Strand",
     tube: "Tube",
@@ -212,11 +212,12 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     sheet: "Sheet",
     short: "Short cut",
     stuffed: "Stuffed",
-    soup: "Soup / pastina",
-    ring: "Ring / wheel",
-    dumpling: "Dumpling / pasta-like",
+    soup: "Soup (Pastina)",
+    ring: "Ring",
+    dumpling: "Dumpling",
   };
 
+  // Optional: keep the short descriptions aligned with the new labels.
   const TYPE_DESCS = {
     strand: "Long, thin noodles (round or slightly flattened).",
     tube: "Hollow pasta designed to hold sauce inside.",
@@ -225,7 +226,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     short: "Short shapes that scoop, trap, or cling to sauce.",
     stuffed: "Filled pasta (pockets, pillows, or sealed edges).",
     soup: "Tiny pasta made for spoons and brothy soups.",
-    ring: "Rings and wheels that catch sauce in openings.",
+    ring: "Rings that catch sauce in openings.",
     dumpling: "Pasta-like dumplings (often irregular or rustic).",
   };
 
@@ -306,9 +307,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   let working = initial.slice();
   let history = []; // [{ key, value, prevWorking }]
 
-  // Always keep any displayed results alphabetical (A–Z), regardless of how the
-  // user arrived at the current working set (Show All, filtered, back, reset).
-  // We sort by the human-readable name using a case-insensitive compare.
+  // Always keep any displayed results alphabetical (A–Z)
   const sortWorking = () => {
     working.sort((a, b) =>
       String(a.name || "").localeCompare(String(b.name || ""), "en", {
@@ -382,31 +381,24 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   const questionAlreadyAnswered = (key) => history.some((h) => h.key === key);
 
   const nextQuestion = () => {
-    // Type is always first.
     if (!questionAlreadyAnswered("type")) return QUESTION_DEFS.find((q) => q.key === "type");
 
-    // Build a set of answered keys so we don't repeat questions
     const answered = new Set(history.map((h) => h.key));
 
-    // Helper: score how well a question can split the current working set.
-    // We ignore empty/unknown values because those don't help narrow results.
-    // Score uses Gini impurity (higher => more diverse => better splitter).
     const scoreQuestion = (key) => {
-      const counts = new Map(); // value -> count
+      const counts = new Map();
 
       for (const item of working) {
         const v = String(item[key] || "").trim();
-        if (!v) continue; // ignore unknowns
+        if (!v) continue;
         counts.set(v, (counts.get(v) || 0) + 1);
       }
 
-      // If there aren't at least 2 distinct known values, this question can't narrow anything.
       if (counts.size < 2) return 0;
 
       const total = Array.from(counts.values()).reduce((a, b) => a + b, 0);
       if (!total) return 0;
 
-      // Gini impurity = 1 - sum(p_i^2)
       let sumSq = 0;
       for (const c of counts.values()) {
         const p = c / total;
@@ -415,15 +407,11 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       return 1 - sumSq;
     };
 
-    // We prefer these questions after Type (in this order).
-    // Size is included but treated as late-stage.
     const preferredOrder = ["hollow", "ridged", "twisted", "curved", "size"];
 
     const candidates = [];
     for (const key of preferredOrder) {
       if (answered.has(key)) continue;
-
-      // Keep Size late-stage: only ask when there are still many matches.
       if (key === "size" && working.length <= 25) continue;
 
       const q = QUESTION_DEFS.find((d) => d.key === key);
@@ -435,7 +423,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
     if (!candidates.length) return null;
 
-    // Highest score wins. Tie-breaker is the preferredOrder sequence above.
     candidates.sort((a, b) => b.s - a.s);
     return candidates[0].q;
   };
@@ -448,11 +435,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     working = working.filter((item) => {
       const itemVal = item[key];
       if (!itemVal) return true;
-
-      // "__ns__" means user is not sure - do not filter.
       if (value === "__ns__") return true;
-
-      // bool values stored as "yes"/"no" in CSV
       return itemVal === value;
     });
 
@@ -491,7 +474,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       img.width = 56;
       img.height = 56;
 
-      // Prefer question-specific icon scheme for yes/no/not sure
       if (q.kind === "bool") {
         img.src = answerIconFor(q.key, value);
       } else if (iconUrl) {
@@ -525,7 +507,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       return;
     }
 
-    // Enum questions
     const values = q.values || Object.keys(TYPE_LABELS);
     for (const v of values) {
       addButton(q.label(v), v, q.desc(v), q.icon ? q.icon(v) : null);
@@ -537,21 +518,16 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   const render = () => {
     const q = nextQuestion();
 
-    // Keep results alphabetical anytime we render.
     sortWorking();
 
-    // Buttons: Back enabled only if we have history
     if (els.btnBack) els.btnBack.disabled = history.length === 0;
 
-    // If we have exactly one match, go straight to detail page.
-    // NOTE: This is optional. If you prefer to keep user in Identify, remove.
     if (working.length === 1) {
       const only = working[0];
       window.location.href = `/pasta/${only.slug}/`;
       return;
     }
 
-    // If no question remains, show list
     if (!q) {
       setText(els.kicker, "Done");
       setText(els.title, "Here are your matches");
@@ -570,7 +546,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     renderAnswers(q);
     renderMatchesCount();
 
-    // Default behavior: keep list hidden on mobile unless user asks.
     showResultsPanel(false);
     renderResultsList();
   };
