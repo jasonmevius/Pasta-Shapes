@@ -6,16 +6,12 @@
 
   // =============================================================================
   // Mobile hamburger menu
-  // - Closed by default
-  // - Toggle open/close
-  // - Close on outside click, ESC, or link click
   // =============================================================================
   function initHamburgerMenu() {
     const btn = $("#nav-toggle");
     const drawer = $("#nav-drawer");
     if (!btn || !drawer) return;
 
-    // Safe initial state on every load.
     btn.setAttribute("aria-expanded", "false");
     drawer.hidden = true;
 
@@ -40,18 +36,15 @@
       toggleMenu();
     });
 
-    // Click a link - close.
     drawer.addEventListener("click", (e) => {
       const a = e.target.closest("a[href]");
       if (a) closeMenu();
     });
 
-    // ESC - close.
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape") closeMenu();
     });
 
-    // Click outside - close.
     document.addEventListener("click", (e) => {
       const isOpen = btn.getAttribute("aria-expanded") === "true";
       if (!isOpen) return;
@@ -88,79 +81,55 @@
     writeRecents(cur);
   }
 
-  
   // =============================================================================
   // Linked home rotator (Homepage)
-  // - Syncs Identify icon rotation with Search placeholder examples
-  // - Purpose: reinforce the connection between "name" and "shape"
-  //
-  // Behavior / guardrails:
-  // - Runs only when:
-  //    - input is empty
-  //    - input is not focused
-  //    - user does NOT prefer reduced motion
-  // - Pauses when user focuses the input or starts typing.
-  // - Uses a single shared index and interval for both icon + placeholder.
-  //
-  // Markup requirements (index.njk):
-  // - Identify <img id="identify-icon-rotator" data-rotator-group="homeHero"
-  //     data-rotate-srcs="url1,url2,..." data-rotate-names="penne,..."
-  //     data-rotate-interval="2500" data-rotate-fade="240">
-  // - Search <input id="pasta-q" data-rotator-group="homeHero"
-  //     data-placeholder-rotate="1"
-  //     data-placeholder-template="Start typing - e.g., {example}"
-  //     data-placeholder-examples="penne,ravioli,..."
-  //     data-rotate-interval="2500">
   // =============================================================================
   function initLinkedHomeRotators() {
     const input = $("#pasta-q");
     const img = $("#identify-icon-rotator");
-
-    // Only run on the homepage layout where both exist.
     if (!input || !img) return;
 
-    // Reduced motion: keep everything static.
     const reduceMotion =
       window.matchMedia &&
       window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduceMotion) return;
 
-    // Make sure these belong to the same group.
     const groupA = input.getAttribute("data-rotator-group") || "";
     const groupB = img.getAttribute("data-rotator-group") || "";
     if (!groupA || groupA !== groupB) return;
 
-    // Parse icon srcs
     const rawSrcs = img.getAttribute("data-rotate-srcs") || "";
     const iconSrcs = rawSrcs.split(",").map((s) => s.trim()).filter(Boolean);
 
-    // Parse names for the placeholder
-    const rawNames = input.getAttribute("data-placeholder-examples")
-      || img.getAttribute("data-rotate-names")
-      || "";
+    const rawNames =
+      input.getAttribute("data-placeholder-examples") ||
+      img.getAttribute("data-rotate-names") ||
+      "";
     const names = rawNames.split(",").map((s) => s.trim()).filter(Boolean);
 
-    // Must have at least 2 to rotate; also keep arrays aligned by using the min length.
     const N = Math.min(iconSrcs.length, names.length);
     if (N < 2) return;
 
-    // Timing knobs
     const intervalMs = Math.max(
       1200,
-      parseInt(input.getAttribute("data-rotate-interval") || img.getAttribute("data-rotate-interval") || "2500", 10)
+      parseInt(
+        input.getAttribute("data-rotate-interval") ||
+          img.getAttribute("data-rotate-interval") ||
+          "2500",
+        10
+      )
     );
     const fadeMs = Math.max(
       120,
       parseInt(img.getAttribute("data-rotate-fade") || "240", 10)
     );
 
-    // Keep CSS transition in sync with fadeMs.
     img.style.transitionDuration = `${fadeMs}ms`;
 
-    // Placeholder template, defaults to your original style.
-    const tpl = input.getAttribute("data-placeholder-template") || "Start typing - e.g., {example}";
+    const tpl =
+      input.getAttribute("data-placeholder-template") ||
+      "Start typing - e.g., {example}";
 
-    // Preload icons to minimize flicker.
     try {
       for (let i = 0; i < N; i++) {
         const pre = new Image();
@@ -169,12 +138,10 @@
       }
     } catch (e) {}
 
-    // Start index: try to match current icon src; otherwise 0.
     const currentSrc = img.getAttribute("src") || "";
     let idx = Math.max(0, iconSrcs.indexOf(currentSrc));
     if (idx >= N) idx = 0;
 
-    // Ensure the placeholder matches initial index.
     function setPlaceholder(i) {
       const ex = names[i] || names[0] || "penne";
       input.setAttribute("placeholder", tpl.replace("{example}", ex));
@@ -185,7 +152,6 @@
     let swapping = false;
 
     function shouldRun() {
-      // Only rotate when the input is empty and NOT focused.
       const hasText = Boolean(String(input.value || "").trim());
       const isFocused = document.activeElement === input;
       return !hasText && !isFocused;
@@ -195,13 +161,9 @@
       if (swapping) return;
       swapping = true;
 
-      // Fade out
       img.classList.add("is-fading");
-
       window.setTimeout(() => {
         img.src = newSrc;
-
-        // Fade back in next frame
         requestAnimationFrame(() => {
           img.classList.remove("is-fading");
           window.setTimeout(() => {
@@ -214,7 +176,6 @@
     function tick() {
       if (!shouldRun()) return;
       idx = (idx + 1) % N;
-
       setPlaceholder(idx);
       fadeSwapIcon(iconSrcs[idx]);
     }
@@ -230,65 +191,49 @@
       timer = null;
     }
 
-    // Start immediately if allowed.
     if (shouldRun()) start();
 
-    // Pause/resume based on user interaction.
     input.addEventListener("focus", () => stop(), { passive: true });
     input.addEventListener("input", () => {
       if (shouldRun()) start();
       else stop();
     });
-    input.addEventListener("blur", () => {
-      // If the user leaves the field empty, resume.
-      if (shouldRun()) start();
-    }, { passive: true });
+    input.addEventListener(
+      "blur",
+      () => {
+        if (shouldRun()) start();
+      },
+      { passive: true }
+    );
 
-    // Pause when the tab is hidden, resume when visible (if allowed).
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) stop();
       else if (shouldRun()) start();
     });
   }
 
-// =============================================================================
+  // =============================================================================
   // Home/Search page behavior
   // =============================================================================
   function initSearchPage() {
     const input = $("#pasta-q");
     const status = $("#pasta-search-status");
     const list = $("#pasta-results");
-
-    // Only run on pages with the search UI.
     if (!input || !status || !list) return;
 
     const resultsPanel = $("#home-results-panel");
     const identifyCard = $("#home-identify-card");
 
-    // -------------------------------------------------------------------------
-    // Home UI state toggles:
-    // - Idle: Identify card shown, Results panel hidden
-    // - Typing: Identify card hidden, Results panel shown
-    // CSS handles the layout via body.is-searching.
-    // -------------------------------------------------------------------------
     function setSearchingUI(isSearching) {
       document.body.classList.toggle("is-searching", isSearching);
-
       if (resultsPanel) resultsPanel.hidden = !isSearching;
-
-      // Keep accessibility clean: the Identify card is visually removed by CSS,
-      // but we also set aria-hidden when searching.
       if (identifyCard) {
         identifyCard.setAttribute("aria-hidden", isSearching ? "true" : "false");
       }
     }
 
-    // Initial UI state
     setSearchingUI(Boolean(String(input.value || "").trim()));
 
-    // -------------------------------------------------------------------------
-    // Existing search logic
-    // -------------------------------------------------------------------------
     const cards = Array.from(list.querySelectorAll("[data-search]"));
     const recentWrap = $("#recently-viewed-wrap");
     const recentList = $("#recently-viewed");
@@ -306,9 +251,6 @@
       el.setAttribute("aria-hidden", isVisible ? "false" : "true");
     }
 
-    // -------------------------------------------------------------------------
-    // Normalization helpers
-    // -------------------------------------------------------------------------
     const STOPWORDS = new Set([
       "a","ad","al","alla","alle","allo","ai","agli","all",
       "da","de","dei","degli","della","delle","del","di",
@@ -327,7 +269,6 @@
         .trim();
     }
 
-    // Collapses spaced-letter inputs like "p e n n e" -> "penne"
     function normalizeQuery(s) {
       const q = normalize(s);
       if (/^(?:[a-z0-9]\s+){2,}[a-z0-9]$/.test(q)) return q.replace(/\s+/g, "");
@@ -343,9 +284,7 @@
       return parts.join(" ").trim();
     }
 
-    // -------------------------------------------------------------------------
     // Optional fuzzy support using /api/pasta-index.json
-    // -------------------------------------------------------------------------
     let indexLoaded = false;
     let index = null;
     let aliasKeys = null;
@@ -402,17 +341,21 @@
       for (let i = 1; i <= al; i++) {
         cur[0] = i;
 
-        let rowMin = cur[0];
+        let minRow = cur[0];
         const ai = a.charCodeAt(i - 1);
 
         for (let j = 1; j <= bl; j++) {
           const cost = ai === b.charCodeAt(j - 1) ? 0 : 1;
-          const val = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
-          cur[j] = val;
-          if (val < rowMin) rowMin = val;
+          const v = Math.min(
+            prev[j] + 1,
+            cur[j - 1] + 1,
+            prev[j - 1] + cost
+          );
+          cur[j] = v;
+          if (v < minRow) minRow = v;
         }
 
-        if (rowMin > maxDist) return maxDist + 1;
+        if (minRow > maxDist) return maxDist + 1;
 
         const tmp = prev;
         prev = cur;
@@ -422,351 +365,726 @@
       return prev[bl];
     }
 
-    // -------------------------------------------------------------------------
-    // Result show/hide helpers
-    // -------------------------------------------------------------------------
-    function hideAll() {
-      for (const c of cards) c.hidden = true;
-    }
+    function showRecents() {
+      if (!recentWrap || !recentList) return;
 
-    function showOnly(listToShow) {
-      hideAll();
-      for (const c of listToShow) c.hidden = false;
-    }
-
-    function updateFooter(matchCount, shownCount) {
-      if (!note || !nextBtn) return;
-
-      const remaining = Math.max(0, matchCount - shownCount);
-
-      if (matchCount === 0 || remaining === 0) {
-        note.textContent = matchCount ? `Showing ${shownCount} of ${matchCount}` : "";
-        setControlVisible(nextBtn, false);
+      const recents = readRecents();
+      if (!recents.length) {
+        recentWrap.hidden = true;
         return;
       }
 
-      note.textContent = `Showing ${shownCount} of ${matchCount} - ${remaining} more`;
-      const nextChunk = Math.min(PAGE_N, remaining);
-      nextBtn.textContent = `Next ${nextChunk} (${remaining} more)`;
-      setControlVisible(nextBtn, true);
-    }
+      const names = [];
+      for (const slug of recents) {
+        const card = cardBySlug.get(slug);
+        if (!card) continue;
+        const name = card.getAttribute("data-name") || slug;
+        names.push({ slug, name });
+      }
 
-    // Cache normalized values from DOM
-    const cached = cards.map((card) => {
-      const nameEl = card.querySelector(".result-name");
-      const alsoEl = card.querySelector(".result-also");
-      const descEl = card.querySelector(".result-desc");
-
-      const nameText = nameEl ? nameEl.textContent : "";
-      const alsoText = alsoEl ? alsoEl.textContent : "";
-      const descText = descEl ? descEl.textContent : "";
-
-      const nameNorm = normalize(nameText);
-      const aliasNorm = normalize([alsoText, descText, card.getAttribute("data-search") || ""].join(" "));
-
-      return { card, nameNorm, aliasNorm };
-    });
-
-    function reorder(newOrder) {
-      for (const it of newOrder) list.appendChild(it.card);
-    }
-
-    // -------------------------------------------------------------------------
-    // Main filter function
-    // -------------------------------------------------------------------------
-    async function applyFilter() {
-      const q = normalizeQuery(input.value || "");
-      const hasQuery = Boolean(q);
-
-      setSearchingUI(hasQuery);
-
-      if (!hasQuery) {
-        hideAll();
-        status.textContent = "Start typing to see matches.";
-        updateFooter(0, 0);
-        setControlVisible(nextBtn, false);
+      if (!names.length) {
+        recentWrap.hidden = true;
         return;
       }
 
-      // 1) Name-prefix matches
-      const nameMatches = [];
-      const nonName = [];
+      recentWrap.hidden = false;
 
-      for (const it of cached) {
-        if (it.nameNorm && it.nameNorm.startsWith(q)) nameMatches.push(it);
-        else nonName.push(it);
-      }
-
-      if (nameMatches.length) {
-        nameMatches.sort(
-          (a, b) => a.nameNorm.length - b.nameNorm.length || a.nameNorm.localeCompare(b.nameNorm)
-        );
-
-        reorder(nameMatches.concat(nonName));
-
-        const limited = nameMatches.slice(0, visibleLimit).map((x) => x.card);
-        showOnly(limited);
-
-        const shown = limited.length;
-        status.textContent = `${shown} of ${nameMatches.length} matches (name starts with "${q}")`;
-        updateFooter(nameMatches.length, shown);
-        return;
-      }
-
-      // 2) Alias/metadata matches (includes)
-      const aliasMatches = [];
-      const nonAlias = [];
-
-      for (const it of cached) {
-        if (it.aliasNorm && it.aliasNorm.includes(q)) aliasMatches.push(it);
-        else nonAlias.push(it);
-      }
-
-      // 3) Optional fuzzy match fallback
-      if (!aliasMatches.length && q.length >= 4) {
-        await loadIndexIfNeeded();
-
-        if (stopKeyToSlugs) {
-          const qStop = stripStopwords(q);
-          const maxDist = qStop.length <= 6 ? 1 : 2;
-
-          const hits = new Set();
-          for (const [stopKey, slugs] of stopKeyToSlugs.entries()) {
-            if (Math.abs(stopKey.length - qStop.length) > maxDist) continue;
-
-            const d = levenshtein(qStop, stopKey, maxDist);
-            if (d <= maxDist) {
-              for (const s of slugs) hits.add(s);
-              if (hits.size >= 25) break;
-            }
-          }
-
-          const fuzzyCards = [];
-          for (const slug of hits) {
-            const card = cardBySlug.get(slug);
-            if (card) fuzzyCards.push(card);
-          }
-
-          if (fuzzyCards.length) {
-            const shownCards = fuzzyCards.slice(0, visibleLimit);
-            showOnly(shownCards);
-            status.textContent = `${Math.min(visibleLimit, fuzzyCards.length)} of ${fuzzyCards.length} matches (fuzzy)`;
-            updateFooter(fuzzyCards.length, shownCards.length);
-            return;
-          }
+      // Comma-delimited list (max 5), still linked
+      const top5 = names.slice(0, 5);
+      recentList.innerHTML = "";
+      top5.forEach((it, i) => {
+        const a = document.createElement("a");
+        a.href = `/pasta/${it.slug}/`;
+        a.textContent = it.name;
+        a.setAttribute("data-recent", "pasta");
+        recentList.appendChild(a);
+        if (i < top5.length - 1) {
+          recentList.appendChild(document.createTextNode(", "));
         }
-      }
-
-      // Alias matches (paged)
-      if (aliasMatches.length) {
-        reorder(aliasMatches.concat(nonAlias));
-
-        const limited = aliasMatches.slice(0, visibleLimit).map((x) => x.card);
-        showOnly(limited);
-
-        const shown = limited.length;
-        status.textContent = `${shown} of ${aliasMatches.length} matches (aliases and metadata)`;
-        updateFooter(aliasMatches.length, shown);
-        return;
-      }
-
-      // Nothing found
-      hideAll();
-      status.textContent = "No matches found.";
-      updateFooter(0, 0);
-      setControlVisible(nextBtn, false);
-    }
-
-    // -------------------------------------------------------------------------
-    // Events
-    // -------------------------------------------------------------------------
-    let rafPending = false;
-    function requestFilter() {
-      if (rafPending) return;
-      rafPending = true;
-      requestAnimationFrame(() => {
-        rafPending = false;
-        applyFilter();
       });
     }
 
-    input.addEventListener("input", () => {
+    showRecents();
+
+    function renderCards(listOfCards) {
+      // Hide all first
+      for (const c of cards) c.hidden = true;
+
+      // Show only current
+      for (const c of listOfCards) c.hidden = false;
+
+      // Match count
+      status.textContent =
+        listOfCards.length === 0
+          ? "No matches"
+          : `${listOfCards.length} match${listOfCards.length === 1 ? "" : "es"}`;
+
+      // Paging UI
+      const canShowMore = listOfCards.length > visibleLimit;
+      setControlVisible(nextBtn, canShowMore);
+      if (nextBtn) nextBtn.textContent = canShowMore ? "Show more" : "Showing all";
+
+      // Note
+      setControlVisible(note, Boolean(String(input.value || "").trim()));
+    }
+
+    async function search() {
+      const rawQ = input.value || "";
+      const q = normalizeQuery(rawQ);
+      const isSearching = Boolean(String(q || "").trim());
+      setSearchingUI(isSearching);
+
+      // Reset pagination on new query
       visibleLimit = PAGE_N;
-      requestFilter();
-    });
+
+      if (!q) {
+        status.textContent = "Start typing to search pasta shapes";
+        for (const c of cards) c.hidden = false;
+        setControlVisible(note, false);
+        setControlVisible(nextBtn, false);
+        showRecents();
+        return;
+      }
+
+      // Name match (simple)
+      const nameMatches = [];
+      for (const c of cards) {
+        const hay = normalize(c.getAttribute("data-search") || "");
+        if (hay.includes(q)) {
+          nameMatches.push({ card: c, score: 0 });
+        }
+      }
+
+      // If we have plenty of direct matches, show them.
+      if (nameMatches.length) {
+        const limited = nameMatches.slice(0, visibleLimit).map((x) => x.card);
+        renderCards(limited);
+        setControlVisible(nextBtn, nameMatches.length > visibleLimit);
+        return;
+      }
+
+      // Fuzzy / alias search if index available
+      await loadIndexIfNeeded();
+      if (!index || !aliasKeys || !stopKeyToSlugs) {
+        renderCards([]);
+        return;
+      }
+
+      const stopQ = stripStopwords(q);
+
+      // Stopword-aware exact-ish key matches first
+      const aliasMatches = [];
+      if (stopQ && stopKeyToSlugs.has(stopQ)) {
+        for (const slug of stopKeyToSlugs.get(stopQ)) {
+          const c = cardBySlug.get(slug);
+          if (c) aliasMatches.push({ card: c, score: 0 });
+        }
+      }
+
+      if (aliasMatches.length) {
+        const limited = aliasMatches.slice(0, visibleLimit).map((x) => x.card);
+        renderCards(limited);
+        setControlVisible(nextBtn, aliasMatches.length > visibleLimit);
+        return;
+      }
+
+      // Light fuzzy fallback
+      const maxDist = Math.min(3, Math.floor((stopQ || q).length / 4));
+      const fuzzy = [];
+      for (const k of aliasKeys) {
+        const stopK = stripStopwords(k);
+        const dist = levenshtein(stopQ || q, stopK, maxDist);
+        if (dist <= maxDist) {
+          const slug = index.aliasToSlug[k];
+          const c = cardBySlug.get(slug);
+          if (c) fuzzy.push({ card: c, score: dist });
+        }
+      }
+
+      fuzzy.sort((a, b) => a.score - b.score);
+
+      if (fuzzy.length) {
+        const shownCards = fuzzy.slice(0, visibleLimit).map((x) => x.card);
+        renderCards(shownCards);
+        setControlVisible(nextBtn, fuzzy.length > visibleLimit);
+        return;
+      }
+
+      renderCards([]);
+    }
+
+    input.addEventListener("input", search);
 
     if (nextBtn) {
       nextBtn.addEventListener("click", (e) => {
         e.preventDefault();
         visibleLimit += PAGE_N;
-        requestFilter();
+        search();
       });
     }
 
-    // Recently viewed: render comma-separated list (max 5)
-    function renderRecents() {
-      if (!recentWrap || !recentList) return;
-
-      const slugs = readRecents();
-      if (!slugs.length) {
-        setControlVisible(recentWrap, false);
-        return;
-      }
-
-      const bySlug = new Map(cached.map((it) => [it.card.getAttribute("data-slug"), it.card]));
-      const items = slugs
-        .map((s) => bySlug.get(s))
-        .filter(Boolean)
-        .slice(0, 5);
-
-      if (!items.length) {
-        setControlVisible(recentWrap, false);
-        return;
-      }
-
-      recentList.innerHTML = "";
-      const frag = document.createDocumentFragment();
-
-      items.forEach((card, idx) => {
-        const link = card.querySelector("a[href]");
-        const name = card.querySelector(".result-name");
-        if (!link) return;
-
-        if (idx > 0) frag.appendChild(document.createTextNode(", "));
-
-        const a = document.createElement("a");
-        a.href = link.getAttribute("href");
-        a.textContent = name ? name.textContent.trim() : a.href;
-        frag.appendChild(a);
-      });
-
-      recentList.appendChild(frag);
-      setControlVisible(recentWrap, true);
-    }
-
-    // Record recents on click (detail pages also record on load)
-    list.addEventListener("click", (e) => {
-      const a = e.target.closest("a[data-recent]");
+    // Record a recent click (detail links should have data-recent="pasta")
+    document.addEventListener("click", (e) => {
+      const a = e.target.closest('a[data-recent="pasta"]');
       if (!a) return;
-
-      const href = a.getAttribute("href") || "";
-      const m = href.match(/\/pasta\/([^\/]+)\//);
+      const m = String(a.getAttribute("href") || "").match(/\/pasta\/([^/]+)\//);
       if (m && m[1]) addRecent(m[1]);
     });
 
-    // Initial state
-    hideAll();
-    renderRecents();
-    requestFilter();
+    // Initial search (in case of prefilled value)
+    search();
   }
 
   // =============================================================================
-  // Detail page: store recent on load
-  // =============================================================================
-  function initDetailPage() {
-    const path = window.location.pathname || "";
-    const m = path.match(/^\/pasta\/([^\/]+)\/?$/);
-    if (m && m[1]) addRecent(m[1]);
-  }
-
-  // =============================================================================
-  // Identify page hook (kept for compatibility)
+  // Identify page behavior (NEW - moves Identify JS out of the template)
   // =============================================================================
   function initIdentifyPage() {
-    return;
-  }
+    const app = $("#identify-app");
+    const dataScript = $("#identify-data");
+    if (!app || !dataScript) return;
 
-  // =============================================================================
-  // Mobile bottom nav: swipe to switch Search <-> Identify
-  // =============================================================================
-  function initSwipeBottomNav() {
-    const nav = document.querySelector(".bottom-nav[data-swipe-nav='1']");
-    if (!nav) return;
+    // Prevent double-init if the template still has the embedded script.
+    if (window.__pastaIdentifyInit) return;
+    window.__pastaIdentifyInit = true;
 
-    const isMobile = window.matchMedia && window.matchMedia("(max-width: 719px)").matches;
-    if (!isMobile) return;
+    const els = {
+      app,
+      title: $("#identify-title"),
+      kicker: $("#identify-kicker"),
+      help: $("#identify-help"),
+      answers: $("#identify-answers"),
+      count: $("#identify-count"),
+      resultsCard: $("#identify-results"),
+      resultsCount: $("#identify-results-count"),
+      resultsList: $("#identify-results-list"),
+      btnBack: $("#identify-back"),
+      btnReset: $("#identify-reset"),
+      btnToggleResults: $("#identify-toggle-results"),
+    };
 
-    if (nav.__swipeInit) return;
-    nav.__swipeInit = true;
+    const IK_THUMBS_BASE = "https://ik.imagekit.io/mevius/pasta/thumbs/";
+    const IK_IDENTIFY_BASE = "https://ik.imagekit.io/mevius/pasta/identify/";
+    const FALLBACK_THUMB = "pending.png";
 
-    const MIN_DX = 60;
-    const MAX_DT = 650;
-    const MAX_SLOPE = 1.2;
+    const AUTO_SHOW_RESULTS_THRESHOLD = 10;
 
-    let startX = 0;
-    let startY = 0;
-    let startT = 0;
+    // When results are large, we default to a “Show more” feel.
+    // Clicking “Show all” will truly show all results (fixes your Margherite cap issue).
+    const DEFAULT_RESULTS_LIMIT = 60;
+    const RESULTS_PAGE_SIZE = 60;
 
-    function pageMode() {
-      const p = window.location && window.location.pathname ? window.location.pathname : "/";
-      return p.startsWith("/identify") ? "identify" : "search";
+    const isUrl = (s) => /^https?:\/\//i.test(String(s || "").trim());
+
+    const fileNameOnly = (s) => {
+      const str = String(s || "").trim();
+      if (!str) return "";
+      const clean = str.split("#")[0].split("?")[0];
+      const parts = clean.split("/");
+      return parts[parts.length - 1] || "";
+    };
+
+    const thumbUrlFor = (thumbRaw) => {
+      if (isUrl(thumbRaw)) return String(thumbRaw).trim();
+      const fn = fileNameOnly(thumbRaw);
+      return IK_THUMBS_BASE + (fn || FALLBACK_THUMB);
+    };
+
+    const identifyIconUrlFor = (file) => IK_IDENTIFY_BASE + file;
+
+    const answerIconFor = (questionKey, value) => {
+      if (value === "__ns__") return identifyIconUrlFor(`${questionKey}-notsure.png`);
+      return identifyIconUrlFor(`${questionKey}-${value}.png`);
+    };
+
+    let raw = [];
+    try {
+      raw = JSON.parse(dataScript.textContent || "[]");
+    } catch (e) {
+      console.error("Identify: failed to parse identify-data JSON", e);
+      if (els.title) els.title.textContent = "Error loading data";
+      if (els.help) els.help.textContent = "Could not parse pasta data on this page.";
+      return;
     }
 
-    function goTo(mode) {
-      const target = mode === "identify" ? "/identify/" : "/";
-      if (window.location.pathname === target) return;
-      window.location.href = target;
-    }
+    const normalize = (v) => String(v || "").trim().toLowerCase();
 
-    nav.addEventListener(
-      "touchstart",
-      (e) => {
-        if (!e.touches || e.touches.length !== 1) return;
-        const t = e.touches[0];
-        startX = t.clientX;
-        startY = t.clientY;
-        startT = Date.now();
+    const TYPE_LABELS = {
+      strand: "Strand",
+      tube: "Tube",
+      ribbon: "Ribbon",
+      sheet: "Sheet",
+      short: "Short cut",
+      stuffed: "Stuffed",
+      soup: "Soup (Pastina)",
+      ring: "Ring",
+      dumpling: "Dumpling",
+    };
+
+    const TYPE_DESCS = {
+      strand: "Long, thin noodles (round or slightly flattened).",
+      tube: "Hollow pasta designed to hold sauce inside.",
+      ribbon: "Long, flat strips like fettuccine-style cuts.",
+      sheet: "Sheets used for layering or cutting (lasagna-style).",
+      short: "Short shapes that scoop, trap, or cling to sauce.",
+      stuffed: "Filled pasta (pockets, pillows, or sealed edges).",
+      soup: "Tiny pasta made for spoons and brothy soups.",
+      ring: "Rings that catch sauce in openings.",
+      dumpling: "Pasta-like dumplings (often irregular or rustic).",
+    };
+
+    const QUESTION_DEFS = [
+      {
+        key: "type",
+        title: "What general type is it?",
+        help: "Start broad - this narrows the list quickly.",
+        kind: "enum",
+        values: Object.keys(TYPE_LABELS),
+        label: (v) => TYPE_LABELS[v] || v,
+        desc: (v) => TYPE_DESCS[v] || "",
+        icon: (v) => identifyIconUrlFor(`${v}.png`),
       },
-      { passive: true }
-    );
+      {
+        key: "hollow",
+        title: "Is it hollow?",
+        help: "Hollow pasta has a visible tube or cavity.",
+        kind: "bool",
+        descYes: "You can see a tube or opening through the shape.",
+        descNo: "Solid pasta - no tube or cavity.",
+      },
+      {
+        key: "ridged",
+        title: "Does it have ridges?",
+        help: "Ridges (rigate) help grip sauce.",
+        kind: "bool",
+        descYes: "Noticeable grooves or ridges on the surface.",
+        descNo: "Mostly smooth surface.",
+      },
+      {
+        key: "twisted",
+        title: "Is it twisted?",
+        help: "Twisted shapes include spirals and corkscrews.",
+        kind: "bool",
+        descYes: "Spiraled or corkscrew-like geometry.",
+        descNo: "Not spiraled or twisted.",
+      },
+      {
+        key: "curved",
+        title: "Is it curved?",
+        help: "Curved shapes include elbows, crescents, and arcs.",
+        kind: "bool",
+        descYes: "Bent or arced rather than straight.",
+        descNo: "Straight rather than bent.",
+      },
+      {
+        key: "size",
+        title: "What size is it?",
+        help: "If you’re unsure, pick “Not sure” - size is often the least reliable.",
+        kind: "enum",
+        values: ["tiny", "small", "medium", "large"],
+        label: (v) => v,
+        icon: (v) => identifyIconUrlFor(`size-${v}.png`),
+      },
+    ];
 
-    nav.addEventListener(
-      "touchend",
-      (e) => {
-        if (!startT) return;
+    const initial = raw.map((r) => ({
+      slug: r.slug,
+      name: r.name,
+      type: normalize(r.type),
+      size: normalize(r.size),
+      hollow: normalize(r.hollow),
+      ridged: normalize(r.ridged),
+      twisted: normalize(r.twisted),
+      curved: normalize(r.curved),
+      stuffed: normalize(r.stuffed),
+      also: String(r.also || ""),
+      thumb: String(r.thumb || ""),
+    }));
 
-        const dt = Date.now() - startT;
-        startT = 0;
-        if (dt > MAX_DT) return;
+    let working = initial.slice();
+    let history = []; // [{ key, value, prevWorking }]
+    let resultsPanelPreference = "auto"; // auto | show | hide
 
-        const t = (e.changedTouches && e.changedTouches[0]) || null;
-        if (!t) return;
+    // results rendering limits
+    let resultsLimit = DEFAULT_RESULTS_LIMIT;
 
-        const dx = t.clientX - startX;
-        const dy = t.clientY - startY;
+    const setText = (el, txt) => { if (el) el.textContent = txt; };
 
-        if (Math.abs(dx) < MIN_DX) return;
-        if (Math.abs(dx) <= Math.abs(dy) * MAX_SLOPE) return;
+    const sortWorking = () => {
+      working.sort((a, b) =>
+        String(a.name || "").localeCompare(String(b.name || ""), "en", { sensitivity: "base" })
+      );
+    };
 
-        const mode = pageMode();
+    const renderMatchesCount = () => {
+      setText(els.count, `Matching: ${working.length}`);
+    };
 
-        if (dx < 0 && mode === "search") {
-          goTo("identify");
+    const showResultsPanel = (show) => {
+      if (!els.resultsCard || !els.btnToggleResults) return;
+      els.resultsCard.hidden = !show;
+      els.btnToggleResults.hidden = false;
+
+      // The button now means: expand the list to show all matches, or collapse it.
+      if (!show) {
+        els.btnToggleResults.textContent = "Show all";
+      } else {
+        // If we’re showing, label depends on whether we’re fully expanded or not.
+        els.btnToggleResults.textContent =
+          resultsLimit >= working.length ? "Hide list" : "Show all";
+      }
+    };
+
+    const shouldShowResultsPanel = () => {
+      if (resultsPanelPreference === "show") return true;
+      if (resultsPanelPreference === "hide") return false;
+      return working.length <= AUTO_SHOW_RESULTS_THRESHOLD;
+    };
+
+    const renderResultsList = () => {
+      if (!els.resultsList) return;
+
+      els.resultsList.innerHTML = "";
+
+      // Decide how many to render based on current limit.
+      const n = Math.min(working.length, resultsLimit);
+
+      for (const item of working.slice(0, n)) {
+        const li = document.createElement("li");
+        li.className = "result-card";
+
+        const a = document.createElement("a");
+        a.className = "result-link";
+        a.href = `/pasta/${item.slug}/`;
+        a.setAttribute("data-recent", "pasta");
+
+        const thumb = document.createElement("div");
+        thumb.className = "thumb";
+
+        const img = document.createElement("img");
+        img.width = 56;
+        img.height = 56;
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.alt = "";
+        img.src = thumbUrlFor(item.thumb);
+
+        thumb.appendChild(img);
+
+        const body = document.createElement("div");
+        body.className = "result-body";
+
+        const titleRow = document.createElement("div");
+        titleRow.className = "result-title-row";
+
+        const strong = document.createElement("strong");
+        strong.className = "result-name";
+        strong.textContent = item.name;
+
+        titleRow.appendChild(strong);
+        body.appendChild(titleRow);
+
+        a.appendChild(thumb);
+        a.appendChild(body);
+        li.appendChild(a);
+        els.resultsList.appendChild(li);
+      }
+
+      setText(els.resultsCount, `${working.length} match${working.length === 1 ? "" : "es"}`);
+
+      // If not all are shown, append a “Show more” row (only when list is visible).
+      if (!els.resultsCard.hidden && resultsLimit < working.length) {
+        const li = document.createElement("li");
+        li.className = "result-card";
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn secondary";
+        btn.textContent = `Show more (${Math.min(working.length - resultsLimit, RESULTS_PAGE_SIZE)})`;
+        btn.addEventListener("click", () => {
+          resultsLimit = Math.min(working.length, resultsLimit + RESULTS_PAGE_SIZE);
+          renderResultsList();
+          if (els.btnToggleResults) {
+            els.btnToggleResults.textContent =
+              resultsLimit >= working.length ? "Hide list" : "Show all";
+          }
+        });
+
+        li.appendChild(btn);
+        els.resultsList.appendChild(li);
+      }
+    };
+
+    const questionAlreadyAnswered = (key) => history.some((h) => h.key === key);
+
+    const nextQuestion = () => {
+      if (!questionAlreadyAnswered("type")) return QUESTION_DEFS.find((q) => q.key === "type");
+
+      const answered = new Set(history.map((h) => h.key));
+
+      const scoreQuestion = (key) => {
+        const counts = new Map();
+        for (const item of working) {
+          const v = String(item[key] || "").trim();
+          if (!v) continue;
+          counts.set(v, (counts.get(v) || 0) + 1);
+        }
+        if (counts.size < 2) return 0;
+
+        const total = Array.from(counts.values()).reduce((a, b) => a + b, 0);
+        if (!total) return 0;
+
+        let sumSq = 0;
+        for (const c of counts.values()) {
+          const p = c / total;
+          sumSq += p * p;
+        }
+        return 1 - sumSq;
+      };
+
+      const preferredOrder = ["hollow", "ridged", "twisted", "curved", "size"];
+
+      const candidates = [];
+      for (const key of preferredOrder) {
+        if (answered.has(key)) continue;
+        if (key === "size" && working.length <= 25) continue;
+        const q = QUESTION_DEFS.find((d) => d.key === key);
+        if (!q) continue;
+        const s = scoreQuestion(key);
+        if (s > 0) candidates.push({ q, s });
+      }
+
+      if (!candidates.length) return null;
+      candidates.sort((a, b) => b.s - a.s);
+      return candidates[0].q;
+    };
+
+    const countAfterAnswer = (key, value) => {
+      if (value === "__ns__") return working.length;
+      let count = 0;
+      for (const item of working) {
+        const itemVal = item[key];
+        if (!itemVal) { count++; continue; }
+        if (itemVal === value) count++;
+      }
+      return count;
+    };
+
+    const applyAnswer = (key, value) => {
+      const prev = working;
+      history.push({ key, value, prevWorking: prev });
+
+      working = working.filter((item) => {
+        const itemVal = item[key];
+        if (!itemVal) return true;
+        if (value === "__ns__") return true;
+        return itemVal === value;
+      });
+
+      // Reset results limiting each step (so “Show more” stays sensible)
+      resultsLimit = DEFAULT_RESULTS_LIMIT;
+      render();
+    };
+
+    const goBack = () => {
+      if (!history.length) return;
+      const last = history.pop();
+      working = last.prevWorking || initial.slice();
+      resultsLimit = DEFAULT_RESULTS_LIMIT;
+      render();
+    };
+
+    const reset = () => {
+      working = initial.slice();
+      history = [];
+      resultsPanelPreference = "auto";
+      resultsLimit = DEFAULT_RESULTS_LIMIT;
+      render();
+    };
+
+    const renderAnswers = (q) => {
+      if (!els.answers) return;
+      els.answers.innerHTML = "";
+
+      // Let CSS know what kind of question this is for layout tweaks.
+      els.answers.setAttribute("data-kind", q.kind);
+
+      const addButton = (label, value, desc, iconUrl) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "identify-answer";
+        btn.addEventListener("click", () => applyAnswer(q.key, value));
+
+        const img = document.createElement("img");
+        img.alt = "";
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.width = 56;
+        img.height = 56;
+
+        if (q.kind === "bool") img.src = answerIconFor(q.key, value);
+        else if (iconUrl) img.src = iconUrl;
+
+        const meta = document.createElement("div");
+        meta.className = "identify-answer-meta";
+
+        const t = document.createElement("div");
+        t.className = "identify-answer-title";
+
+        const projected = countAfterAnswer(q.key, value);
+        t.textContent = `${label} (${projected})`;
+
+        const d = document.createElement("div");
+        d.className = "identify-answer-desc muted";
+        d.textContent = desc || "";
+
+        meta.appendChild(t);
+        if (desc) meta.appendChild(d);
+
+        btn.appendChild(img);
+        btn.appendChild(meta);
+
+        els.answers.appendChild(btn);
+      };
+
+      if (q.kind === "bool") {
+        addButton("Yes", "yes", q.descYes || "", null);
+        addButton("No", "no", q.descNo || "", null);
+        addButton("Not sure", "__ns__", "Keep all possibilities.", null);
+        return;
+      }
+
+      // Sort enum answers by projected count (descending), but keep “Not sure” last.
+      const values = q.values || [];
+      const ranked = values
+        .map((v) => ({ v, n: countAfterAnswer(q.key, v) }))
+        .sort((a, b) => b.n - a.n)
+        .map((x) => x.v);
+
+      for (const v of ranked) {
+        addButton(q.label(v), v, q.desc ? q.desc(v) : "", q.icon ? q.icon(v) : null);
+      }
+      addButton("Not sure", "__ns__", "Keep all possibilities.", null);
+    };
+
+    const render = () => {
+      sortWorking();
+
+      if (els.btnBack) els.btnBack.disabled = history.length === 0;
+
+      const q = nextQuestion();
+
+      // Single match confirmation state (no auto-redirect)
+      if (working.length === 1) {
+        const only = working[0];
+
+        setText(els.kicker, "Result");
+        setText(els.title, "Is this your pasta?");
+        setText(
+          els.help,
+          `We narrowed it down to 1 match: ${only.name}. Tap “View details” to confirm, or use Back / Reset to revise your answers.`
+        );
+
+        if (els.answers) {
+          els.answers.innerHTML = "";
+          els.answers.setAttribute("data-kind", "single");
+
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "btn";
+          btn.textContent = "View details";
+          btn.addEventListener("click", () => {
+            window.location.href = `/pasta/${only.slug}/`;
+          });
+
+          els.answers.appendChild(btn);
+        }
+
+        renderMatchesCount();
+        resultsPanelPreference = "show";
+        resultsLimit = working.length; // show all
+        showResultsPanel(true);
+        renderResultsList();
+        return;
+      }
+
+      // If no useful questions remain, show results
+      if (!q) {
+        setText(els.kicker, "Done");
+        setText(els.title, "Here are your matches");
+        setText(els.help, "You can refine by restarting or tapping a match.");
+
+        if (els.answers) {
+          els.answers.innerHTML = "";
+          els.answers.removeAttribute("data-kind");
+        }
+
+        resultsPanelPreference = "show";
+        showResultsPanel(true);
+
+        renderMatchesCount();
+        renderResultsList();
+        return;
+      }
+
+      // Normal question flow
+      setText(els.kicker, `Question ${history.length + 1}`);
+      setText(els.title, q.title);
+      setText(els.help, q.help || "");
+
+      renderAnswers(q);
+      renderMatchesCount();
+
+      // Auto show list when small, or if user expanded it.
+      const show = shouldShowResultsPanel();
+      showResultsPanel(show);
+
+      // If we’re showing results, default to a reasonable limit unless user expanded.
+      if (show) {
+        if (resultsPanelPreference === "show") resultsLimit = working.length;
+        else resultsLimit = Math.min(DEFAULT_RESULTS_LIMIT, working.length);
+      }
+
+      renderResultsList();
+    };
+
+    // Controls
+    if (els.btnBack) els.btnBack.addEventListener("click", goBack);
+    if (els.btnReset) els.btnReset.addEventListener("click", reset);
+
+    if (els.btnToggleResults) {
+      els.btnToggleResults.addEventListener("click", () => {
+        // If hidden -> show list (start with a reasonable chunk)
+        if (els.resultsCard.hidden) {
+          resultsPanelPreference = "show";
+          resultsLimit = Math.min(DEFAULT_RESULTS_LIMIT, working.length);
+          showResultsPanel(true);
+          renderResultsList();
           return;
         }
 
-        if (dx > 0 && mode === "identify") {
-          goTo("search");
+        // If visible but not fully expanded -> expand to all
+        if (resultsLimit < working.length) {
+          resultsPanelPreference = "show";
+          resultsLimit = working.length; // THIS is the “Show all” fix
+          showResultsPanel(true);
+          renderResultsList();
           return;
         }
-      },
-      { passive: true }
-    );
+
+        // Otherwise, hide list
+        resultsPanelPreference = "hide";
+        showResultsPanel(false);
+      });
+    }
+
+    render();
   }
 
   // =============================================================================
-  // Init
+  // Boot
   // =============================================================================
-  document.addEventListener(
-    "DOMContentLoaded",
-    () => {
-      initHamburgerMenu();
-      initLinkedHomeRotators();
-      initSearchPage();
-      initDetailPage();
-      initIdentifyPage();
-      initSwipeBottomNav();
-    },
-    { once: true }
-  );
+  initHamburgerMenu();
+  initLinkedHomeRotators();
+  initSearchPage();
+  initIdentifyPage();
 })();
