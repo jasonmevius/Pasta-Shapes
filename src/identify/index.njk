@@ -17,13 +17,14 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   - Avoid dead ends - user can Back/Reset anytime.
 
   IMPORTANT NOTES
-  - Identify JS is intentionally embedded in this template (existing behavior).
-  - No inline CSS - all styling remains in /src/css/styles.css.
+  - Identify logic is intentionally embedded in this template (existing behavior).
+    This keeps everything working without needing extra asset wiring.
+  - No inline CSS - styling remains in /src/css/styles.css.
 ============================================================================= #}
 
 {# -----------------------------------------------------------------------------
   Build identifyData JSON in the template so JS has a compact dataset.
-  - This avoids extra API calls and keeps the experience fast.
+  - Avoids extra API calls and keeps the experience fast.
 ----------------------------------------------------------------------------- #}
 {% set identifyData = [] %}
 {% for item in pasta %}
@@ -41,8 +42,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   {% set thumbRaw = thumbCandidate if thumbCandidate else (item.Slug ~ ".png") %}
 
   {# Aliases notes:
-     - Your CSV has evolved - we try multiple possible column names.
-     - Use whichever exists.
+     - CSV has evolved - try multiple possible column names.
   #}
   {% set alsoRaw =
     item.SearchAliases
@@ -81,11 +81,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
 {# -----------------------------------------------------------------------------
   Identify UI skeleton
-  - JS will populate:
-      - title/help text
-      - answer buttons
-      - match count
-      - matches list (optionally)
 ----------------------------------------------------------------------------- #}
 <section id="identify-app" class="identify">
   <div class="card identify-card">
@@ -104,7 +99,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
   {# Matches panel
      - Hidden by default on mobile
-     - Can be shown on tablet/desktop via CSS and the "Show all" toggle
+     - Auto-shown when small match set
   #}
   <div class="card identify-results" id="identify-results" hidden>
     <div class="results-head">
@@ -114,9 +109,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     <ul class="results-list" id="identify-results-list"></ul>
   </div>
 
-  {# Bottom control bar
-     - Large buttons for mobile thumb usability
-  #}
+  {# Bottom control bar #}
   <div class="identify-bottom-bar" role="navigation" aria-label="Identify controls">
     <button class="btn secondary" type="button" id="identify-back" disabled>Back</button>
     <button class="btn secondary" type="button" id="identify-reset">Reset</button>
@@ -126,14 +119,13 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
 {# -----------------------------------------------------------------------------
   JSON payload for JS
-  - Stored in a script tag so it ships with the page.
 ----------------------------------------------------------------------------- #}
 <script type="application/json" id="identify-data">
 {{ identifyData | dump | safe }}
 </script>
 
 {# -----------------------------------------------------------------------------
-  Identify JS (embedded by design for now)
+  Identify JS (embedded)
 ----------------------------------------------------------------------------- #}
 <script>
 (function () {
@@ -162,6 +154,13 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   const IK_THUMBS_BASE = "https://ik.imagekit.io/mevius/pasta/thumbs/";
   const IK_IDENTIFY_BASE = "https://ik.imagekit.io/mevius/pasta/identify/";
   const FALLBACK_THUMB = "pending.png";
+
+  // ---------------------------------------------------------------------------
+  // UX TUNING
+  // ---------------------------------------------------------------------------
+  // Once the match set gets small, it’s more helpful to just show the list
+  // (even while additional narrowing questions may still be available).
+  const AUTO_SHOW_RESULTS_THRESHOLD = 10;
 
   const isUrl = (s) => /^https?:\/\//i.test(String(s || "").trim());
 
@@ -202,9 +201,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     return;
   }
 
-  // ---------------------------------------------------------------------------
-  // TYPE LABELS (UPDATED per your new category naming)
-  // ---------------------------------------------------------------------------
+  // Updated naming to match your recategorization language
   const TYPE_LABELS = {
     strand: "Strand",
     tube: "Tube",
@@ -217,7 +214,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     dumpling: "Dumpling",
   };
 
-  // Optional: keep the short descriptions aligned with the new labels.
   const TYPE_DESCS = {
     strand: "Long, thin noodles (round or slightly flattened).",
     tube: "Hollow pasta designed to hold sauce inside.",
@@ -307,7 +303,14 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   let working = initial.slice();
   let history = []; // [{ key, value, prevWorking }]
 
-  // Always keep any displayed results alphabetical (A–Z)
+  // Results panel behavior:
+  // - "auto": show list automatically only when the match set is small
+  // - "show": user explicitly expanded the list
+  // - "hide": user explicitly collapsed the list
+  let resultsPanelPreference = "auto";
+
+  // Always keep any displayed results alphabetical (A–Z), regardless of how the
+  // user arrived at the current working set (Show All, filtered, back, reset).
   const sortWorking = () => {
     working.sort((a, b) =>
       String(a.name || "").localeCompare(String(b.name || ""), "en", {
@@ -377,20 +380,29 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     els.btnToggleResults.textContent = show ? "Hide list" : "Show all";
   };
 
+  // Decide whether to show the results panel right now.
+  const shouldShowResultsPanel = () => {
+    if (resultsPanelPreference === "show") return true;
+    if (resultsPanelPreference === "hide") return false;
+    return working.length <= AUTO_SHOW_RESULTS_THRESHOLD;
+  };
+
   // --- Question selection ---------------------------------------------------
   const questionAlreadyAnswered = (key) => history.some((h) => h.key === key);
 
   const nextQuestion = () => {
+    // Type is always first.
     if (!questionAlreadyAnswered("type")) return QUESTION_DEFS.find((q) => q.key === "type");
 
     const answered = new Set(history.map((h) => h.key));
 
+    // Score using Gini impurity (higher => better splitter).
     const scoreQuestion = (key) => {
       const counts = new Map();
 
       for (const item of working) {
         const v = String(item[key] || "").trim();
-        if (!v) continue;
+        if (!v) continue; // ignore unknowns
         counts.set(v, (counts.get(v) || 0) + 1);
       }
 
@@ -412,6 +424,8 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     const candidates = [];
     for (const key of preferredOrder) {
       if (answered.has(key)) continue;
+
+      // Keep Size late-stage: only ask when there are still many matches.
       if (key === "size" && working.length <= 25) continue;
 
       const q = QUESTION_DEFS.find((d) => d.key === key);
@@ -435,7 +449,10 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     working = working.filter((item) => {
       const itemVal = item[key];
       if (!itemVal) return true;
+
+      // "__ns__" means user is not sure - do not filter.
       if (value === "__ns__") return true;
+
       return itemVal === value;
     });
 
@@ -452,7 +469,31 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   const reset = () => {
     working = initial.slice();
     history = [];
+    resultsPanelPreference = "auto";
     render();
+  };
+
+  // ---------------------------------------------------------------------------
+  // Answer count previews (what happens if you tap this?)
+  // ---------------------------------------------------------------------------
+  // Mirrors applyAnswer() exactly:
+  // - Unknown/blank values for that key are kept
+  // - "Not sure" keeps everything
+  const countAfterAnswer = (key, value) => {
+    if (value === "__ns__") return working.length;
+
+    let count = 0;
+    for (const item of working) {
+      const itemVal = item[key];
+
+      if (!itemVal) {
+        count++;
+        continue;
+      }
+
+      if (itemVal === value) count++;
+    }
+    return count;
   };
 
   // --- Rendering answers ----------------------------------------------------
@@ -485,7 +526,10 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
       const t = document.createElement("div");
       t.className = "identify-answer-title";
-      t.textContent = label;
+
+      // Example: "Strand (18)", "Yes (2)", "No (16)"
+      const projected = countAfterAnswer(q.key, value);
+      t.textContent = `${label} (${projected})`;
 
       const d = document.createElement("div");
       d.className = "identify-answer-desc muted";
@@ -522,6 +566,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
     if (els.btnBack) els.btnBack.disabled = history.length === 0;
 
+    // Optional: auto-jump when only one match remains
     if (working.length === 1) {
       const only = working[0];
       window.location.href = `/pasta/${only.slug}/`;
@@ -546,7 +591,8 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     renderAnswers(q);
     renderMatchesCount();
 
-    showResultsPanel(false);
+    // Auto-show list when small match set, or if user explicitly toggled.
+    showResultsPanel(shouldShowResultsPanel());
     renderResultsList();
   };
 
@@ -555,8 +601,9 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   if (els.btnReset) els.btnReset.addEventListener("click", reset);
   if (els.btnToggleResults) {
     els.btnToggleResults.addEventListener("click", () => {
-      const isHidden = els.resultsCard.hidden;
-      showResultsPanel(isHidden);
+      // Toggle user preference between "show" and "hide".
+      resultsPanelPreference = els.resultsCard.hidden ? "show" : "hide";
+      showResultsPanel(shouldShowResultsPanel());
     });
   }
 
