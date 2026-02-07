@@ -3,14 +3,6 @@
   -----------------------------------------------------------------------------
   Single global stylesheet for the entire site.
 
-  Key behaviors supported:
-  - Sticky top bar with desktop nav (>= 720px)
-  - Mobile hamburger menu (< 720px) with drawer
-  - Fixed bottom segmented nav (Search / Identify) on mobile
-  - Simplified home layout:
-      - Idle: Search card + Identify card
-      - Typing: Search card shrinks, Identify card replaced by live results
-
   Notes:
   - No inline CSS in templates.
   - Heavily commented for future-proofing.
@@ -255,12 +247,6 @@ a:hover{ text-decoration: underline; }
   font-size: 0.95rem;
 }
 
-.field__hint{
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.88rem;
-}
-
 /* Inputs and selects share the same “pill-ish” look */
 .field__input,
 .field__select{
@@ -302,7 +288,12 @@ a:hover{ text-decoration: underline; }
 /* =============================================================================
   All Pastas page: tools + table styling
   -----------------------------------------------------------------------------
-  Goal: make the table feel “roomy” and readable instead of cramped.
+  Goals for Jason’s notes:
+  1) Reduce cramped feel above the table
+  2) Remove “Thumb” label but keep structure
+  3) Left-align body row pasta names (th defaults to centered in browsers)
+  4) Make sortable headers visually look clickable
+  5) Make header row sticky to the top of the viewport when scrolling the page
 ============================================================================= */
 
 .table-tools{
@@ -341,10 +332,19 @@ a:hover{ text-decoration: underline; }
   font-size: 0.95rem;
 }
 
-/* Table container: allow horizontal scroll on small screens without destroying layout */
+/* -----------------------------------------------------------------------------
+  Table container
+  - Keep horizontal scrolling available on small screens.
+  - IMPORTANT: use overflow-x only, not overflow: auto;
+    overflow: auto creates a scroll container that can break sticky headers
+    relative to the viewport.
+----------------------------------------------------------------------------- */
 .table-wrap{
   margin-top: 0.75rem;
-  overflow: auto;
+
+  overflow-x: auto;
+  overflow-y: visible;
+
   -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 2px);
@@ -356,7 +356,7 @@ a:hover{ text-decoration: underline; }
   width: 100%;
   border-collapse: collapse;
 
-  /* Important: prevents “content-sized columns” cramped look */
+  /* Prevent “content-sized columns” cramped look */
   table-layout: fixed;
 }
 
@@ -366,12 +366,24 @@ a:hover{ text-decoration: underline; }
 .data-table--all .col-category{ width: 11rem; }
 /* col-synonyms intentionally left flexible to fill remaining space */
 
-.data-table thead th{
-  position: sticky; /* keeps header visible when horizontally scrolling */
-  top: 0;
-  background: #fff;
-  z-index: 1;
+/* -----------------------------------------------------------------------------
+  Sticky header row
+  - Sticky to the viewport top while the page scrolls.
+  - The topbar is also sticky; we add an offset so the table header
+    sits just under the topbar instead of hiding behind it.
 
+  If you later change topbar height, update --table-sticky-offset.
+----------------------------------------------------------------------------- */
+:root{
+  --table-sticky-offset: 58px; /* approx topbar height incl. border */
+}
+
+.data-table thead th{
+  position: sticky;
+  top: var(--table-sticky-offset);
+  z-index: 5;
+
+  background: #fff;
   text-align: left;
   font-size: 0.9rem;
   color: var(--muted);
@@ -382,6 +394,11 @@ a:hover{ text-decoration: underline; }
   padding: 0.85rem 0.9rem;
 }
 
+/* Subtle shadow so the sticky row reads as “floating” */
+.data-table thead th{
+  box-shadow: 0 1px 0 rgba(17,24,39,0.06);
+}
+
 .data-table tbody td,
 .data-table tbody th{
   border-bottom: 1px solid var(--border);
@@ -389,14 +406,22 @@ a:hover{ text-decoration: underline; }
   vertical-align: middle;
 }
 
-/* Give the table some breathing room: slightly taller rows */
 .data-table tbody tr:hover{
   background: rgba(17,24,39,0.02);
 }
 
-/* Thumb cell uses the same “thumb” component as Search results */
+/* Thumb column */
 .data-table__thumb{
   width: 84px;
+}
+
+/* -----------------------------------------------------------------------------
+  IMPORTANT: Left-align pasta names in body rows
+  - Because they’re <th scope="row">, browsers often center them by default.
+----------------------------------------------------------------------------- */
+.data-table__name,
+.data-table tbody th{
+  text-align: left;
 }
 
 .data-table__name a{
@@ -408,17 +433,15 @@ a:hover{ text-decoration: underline; }
   text-decoration: underline;
 }
 
-/* Category cell: muted but readable */
+/* Category cell */
 .cell-category{
   color: var(--muted);
 }
 
-/* Synonyms: allow wrapping, avoid overflow, and keep it visually secondary */
+/* Synonyms cell */
 .cell-synonyms{
   color: var(--muted);
   font-size: 0.92rem;
-
-  /* Wrapping is the key to preventing the “tight columns” feel */
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
@@ -431,229 +454,47 @@ a:hover{ text-decoration: underline; }
 /* Alignment helpers */
 .data-table__left{ text-align: left; }
 
-/* Sortable headers (visual affordance without changing your JS) */
+/* -----------------------------------------------------------------------------
+  Sortable headers: make them look interactive
+  - Underline style + small “sort glyph” so users know these are clickable.
+  - We style based on aria-sort which your JS can update.
+----------------------------------------------------------------------------- */
 .data-table__sortable{
   cursor: pointer;
   user-select: none;
+
+  /* Visual cue: subtle dotted underline */
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.data-table__sortable:hover{
+  color: var(--fg);
 }
 
 .sort-indicator{
   display: inline-block;
-  width: 0.9em;
-  height: 0.9em;
+  width: 1.1em;
+  height: 1.1em;
   margin-left: 0.25rem;
-  opacity: 0.6;
+  opacity: 0.75;
+  vertical-align: -0.15em;
 }
 
-/* =============================================================================
-  Simplified home layout (2 big panels)
-============================================================================= */
-
-.home-shell{ display: block; }
-
-.home-panels{
-  display: grid;
-  gap: var(--gap);
-  grid-template-columns: 1fr;
+/* Default (unsorted): show a neutral sort glyph */
+.data-table__sortable[aria-sort="none"] .sort-indicator::before{
+  content: "⇅";
 }
 
-/* Landscape phones: two columns */
-@media (max-width: 719px) and (orientation: landscape){
-  .home-panels{
-    grid-template-columns: 1fr 1fr;
-    align-items: stretch;
-  }
+/* Ascending / Descending: show direction */
+.data-table__sortable[aria-sort="ascending"] .sort-indicator::before{
+  content: "↑";
 }
-
-.home-card{
-  border-radius: calc(var(--radius) + 4px);
-  padding: 1rem;
+.data-table__sortable[aria-sort="descending"] .sort-indicator::before{
+  content: "↓";
 }
-
-.home-card-head{
-  display: grid;
-  gap: 0.25rem;
-  text-align: center;
-}
-
-.home-card-title{
-  font-size: 1.1rem;
-  letter-spacing: -0.01em;
-}
-
-/* Search card expands by default and shrinks while typing */
-#home-search-card{
-  min-height: 42svh;
-  transition: min-height 180ms ease, padding 180ms ease;
-}
-
-body.is-searching #home-search-card{
-  min-height: 24svh;
-  padding: 0.85rem;
-}
-
-/* In landscape split mode, don’t force svh heights */
-@media (max-width: 719px) and (orientation: landscape){
-  #home-search-card{ min-height: 0; }
-  body.is-searching #home-search-card{ min-height: 0; }
-}
-
-.home-search-status{ margin: 0; }
-
-/* Identify card is one big button */
-.home-card-link{
-  text-decoration: none;
-  cursor: pointer;
-  position: relative;
-}
-.home-card-link:hover{
-  text-decoration: none;
-  background: rgba(17,24,39,0.02);
-}
-
-/* Identify hero */
-.identify-hero{
-  width: 100%;
-  border: none;
-  background: transparent;
-
-  min-height: 10rem;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.identify-hero img{
-  display: block;
-  object-fit: contain;
-  width: 96px;
-  height: 96px;
-
-  opacity: 1;
-  transition: opacity 240ms ease;
-}
-
-.identify-hero img.is-fading{
-  opacity: 0;
-}
-
-/* Respect reduced-motion: disable transitions */
-@media (prefers-reduced-motion: reduce){
-  .identify-hero img{ transition: none; }
-}
-
-@media (max-width: 719px){
-  .identify-hero img{
-    max-width: 80px;
-    max-height: 80px;
-    height: 75%;
-    width: 75%;
-  }
-}
-
-/* Results panel */
-.home-results{
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* When searching */
-body.is-searching #home-identify-card{ display: none; }
-body.is-searching #home-results-panel{ display: grid; }
-
-/* =============================================================================
-  Results list
-============================================================================= */
-
-.suggestions{
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.5rem;
-}
-.suggestions:empty{ display: none; }
-
-.results-list{
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.65rem;
-}
-
-.result-card{
-  border: 1px solid var(--border);
-  background: var(--card);
-  border-radius: var(--radius);
-  padding: 0.75rem;
-}
-
-.result-link{
-  display: grid;
-  grid-template-columns: 56px 1fr;
-  gap: 0.75rem;
-  align-items: center;
-  text-decoration: none;
-}
-.result-link:hover{ text-decoration: none; }
-
-.thumb{
-  width: 56px;
-  height: 56px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: #fff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  overflow: hidden;
-}
-.thumb img{
-  display: block;
-  width: 56px;
-  height: 56px;
-  object-fit: cover;
-}
-
-.result-body{ min-width: 0; }
-
-.result-title-row{
-  display: flex;
-  gap: 0.5rem;
-  align-items: baseline;
-  flex-wrap: wrap;
-}
-
-.result-name{
-  font-size: 1.02rem;
-  letter-spacing: -0.01em;
-}
-
-.result-also{
-  font-size: 0.88rem;
-  margin-top: 0.25rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.results-tools{
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-top: 0.75rem;
-  flex-wrap: wrap;
-}
-
-/* Recently viewed sits at the bottom of the results panel */
-.recent-wrap{
-  border-top: 1px dashed var(--border);
-  padding-top: 0.75rem;
-}
-.recent-wrap[hidden]{ display: none; }
 
 /* =============================================================================
   Footer
@@ -748,154 +589,4 @@ body.is-searching #home-results-panel{ display: grid; }
 /* Hide the bottom nav on tablet/desktop */
 @media (min-width: 720px){
   .bottom-nav{ display: none; }
-}
-
-/* =============================================================================
-  Identify page styling
-  ------------------------------------------------------------------------------
-  - Makes Type cards usable on mobile (2-up)
-  - Centers Matching count
-  - Centers bottom controls
-  - Adds glyph icon for bool questions (Y / N / ?)
-============================================================================= */
-
-.identify{
-  display: grid;
-  gap: var(--gap);
-}
-
-.identify-card{
-  padding: 1rem;
-}
-
-.identify-question{
-  display: grid;
-  gap: 0.35rem;
-}
-
-.identify-answers{
-  margin-top: 0.75rem;
-  display: grid;
-  gap: 0.65rem;
-}
-
-/* Default enum layout - single column for safety */
-.identify-answers[data-kind="enum"]{
-  grid-template-columns: 1fr;
-}
-
-/* Type choices - 2-up on narrow screens */
-@media (max-width: 719px){
-  .identify-answers[data-kind="enum"][data-key="type"]{
-    grid-template-columns: 1fr 1fr;
-  }
-}
-
-/* On wider screens - allow more columns for enum cards */
-@media (min-width: 720px){
-  .identify-answers[data-kind="enum"]{
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
-/* Bool questions - 3-up */
-.identify-answers[data-kind="bool"]{
-  grid-template-columns: repeat(3, 1fr);
-}
-
-/* Single CTA state */
-.identify-answers[data-kind="single"]{
-  grid-template-columns: 1fr;
-}
-
-/* Answer card button */
-.identify-answer{
-  width: 100%;
-  text-align: left;
-  cursor: pointer;
-
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) + 2px);
-  background: #fff;
-
-  padding: 0.85rem;
-  display: grid;
-  grid-template-columns: 56px 1fr;
-  gap: 0.75rem;
-  align-items: center;
-}
-
-.identify-answer:hover{
-  background: rgba(17,24,39,0.02);
-}
-
-/* Enum images - centered */
-.identify-answer img{
-  width: 56px;
-  height: 56px;
-  display: block;
-  margin: 0 auto;
-  object-fit: contain;
-}
-
-.identify-answer-meta{
-  min-width: 0;
-}
-
-.identify-answer-title{
-  font-weight: 750;
-  letter-spacing: -0.01em;
-}
-
-.identify-answer-desc{
-  margin-top: 0.25rem;
-  font-size: 0.92rem;
-}
-
-/* Matching count - centered + padded */
-.identify-meta{
-  margin-top: 0.75rem;
-  padding-top: 0.5rem;
-  display: flex;
-  justify-content: center;
-  text-align: center;
-}
-
-/* Bottom controls - centered + padded */
-.identify-bottom-bar{
-  display: flex;
-  justify-content: center;
-  gap: 0.6rem;
-  flex-wrap: wrap;
-
-  padding: 0.75rem 0.25rem;
-}
-
-.identify-results .results-head{
-  display: grid;
-  gap: 0.25rem;
-  margin-bottom: 0.5rem;
-}
-
-/* -----------------------------------------------------------------------------
-  Bool answer glyph icon (Y / N / ?)
------------------------------------------------------------------------------ */
-.identify-answer-glyph{
-  width: 56px;
-  height: 56px;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: #fff;
-
-  font-weight: 800;
-  font-size: 1.6rem;
-  line-height: 1;
-  letter-spacing: -0.02em;
-
-  flex: 0 0 56px;
 }
