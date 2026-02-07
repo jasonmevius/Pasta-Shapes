@@ -16,32 +16,19 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     state with a “View details” button so the user can verify or revise.
 
   IMPORTANT NOTES
-  - Identify logic is intentionally embedded in this template (existing behavior).
+  - Identify logic is embedded in this template (existing behavior).
   - No inline CSS - styling remains in /src/css/styles.css.
 ============================================================================= #}
 
 {# -----------------------------------------------------------------------------
   Build identifyData JSON in the template so JS has a compact dataset.
-  - Avoids extra API calls and keeps the experience fast.
 ----------------------------------------------------------------------------- #}
 {% set identifyData = [] %}
 {% for item in pasta %}
 
-  {# Thumbnail notes:
-     - Could be blank
-     - Could be "penne.png"
-     - Could be a full URL
-     We store raw and normalize in JS.
-  #}
-  {# Prefer explicit ThumbnailImage. If blank, fall back to a slug-based filename (slug.png).
-     This keeps Identify from showing pending.png when the CSV omits ThumbnailImage,
-     while still allowing explicit overrides when needed. #}
   {% set thumbCandidate = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
   {% set thumbRaw = thumbCandidate if thumbCandidate else (item.Slug ~ ".png") %}
 
-  {# Aliases notes:
-     - CSV has evolved - try multiple possible column names.
-  #}
   {% set alsoRaw =
     item.SearchAliases
     or item.Aliases
@@ -51,7 +38,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     or ""
   %}
 
-  {# Push a normalized object into identifyData array #}
   {% set _ = identifyData.push({
     slug: item.Slug,
     name: item.ShapeName,
@@ -67,19 +53,11 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   }) %}
 {% endfor %}
 
-{# --- Breadcrumbs ----------------------------------------------------------- #}
-<nav class="breadcrumbs">
-  <a href="/">← Back to search</a>
-</nav>
-
 <header class="stack tight">
   <h1 class="h1">Identify a pasta shape</h1>
   <p class="muted">Answer one question at a time. You can always tap “Not sure.”</p>
 </header>
 
-{# -----------------------------------------------------------------------------
-  Identify UI skeleton
------------------------------------------------------------------------------ #}
 <section id="identify-app" class="identify">
   <div class="card identify-card">
     <div class="identify-question">
@@ -88,7 +66,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       <p class="identify-help muted" id="identify-help"></p>
     </div>
 
-    {# Answer buttons are rendered here by JS. #}
     <div class="identify-answers" id="identify-answers" aria-live="polite"></div>
 
     <div class="identify-meta">
@@ -96,10 +73,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     </div>
   </div>
 
-  {# Matches panel
-     - Hidden by default on mobile
-     - Auto-shown when the match set is small
-  #}
   <div class="card identify-results" id="identify-results" hidden>
     <div class="results-head">
       <h2 class="h2">Matches</h2>
@@ -108,7 +81,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     <ul class="results-list" id="identify-results-list"></ul>
   </div>
 
-  {# Bottom control bar #}
   <div class="identify-bottom-bar" role="navigation" aria-label="Identify controls">
     <button class="btn secondary" type="button" id="identify-back" disabled>Back</button>
     <button class="btn secondary" type="button" id="identify-reset">Reset</button>
@@ -116,16 +88,10 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   </div>
 </section>
 
-{# -----------------------------------------------------------------------------
-  JSON payload for JS
------------------------------------------------------------------------------ #}
 <script type="application/json" id="identify-data">
 {{ identifyData | dump | safe }}
 </script>
 
-{# -----------------------------------------------------------------------------
-  Identify JS (embedded)
------------------------------------------------------------------------------ #}
 <script>
 (function () {
   if (window.__pastaIdentifyInit) return;
@@ -149,16 +115,10 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     dataScript: $("#identify-data"),
   };
 
-  // ImageKit bases (per your requirements)
   const IK_THUMBS_BASE = "https://ik.imagekit.io/mevius/pasta/thumbs/";
   const IK_IDENTIFY_BASE = "https://ik.imagekit.io/mevius/pasta/identify/";
   const FALLBACK_THUMB = "pending.png";
 
-  // ---------------------------------------------------------------------------
-  // UX TUNING
-  // ---------------------------------------------------------------------------
-  // Once the match set gets small, it’s more helpful to just show the list
-  // (even while additional narrowing questions may still be available).
   const AUTO_SHOW_RESULTS_THRESHOLD = 10;
 
   const isUrl = (s) => /^https?:\/\//i.test(String(s || "").trim());
@@ -179,10 +139,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
   const identifyIconUrlFor = (file) => IK_IDENTIFY_BASE + file;
 
-  // Question-specific answer icon mapping:
-  // hollow-yes.png / hollow-no.png / hollow-notsure.png
-  // twisted-yes.png / twisted-no.png / twisted-notsure.png
-  // etc.
   const answerIconFor = (questionKey, value) => {
     if (value === "__ns__") return identifyIconUrlFor(`${questionKey}-notsure.png`);
     return identifyIconUrlFor(`${questionKey}-${value}.png`);
@@ -200,7 +156,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     return;
   }
 
-  // Updated naming to match your recategorization language
   const TYPE_LABELS = {
     strand: "Strand",
     tube: "Tube",
@@ -235,10 +190,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       desc: (v) => TYPE_DESCS[v] || "",
       icon: (v) => identifyIconUrlFor(`${v}.png`),
     },
-    // NOTE:
-    // We intentionally do NOT ask "stuffed" as a follow-on discriminator.
-    // Type already encodes it (Type=stuffed => stuffed=yes; all other types => no),
-    // so asking it after Type would never narrow results.
     {
       key: "hollow",
       title: "Is it hollow?",
@@ -282,7 +233,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     },
   ];
 
-  // --- State ---------------------------------------------------------------
   const normalize = (v) => String(v || "").trim().toLowerCase();
 
   const initial = raw.map((r) => ({
@@ -300,30 +250,19 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   }));
 
   let working = initial.slice();
-  let history = []; // [{ key, value, prevWorking }]
+  let history = [];
 
-  // Results panel behavior:
-  // - "auto": show list automatically only when the match set is small
-  // - "show": user explicitly expanded the list
-  // - "hide": user explicitly collapsed the list
   let resultsPanelPreference = "auto";
 
-  // Prevent iOS scroll jumps:
-  // iOS Safari can snap scroll position when a large DOM subtree is replaced.
-  // We avoid rebuilding the results list unless the match set actually changed.
+  // iOS scroll-jump prevention: only rebuild results DOM when match set changes.
   let lastResultsKey = "";
 
-  // Always keep any displayed results alphabetical (A–Z).
   const sortWorking = () => {
     working.sort((a, b) =>
-      String(a.name || "").localeCompare(String(b.name || ""), "en", {
-        sensitivity: "base",
-      })
+      String(a.name || "").localeCompare(String(b.name || ""), "en", { sensitivity: "base" })
     );
   };
 
-  // Create a stable signature for the current match set.
-  // Sorting by slug makes the signature order-independent.
   const resultsKey = () => {
     const slugs = working.map((x) => x.slug).slice().sort();
     return slugs.join("|");
@@ -338,8 +277,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   const renderResultsList = () => {
     if (!els.resultsList) return;
 
-    // If the match set hasn’t changed, do not touch the DOM.
-    // This is the key fix for iOS Safari scroll snapping.
     const key = resultsKey();
     if (key === lastResultsKey) {
       setText(els.resultsCount, `${working.length} match${working.length === 1 ? "" : "es"}`);
@@ -399,32 +336,26 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     els.btnToggleResults.textContent = show ? "Hide list" : "Show all";
   };
 
-  // Decide whether to show the results panel right now.
   const shouldShowResultsPanel = () => {
     if (resultsPanelPreference === "show") return true;
     if (resultsPanelPreference === "hide") return false;
     return working.length <= AUTO_SHOW_RESULTS_THRESHOLD;
   };
 
-  // --- Question selection ---------------------------------------------------
   const questionAlreadyAnswered = (key) => history.some((h) => h.key === key);
 
   const nextQuestion = () => {
-    // Type is always first.
     if (!questionAlreadyAnswered("type")) return QUESTION_DEFS.find((q) => q.key === "type");
 
     const answered = new Set(history.map((h) => h.key));
 
-    // Score using Gini impurity (higher => better splitter).
     const scoreQuestion = (key) => {
       const counts = new Map();
-
       for (const item of working) {
         const v = String(item[key] || "").trim();
-        if (!v) continue; // ignore unknowns
+        if (!v) continue;
         counts.set(v, (counts.get(v) || 0) + 1);
       }
-
       if (counts.size < 2) return 0;
 
       const total = Array.from(counts.values()).reduce((a, b) => a + b, 0);
@@ -443,8 +374,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     const candidates = [];
     for (const key of preferredOrder) {
       if (answered.has(key)) continue;
-
-      // Keep Size late-stage: only ask when there are still many matches.
       if (key === "size" && working.length <= 25) continue;
 
       const q = QUESTION_DEFS.find((d) => d.key === key);
@@ -460,7 +389,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     return candidates[0].q;
   };
 
-  // --- Filtering ------------------------------------------------------------
   const applyAnswer = (key, value) => {
     const prev = working;
     history.push({ key, value, prevWorking: prev });
@@ -468,10 +396,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     working = working.filter((item) => {
       const itemVal = item[key];
       if (!itemVal) return true;
-
-      // "__ns__" means user is not sure - do not filter.
       if (value === "__ns__") return true;
-
       return itemVal === value;
     });
 
@@ -489,39 +414,29 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     working = initial.slice();
     history = [];
     resultsPanelPreference = "auto";
-
-    // Force results list to rebuild after reset.
     lastResultsKey = "";
-
     render();
   };
 
-  // ---------------------------------------------------------------------------
-  // Answer count previews (what happens if you tap this?)
-  // ---------------------------------------------------------------------------
-  // Mirrors applyAnswer() exactly:
-  // - Unknown/blank values for that key are kept
-  // - "Not sure" keeps everything
   const countAfterAnswer = (key, value) => {
     if (value === "__ns__") return working.length;
 
     let count = 0;
     for (const item of working) {
       const itemVal = item[key];
-
-      if (!itemVal) {
-        count++;
-        continue;
-      }
-
+      if (!itemVal) { count++; continue; }
       if (itemVal === value) count++;
     }
     return count;
   };
 
-  // --- Rendering answers ----------------------------------------------------
   const renderAnswers = (q) => {
     if (!els.answers) return;
+
+    // Let CSS know what we’re rendering (enum vs bool), so it can lay out cards nicely.
+    els.answers.dataset.kind = q.kind || "";
+    els.answers.dataset.key = q.key || "";
+
     els.answers.innerHTML = "";
 
     const addButton = (label, value, desc, iconUrl) => {
@@ -549,7 +464,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       const t = document.createElement("div");
       t.className = "identify-answer-title";
 
-      // Example: "Strand (18)", "Yes (2)", "No (16)"
       const projected = countAfterAnswer(q.key, value);
       t.textContent = `${label} (${projected})`;
 
@@ -566,6 +480,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       els.answers.appendChild(btn);
     };
 
+    // Bool questions keep your preferred order: Yes, No, Not sure.
     if (q.kind === "bool") {
       addButton("Yes", "yes", q.descYes || "", null);
       addButton("No", "no", q.descNo || "", null);
@@ -573,14 +488,31 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       return;
     }
 
+    // Enum questions: sort options by projected count DESC for better usability.
+    // (Not sure always last.)
     const values = q.values || Object.keys(TYPE_LABELS);
-    for (const v of values) {
-      addButton(q.label(v), v, q.desc(v), q.icon ? q.icon(v) : null);
+
+    const rows = values.map((v) => ({
+      v,
+      label: q.label(v),
+      desc: q.desc ? q.desc(v) : "",
+      icon: q.icon ? q.icon(v) : null,
+      projected: countAfterAnswer(q.key, v),
+    }));
+
+    rows.sort((a, b) => {
+      if (b.projected !== a.projected) return b.projected - a.projected;
+      // Tie-breaker: alphabetical
+      return String(a.label).localeCompare(String(b.label), "en", { sensitivity: "base" });
+    });
+
+    for (const r of rows) {
+      addButton(r.label, r.v, r.desc, r.icon);
     }
+
     addButton("Not sure", "__ns__", "Keep all possibilities.", null);
   };
 
-  // --- Main render ----------------------------------------------------------
   const render = () => {
     const q = nextQuestion();
 
@@ -588,8 +520,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
     if (els.btnBack) els.btnBack.disabled = history.length === 0;
 
-    // When only one match remains, DO NOT auto-redirect.
-    // Instead, show a confirmation state so the user can verify and/or go Back.
     if (working.length === 1) {
       const only = working[0];
 
@@ -600,8 +530,9 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
         `We narrowed it down to 1 match: ${only.name}. Tap “View details” to confirm, or use Back / Reset to revise your answers.`
       );
 
-      // Replace answer buttons with a single primary CTA.
       if (els.answers) {
+        els.answers.dataset.kind = "single";
+        els.answers.dataset.key = "single";
         els.answers.innerHTML = "";
 
         const btn = document.createElement("button");
@@ -617,7 +548,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
       renderMatchesCount();
 
-      // Always show the results panel in this state (so the user can tap the card too).
       resultsPanelPreference = "show";
       showResultsPanel(true);
       renderResultsList();
@@ -625,14 +555,16 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       return;
     }
 
-    // No more useful questions to ask - show matches.
     if (!q) {
       setText(els.kicker, "Done");
       setText(els.title, "Here are your matches");
       setText(els.help, "You can refine by restarting or tapping a match.");
 
-      // No more questions - show results.
-      if (els.answers) els.answers.innerHTML = "";
+      if (els.answers) {
+        els.answers.dataset.kind = "done";
+        els.answers.dataset.key = "done";
+        els.answers.innerHTML = "";
+      }
 
       showResultsPanel(true);
       renderMatchesCount();
@@ -640,7 +572,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       return;
     }
 
-    // Normal question flow
     setText(els.kicker, `Question ${history.length + 1}`);
     setText(els.title, q.title);
     setText(els.help, q.help || "");
@@ -648,21 +579,16 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     renderAnswers(q);
     renderMatchesCount();
 
-    // Auto-show list when small match set, or if user explicitly toggled.
     showResultsPanel(shouldShowResultsPanel());
     renderResultsList();
   };
 
-  // --- Wire up controls -----------------------------------------------------
   if (els.btnBack) els.btnBack.addEventListener("click", goBack);
   if (els.btnReset) els.btnReset.addEventListener("click", reset);
   if (els.btnToggleResults) {
     els.btnToggleResults.addEventListener("click", () => {
-      // Toggle user preference between "show" and "hide".
       resultsPanelPreference = els.resultsCard.hidden ? "show" : "hide";
       showResultsPanel(shouldShowResultsPanel());
-
-      // If the user forces the list open, ensure it renders at least once.
       renderResultsList();
     });
   }
