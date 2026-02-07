@@ -6,12 +6,20 @@ permalink: /all/
 
 {# =============================================================================
   src/all/index.njk
+  ------------------------------------------------------------------------------
+  PURPOSE
+  - Browse all pasta shapes in a clean, readable table.
+  - Provide lightweight client-side filtering (Search + Category).
+  - Remove redundant "Detail" column because Name is already linked.
+  - Add a "Synonyms" (aka "Also known as") column to help discovery.
 
-  Key fixes:
-  - Thumbnails use the known-good ImageKit endpoint used on Search:
-    https://ik.imagekit.io/mevius/pasta/thumbs/<slug>.png
-  - Do NOT remove the <img> on error; instead swap to a tiny inline SVG placeholder.
-  - Columns: Thumb, Name (sortable), Category (sortable), Detail (link)
+  NOTES
+  - Thumbnails use the same ImageKit structure as the Search page:
+      https://ik.imagekit.io/mevius/pasta/thumbs/<slug>.png
+  - We keep data-* attributes for JS filtering/sorting logic you already have.
+  - Synonyms are read from the first populated field among common schema names:
+      Synonyms, Aliases, SearchAliases, AlsoKnownAs, Also_Known_As
+    (If none exist, we render an em dash placeholder.)
 ============================================================================= #}
 
 {# Known-good ImageKit base for this project (matches your Search page snippet) #}
@@ -32,10 +40,10 @@ permalink: /all/
         id="allPastaSearch"
         class="field__input"
         type="search"
-        placeholder="Type a name or category…"
+        placeholder="Type a name, synonym, or category…"
         autocomplete="off"
       />
-      <p class="field__hint">Filters across Name and Category.</p>
+      <p class="field__hint">Filters across Name, Synonyms, and Category.</p>
     </div>
 
     <div class="field">
@@ -51,7 +59,8 @@ permalink: /all/
         Showing <strong id="allPastaVisibleCount">{{ pasta.length }}</strong> of <strong>{{ pasta.length }}</strong>
       </div>
 
-      <button id="allPastaClear" class="btn btn--secondary" type="button">
+      {# Use the button class your stylesheet already supports (and we also alias btn--secondary in CSS) #}
+      <button id="allPastaClear" class="btn secondary btn-small" type="button">
         Clear filters
       </button>
     </div>
@@ -61,6 +70,20 @@ permalink: /all/
 <section class="table-wrap" aria-label="All pasta shapes table">
   <table id="allPastaTable" class="data-table data-table--all">
     <caption class="sr-only">All pasta shapes with sortable columns</caption>
+
+    {# ----------------------------------------------------------------------------
+      Column sizing
+      - Thumb: fixed
+      - Name: comfortable min width
+      - Category: fixed-ish
+      - Synonyms: takes remaining space
+    ----------------------------------------------------------------------------- #}
+    <colgroup>
+      <col class="col-thumb" />
+      <col class="col-name" />
+      <col class="col-category" />
+      <col class="col-synonyms" />
+    </colgroup>
 
     <thead>
       <tr>
@@ -80,7 +103,10 @@ permalink: /all/
           Category <span class="sort-indicator" aria-hidden="true"></span>
         </th>
 
-        <th scope="col" class="data-table__left">Detail</th>
+        <th scope="col" class="data-table__left">
+          Synonyms
+          <span class="sr-only">(also known as)</span>
+        </th>
       </tr>
     </thead>
 
@@ -99,10 +125,49 @@ permalink: /all/
         {% set thumbUrl = imagekitBase ~ "/pasta/thumbs/" ~ slugVal ~ ".png" %}
         {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
 
+        {# ------------------------------------------------------------------------
+          Synonyms: support multiple schema possibilities without breaking the page
+        ------------------------------------------------------------------------- #}
+        {% set synRaw =
+          item.Synonyms
+          or item.Aliases
+          or item.SearchAliases
+          or item.AlsoKnownAs
+          or item.Also_Known_As
+          or ""
+        %}
+
+        {# Normalize separators to commas, then split into a list #}
+        {% set synNormalized = (synRaw | string)
+          | replace(";", ",")
+          | replace("|", ",")
+        %}
+
+        {% set synList = [] %}
+        {% if synNormalized and synNormalized | trim %}
+          {% set synList = synNormalized | split(",") %}
+        {% endif %}
+
+        {# Build a clean, trimmed, non-empty list #}
+        {% set synClean = [] %}
+        {% for s in synList %}
+          {% set t = (s | trim) %}
+          {% if t %}
+            {% set synClean = synClean.concat([t]) %}
+          {% endif %}
+        {% endfor %}
+
+        {# For filtering convenience, store synonyms as a single lowercase string #}
+        {% set synForData = "" %}
+        {% if synClean.length %}
+          {% set synForData = (synClean | join(", ")) %}
+        {% endif %}
+
         <tr
           class="data-row"
           data-name="{{ (item.ShapeName or '') | lower | escape }}"
           data-category="{{ (item.Category or '') | lower | escape }}"
+          data-synonyms="{{ synForData | lower | escape }}"
         >
           <td class="data-table__thumb">
             <span class="thumb" aria-hidden="true">
@@ -123,8 +188,15 @@ permalink: /all/
 
           <td class="cell-category">{{ item.Category or "" }}</td>
 
-          <td class="data-table__detail">
-            <a href="{{ detailUrl }}">View</a>
+          <td class="cell-synonyms">
+            {% if synClean.length %}
+              {# Comma-delimited list for readability #}
+              <span class="synonyms" title="{{ synClean | join(', ') | escape }}">
+                {{ synClean | join(", ") }}
+              </span>
+            {% else %}
+              <span class="synonyms synonyms--empty" aria-label="No synonyms available">-</span>
+            {% endif %}
           </td>
         </tr>
 
