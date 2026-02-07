@@ -861,6 +861,9 @@ body.is-searching #home-results-panel{ display: grid; }
       - Force Not sure (always last) to span full width for clarity
   - Single-result confirmation state:
       - Make the “View details” button full-width and easy to tap
+  - Icon treatment:
+      - Make icons look intentional on grey cards by giving them the same “thumb”
+        tile language used elsewhere: white tile, border, radius, padding
 ============================================================================= */
 
 /* Answer grid container (defaults to 2 columns on narrow screens) */
@@ -881,6 +884,29 @@ body.is-searching #home-results-panel{ display: grid; }
   flex-direction: column;
   gap: 4px;
   min-width: 0; /* important for long labels in grid layouts */
+}
+
+/* ---------------------------------------------------------------------------
+  Identify answer icon tile (Option A)
+  - Problem: grey card background + icons with white backgrounds felt inconsistent
+  - Fix: treat the icon as a deliberate “thumb” tile:
+      - white background
+      - subtle border
+      - consistent rounded corners
+      - padding so odd crops feel centered
+--------------------------------------------------------------------------- */
+.identify-answer > img{
+  width: 56px;
+  height: 56px;
+
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+
+  padding: 6px;
+  object-fit: contain;
+
+  display: block;
 }
 
 /* Bool questions: make “Not sure” span all columns (it’s always last in JS) */
