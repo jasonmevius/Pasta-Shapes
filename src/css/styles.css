@@ -34,7 +34,6 @@ html, body{ height: 100%; }
 
 /* -----------------------------------------------------------------------------
   IMPORTANT: make the HTML hidden attribute bulletproof.
-  Some resets or component CSS can accidentally override it.
 ----------------------------------------------------------------------------- */
 [hidden]{ display: none !important; }
 
@@ -100,9 +99,7 @@ a:hover{ text-decoration: underline; }
 
 /* Leave room for fixed bottom nav on mobile so content is never hidden underneath */
 @media (max-width: 719px){
-  .container{
-    padding-bottom: 5rem;
-  }
+  .container{ padding-bottom: 5rem; }
 }
 
 /* =============================================================================
@@ -150,12 +147,8 @@ a:hover{ text-decoration: underline; }
 }
 
 /* Desktop nav shown only on wider screens */
-@media (max-width: 719px){
-  .nav-desktop{ display: none; }
-}
-@media (min-width: 720px){
-  .nav-desktop{ display: flex; }
-}
+@media (max-width: 719px){ .nav-desktop{ display: none; } }
+@media (min-width: 720px){ .nav-desktop{ display: flex; } }
 
 /* -----------------------------------------------------------------------------
   Mobile hamburger button (shown only on small screens)
@@ -175,16 +168,9 @@ a:hover{ text-decoration: underline; }
 
   cursor: pointer;
 }
+.nav-toggle:hover{ background: rgba(17,24,39,0.03); }
 
-.nav-toggle:hover{
-  background: rgba(17,24,39,0.03);
-}
-
-.nav-toggle-bars{
-  display: grid;
-  gap: 5px;
-}
-
+.nav-toggle-bars{ display: grid; gap: 5px; }
 .nav-toggle-bars span{
   display: block;
   width: 18px;
@@ -194,13 +180,10 @@ a:hover{ text-decoration: underline; }
 }
 
 /* Hide the hamburger button on desktop */
-@media (min-width: 720px){
-  .nav-toggle{ display: none; }
-}
+@media (min-width: 720px){ .nav-toggle{ display: none; } }
 
 /* -----------------------------------------------------------------------------
   Mobile drawer menu
-  - Starts hidden via HTML attribute and enforced with [hidden] rule above.
 ----------------------------------------------------------------------------- */
 .nav-drawer{
   max-width: var(--container);
@@ -224,15 +207,10 @@ a:hover{ text-decoration: underline; }
   color: var(--fg);
   font-weight: 650;
 }
-
-.nav-drawer a:hover{
-  background: rgba(17,24,39,0.03);
-}
+.nav-drawer a:hover{ background: rgba(17,24,39,0.03); }
 
 /* Hide the drawer on desktop regardless of hidden state */
-@media (min-width: 720px){
-  .nav-drawer{ display: none !important; }
-}
+@media (min-width: 720px){ .nav-drawer{ display: none !important; } }
 
 /* =============================================================================
   Typography helpers
@@ -276,9 +254,7 @@ a:hover{ text-decoration: underline; }
   background: #fff;
   color: var(--fg);
 }
-.btn.secondary:hover{
-  background: rgba(17,24,39,0.03);
-}
+.btn.secondary:hover{ background: rgba(17,24,39,0.03); }
 
 .btn-small{
   padding: 0.55rem 0.75rem;
@@ -290,10 +266,7 @@ a:hover{ text-decoration: underline; }
   Forms
 ============================================================================= */
 
-.search{
-  display: grid;
-  gap: 0.5rem;
-}
+.search{ display: grid; gap: 0.5rem; }
 
 .search-input{
   width: 100%;
@@ -303,7 +276,6 @@ a:hover{ text-decoration: underline; }
   font-size: 1rem;
   background: #fff;
 }
-
 .search-input:focus{
   outline: 2px solid rgba(17,24,39,0.18);
   outline-offset: 2px;
@@ -337,7 +309,7 @@ a:hover{ text-decoration: underline; }
 .home-card-head{
   display: grid;
   gap: 0.25rem;
-  text-align: center; /* center the headings */
+  text-align: center;
 }
 
 .home-card-title{
@@ -350,7 +322,6 @@ a:hover{ text-decoration: underline; }
   min-height: 42svh;
   transition: min-height 180ms ease, padding 180ms ease;
 }
-
 body.is-searching #home-search-card{
   min-height: 24svh;
   padding: 0.85rem;
@@ -375,39 +346,26 @@ body.is-searching #home-search-card{
   background: rgba(17,24,39,0.02);
 }
 
-/* Identify hero:
-   - No white inner box
-   - Icon sits cleanly on the grey card background
-   - Icon is centered both axes */
+/* Identify hero icon on home */
 .identify-hero{
   width: 100%;
   border: none;
   background: transparent;
-
   min-height: 10rem;
-
   display: flex;
   align-items: center;
   justify-content: center;
 }
-
 .identify-hero img{
   display: block;
   object-fit: contain;
   width: 96px;
   height: 96px;
-
-  /* Smooth fade when JS swaps icons */
   opacity: 1;
   transition: opacity 240ms ease;
 }
+.identify-hero img.is-fading{ opacity: 0; }
 
-/* JS applies this class briefly to fade out before swapping src */
-.identify-hero img.is-fading{
-  opacity: 0;
-}
-
-/* Respect reduced-motion: disable transitions (JS also disables rotation) */
 @media (prefers-reduced-motion: reduce){
   .identify-hero img{ transition: none; }
 }
@@ -421,17 +379,11 @@ body.is-searching #home-search-card{
   }
 }
 
-/* Results panel:
-   - Hidden by default via [hidden]
-   - Scrollable when shown */
+/* Results panel on home */
 .home-results{
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
-
-/* When searching:
-   - Hide Identify card
-   - Show results panel */
 body.is-searching #home-identify-card{ display: none; }
 body.is-searching #home-results-panel{ display: grid; }
 
@@ -521,7 +473,6 @@ body.is-searching #home-results-panel{ display: grid; }
   flex-wrap: wrap;
 }
 
-/* Recently viewed sits at the bottom of the results panel */
 .recent-wrap{
   border-top: 1px dashed var(--border);
   padding-top: 0.75rem;
@@ -530,24 +481,17 @@ body.is-searching #home-results-panel{ display: grid; }
 
 /* =============================================================================
   Footer
-  - You asked to remove the "About Sources Feedback" links; keep footer minimal.
 ============================================================================= */
 
 .site-footer{
   border-top: 1px solid var(--border);
   background: #fff;
 }
-
-.site-footer-inner{
-  padding: 1.25rem var(--pad);
-}
-
-.footer-tagline{
-  margin: 0;
-}
+.site-footer-inner{ padding: 1.25rem var(--pad); }
+.footer-tagline{ margin: 0; }
 
 /* =============================================================================
-  Mobile bottom navigation (Search / Identify) - FIXED + SEGMENTED
+  Mobile bottom navigation (Search / Identify)
 ============================================================================= */
 
 .bottom-nav{
@@ -558,7 +502,6 @@ body.is-searching #home-results-panel{ display: grid; }
   z-index: 70;
 
   padding: 0.6rem var(--pad) calc(0.6rem + env(safe-area-inset-bottom));
-
   background: rgba(255,255,255,0.92);
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--border);
@@ -576,7 +519,6 @@ body.is-searching #home-results-panel{ display: grid; }
   background: #fff;
   border-radius: 999px;
   overflow: hidden;
-
   padding: 0.2rem;
 }
 
@@ -615,36 +557,109 @@ body.is-searching #home-results-panel{ display: grid; }
   color: var(--muted);
 }
 
-.bottom-nav-link[aria-current="page"]{
-  color: var(--fg);
-}
+.bottom-nav-link[aria-current="page"]{ color: var(--fg); }
 
-/* Hide the bottom nav on tablet/desktop */
 @media (min-width: 720px){
   .bottom-nav{ display: none; }
 }
 
-/* ------------------------------------------------------------
-   /all/ table page styling
-   - Mobile-first
-   - Table remains readable on small screens
-   - Enhances “Excel-ish” interaction affordances
-------------------------------------------------------------- */
+/* =============================================================================
+  Identify page - UI polish + answer tiles
+============================================================================= */
 
-.page-header {
-  margin: 0 0 1rem 0;
+/* “Matching: N” line spacing + centering */
+.identify-meta{
+  text-align: center;
+  padding-top: 0.6rem;
+  padding-bottom: 0.15rem;
+}
+#identify-count{ display: block; }
+
+/* Bottom control bar centering + padding */
+.identify-bottom-bar{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.6rem;
+
+  padding: 0.85rem 0 0.25rem;
+  flex-wrap: wrap;
 }
 
-.page-subtitle {
-  margin: 0.25rem 0 0 0;
-  opacity: 0.85;
+/* Answer grid container */
+.identify-answers{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
-/* Filters / controls */
-.table-tools {
-  margin: 1rem 0;
+/* Answer card polish */
+.identify-answer{
+  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  padding: 0.85rem;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+
+  gap: 0.55rem;
+  cursor: pointer;
+}
+.identify-answer:hover{
+  background: rgba(17,24,39,0.02);
 }
 
+/* Answer text block */
+.identify-answer-meta{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  text-align: center;
+}
+
+/* Icon tile (Option A) */
+.identify-answer > img{
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  padding: 6px;
+  object-fit: contain;
+  display: block;
+}
+
+/* Bool questions: make “Not sure” span full width (JS keeps it last) */
+.identify-answers[data-kind="bool"] .identify-answer:last-child{
+  grid-column: 1 / -1;
+}
+
+/* Expand columns on larger screens */
+@media (min-width: 480px){
+  .identify-answers{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+@media (min-width: 768px){
+  .identify-answers{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+/* Single-result confirmation CTA full width */
+.identify-answers[data-kind="single"] .btn{
+  width: 100%;
+}
+
+/* =============================================================================
+  /all/ table page styling (unchanged from your base)
+============================================================================= */
+
+.page-header { margin: 0 0 1rem 0; }
+.page-subtitle { margin: 0.25rem 0 0 0; opacity: 0.85; }
+
+.table-tools { margin: 1rem 0; }
 .table-tools__row {
   display: grid;
   grid-template-columns: 1fr;
@@ -667,11 +682,7 @@ body.is-searching #home-results-panel{ display: grid; }
   border: 1px solid rgba(0, 0, 0, 0.18);
 }
 
-.field__hint {
-  margin: 0.35rem 0 0 0;
-  font-size: 0.9rem;
-  opacity: 0.75;
-}
+.field__hint { margin: 0.35rem 0 0 0; font-size: 0.9rem; opacity: 0.75; }
 
 .table-meta {
   display: flex;
@@ -680,43 +691,18 @@ body.is-searching #home-results-panel{ display: grid; }
   align-items: center;
   flex-wrap: wrap;
 }
+.table-meta__count { font-size: 0.95rem; }
 
-.table-meta__count {
-  font-size: 0.95rem;
-}
-
-/* Button (lightweight; adapt to your existing button system if you have one) */
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.55rem 0.8rem;
-  border-radius: 0.6rem;
-  border: 1px solid rgba(0, 0, 0, 0.18);
-  background: transparent;
-  font: inherit;
-}
-
-.btn:hover {
-  border-color: rgba(0, 0, 0, 0.35);
-}
-
-.btn--secondary {
-  opacity: 0.95;
-}
-
-/* Table wrapper for horizontal scroll on small screens */
 .table-wrap {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   border-radius: 0.8rem;
 }
 
-/* Data table */
 .data-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 720px; /* forces horizontal scroll on narrow screens */
+  min-width: 720px;
 }
 
 .data-table th,
@@ -733,15 +719,9 @@ body.is-searching #home-results-panel{ display: grid; }
   z-index: 1;
 }
 
-.data-table__thumb {
-  width: 72px;
-  text-align: center;
-}
+.data-table__thumb { width: 72px; text-align: center; }
 
-.thumb-img {
-  display: inline-block;
-  border-radius: 0.5rem;
-}
+.thumb-img { display: inline-block; border-radius: 0.5rem; }
 
 .thumb-placeholder {
   display: inline-block;
@@ -751,213 +731,19 @@ body.is-searching #home-results-panel{ display: grid; }
   background: rgba(0, 0, 0, 0.06);
 }
 
-.data-table__name a {
-  text-decoration: none;
+.data-table__name a { text-decoration: none; }
+.data-table__name a:hover { text-decoration: underline; }
+
+.data-table__sortable { user-select: none; }
+.data-table__sortable:hover { background: rgba(0, 0, 0, 0.03); }
+
+.sort-indicator { display: inline-block; margin-left: 0.35rem; opacity: 0.5; }
+
+@media (min-width: 860px){
+  .table-tools__row{ grid-template-columns: 1.2fr 0.8fr 0.8fr; }
 }
 
-.data-table__name a:hover {
-  text-decoration: underline;
-}
-
-/* Sort affordance */
-.data-table__sortable {
-  user-select: none;
-}
-
-.data-table__sortable:hover {
-  background: rgba(0, 0, 0, 0.03);
-}
-
-.sort-indicator {
-  display: inline-block;
-  margin-left: 0.35rem;
-  opacity: 0.5;
-}
-
-/* Simple responsive improvement for the filter row */
-@media (min-width: 860px) {
-  .table-tools__row {
-    grid-template-columns: 1.2fr 0.8fr 0.8fr;
-  }
-}
-
-/* Screen-reader only utility (if you already have one, keep yours) */
-.sr-only {
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  padding: 0 !important;
-  margin: -1px !important;
-  overflow: hidden !important;
-  clip: rect(0, 0, 0, 0) !important;
-  white-space: nowrap !important;
-  border: 0 !important;
-}
-
-/* ------------------------------------------------------------
-   All Pastas table tweaks
-------------------------------------------------------------- */
-
-/* Left-align selected headers/cells */
 .data-table__left,
 .data-table__name,
-.data-table__detail {
-  text-align: left;
-}
-
-/* Thumb column stays centered */
-.data-table__thumb {
-  text-align: center;
-}
-
-/* Match Search page thumbnail wrapper structure */
-.thumb {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 56px;
-  height: 56px;
-  border-radius: 0.5rem;
-  overflow: hidden;
-}
-
-.thumb img {
-  display: block;
-  width: 56px;
-  height: 56px;
-  object-fit: cover;
-}
-
-.thumb--placeholder {
-  background: rgba(0, 0, 0, 0.06);
-}
-
-/* Make sure the Clear filters button is visibly a button */
-.btn {
-  color: inherit; /* protects against global button color resets */
-  line-height: 1.1;
-}
-
-.btn--secondary {
-  background: rgba(0, 0, 0, 0.04);
-  border: 1px solid rgba(0, 0, 0, 0.18);
-}
-
-.btn--secondary:hover {
-  background: rgba(0, 0, 0, 0.07);
-  border-color: rgba(0, 0, 0, 0.28);
-}
-
-/* =============================================================================
-  Identify page - Answer grid usability (mobile-first)
-  -----------------------------------------------------------------------------
-  Goals:
-  - Make answer “cards” easier to scan on mobile by using a consistent grid.
-  - Type (enum) questions:
-      - 2-up on small screens for better scanning
-      - expand to 3-up and 4-up as viewport grows
-  - Bool (Yes/No/Not sure) questions:
-      - Keep Yes first, No second (JS enforces ordering)
-      - Force Not sure (always last) to span full width for clarity
-  - Single-result confirmation state:
-      - Make the “View details” button full-width and easy to tap
-  - Icon + card polish:
-      - Center the icon in the card
-      - Add a bit more internal padding
-      - Add vertical separation between icon and title text
-============================================================================= */
-
-/* Answer grid container (defaults to 2 columns on narrow screens) */
-.identify-answers{
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-/* ---------------------------------------------------------------------------
-  Answer card polish
-  - Make cards feel like consistent “tiles”
-  - Center content vertically
-  - Add padding + spacing between icon and text
---------------------------------------------------------------------------- */
-.identify-answer{
-  height: 100%;
-
-  /* Treat each answer as a mini card */
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--card);
-
-  /* A touch more padding than the global .card for tap targets */
-  padding: 0.85rem;
-
-  /* Center image + text and create reliable spacing */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-
-  /* Vertical separation between icon tile and the title block */
-  gap: 0.55rem;
-
-  /* Improve tapping feel (optional but nice) */
-  cursor: pointer;
-}
-
-.identify-answer:hover{
-  background: rgba(17,24,39,0.02);
-}
-
-/* Keep the answer text tidy inside a grid cell (prevents overflow issues) */
-.identify-answer-meta{
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-  text-align: center; /* aligns with centered icon layout */
-}
-
-/* ---------------------------------------------------------------------------
-  Identify answer icon tile (Option A)
-  - Use the same “thumb” language as elsewhere:
-      - white tile
-      - subtle border
-      - rounded corners
-      - padding so odd crops feel centered
---------------------------------------------------------------------------- */
-.identify-answer > img{
-  width: 56px;
-  height: 56px;
-
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: #fff;
-
-  padding: 6px;
-  object-fit: contain;
-
-  display: block;
-}
-
-/* Bool questions: make “Not sure” span all columns (it’s always last in JS) */
-.identify-answers[data-kind="bool"] .identify-answer:last-child{
-  grid-column: 1 / -1;
-}
-
-/* As the screen gets wider, show more columns (helps scan Type quickly) */
-@media (min-width: 480px){
-  .identify-answers{
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-@media (min-width: 768px){
-  .identify-answers{
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
-/* Single-result confirmation state: full-width primary CTA */
-.identify-answers[data-kind="single"] .btn{
-  width: 100%;
-}
+.data-table__detail { text-align: left; }
+.data-table__thumb { text-align: center; }
