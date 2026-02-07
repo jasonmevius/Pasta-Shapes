@@ -10,15 +10,13 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   PURPOSE
   - Identify pasta by narrowing down with sequential questions.
   - Mobile-first UI: big tap targets, one question at a time.
-  - Tablet/desktop: can show matches panel more prominently via CSS.
-
-  DESIGN PRINCIPLES
-  - Never punish "Not sure" - it must always be a first-class option.
-  - Avoid dead ends - user can Back/Reset anytime.
+  - Show the user how each answer narrows the list using count previews.
+  - When matches become small, show a live “Matches” list (helps confidence).
+  - When exactly 1 match remains, DO NOT auto-redirect - show a confirmation
+    state with a “View details” button so the user can verify or revise.
 
   IMPORTANT NOTES
   - Identify logic is intentionally embedded in this template (existing behavior).
-    This keeps everything working without needing extra asset wiring.
   - No inline CSS - styling remains in /src/css/styles.css.
 ============================================================================= #}
 
@@ -90,6 +88,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       <p class="identify-help muted" id="identify-help"></p>
     </div>
 
+    {# Answer buttons are rendered here by JS. #}
     <div class="identify-answers" id="identify-answers" aria-live="polite"></div>
 
     <div class="identify-meta">
@@ -99,7 +98,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
   {# Matches panel
      - Hidden by default on mobile
-     - Auto-shown when small match set
+     - Auto-shown when the match set is small
   #}
   <div class="card identify-results" id="identify-results" hidden>
     <div class="results-head">
@@ -309,8 +308,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   // - "hide": user explicitly collapsed the list
   let resultsPanelPreference = "auto";
 
-  // Always keep any displayed results alphabetical (A–Z), regardless of how the
-  // user arrived at the current working set (Show All, filtered, back, reset).
+  // Always keep any displayed results alphabetical (A–Z).
   const sortWorking = () => {
     working.sort((a, b) =>
       String(a.name || "").localeCompare(String(b.name || ""), "en", {
@@ -505,7 +503,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "identify-answer";
-
       btn.addEventListener("click", () => applyAnswer(q.key, value));
 
       const img = document.createElement("img");
@@ -566,24 +563,59 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
     if (els.btnBack) els.btnBack.disabled = history.length === 0;
 
-    // Optional: auto-jump when only one match remains
+    // When only one match remains, DO NOT auto-redirect.
+    // Instead, show a confirmation state so the user can verify and/or go Back.
     if (working.length === 1) {
       const only = working[0];
-      window.location.href = `/pasta/${only.slug}/`;
+
+      setText(els.kicker, "Result");
+      setText(els.title, "Is this your pasta?");
+      setText(
+        els.help,
+        `We narrowed it down to 1 match: ${only.name}. Tap “View details” to confirm, or use Back / Reset to revise your answers.`
+      );
+
+      // Replace answer buttons with a single primary CTA.
+      if (els.answers) {
+        els.answers.innerHTML = "";
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn";
+        btn.textContent = "View details";
+        btn.addEventListener("click", () => {
+          window.location.href = `/pasta/${only.slug}/`;
+        });
+
+        els.answers.appendChild(btn);
+      }
+
+      renderMatchesCount();
+
+      // Always show the results panel in this state (so the user can tap the card too).
+      resultsPanelPreference = "show";
+      showResultsPanel(true);
+      renderResultsList();
+
       return;
     }
 
+    // No more useful questions to ask - show matches.
     if (!q) {
       setText(els.kicker, "Done");
       setText(els.title, "Here are your matches");
       setText(els.help, "You can refine by restarting or tapping a match.");
-      renderAnswers({ key: "__none__", kind: "none" });
+
+      // No more questions - show results.
+      if (els.answers) els.answers.innerHTML = "";
+
       showResultsPanel(true);
       renderMatchesCount();
       renderResultsList();
       return;
     }
 
+    // Normal question flow
     setText(els.kicker, `Question ${history.length + 1}`);
     setText(els.title, q.title);
     setText(els.help, q.help || "");
