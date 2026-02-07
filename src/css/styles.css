@@ -99,7 +99,9 @@ a:hover{ text-decoration: underline; }
 
 /* Leave room for fixed bottom nav on mobile so content is never hidden underneath */
 @media (max-width: 719px){
-  .container{ padding-bottom: 5rem; }
+  .container{
+    padding-bottom: 5rem;
+  }
 }
 
 /* =============================================================================
@@ -147,8 +149,12 @@ a:hover{ text-decoration: underline; }
 }
 
 /* Desktop nav shown only on wider screens */
-@media (max-width: 719px){ .nav-desktop{ display: none; } }
-@media (min-width: 720px){ .nav-desktop{ display: flex; } }
+@media (max-width: 719px){
+  .nav-desktop{ display: none; }
+}
+@media (min-width: 720px){
+  .nav-desktop{ display: flex; }
+}
 
 /* -----------------------------------------------------------------------------
   Mobile hamburger button (shown only on small screens)
@@ -168,9 +174,16 @@ a:hover{ text-decoration: underline; }
 
   cursor: pointer;
 }
-.nav-toggle:hover{ background: rgba(17,24,39,0.03); }
 
-.nav-toggle-bars{ display: grid; gap: 5px; }
+.nav-toggle:hover{
+  background: rgba(17,24,39,0.03);
+}
+
+.nav-toggle-bars{
+  display: grid;
+  gap: 5px;
+}
+
 .nav-toggle-bars span{
   display: block;
   width: 18px;
@@ -180,7 +193,9 @@ a:hover{ text-decoration: underline; }
 }
 
 /* Hide the hamburger button on desktop */
-@media (min-width: 720px){ .nav-toggle{ display: none; } }
+@media (min-width: 720px){
+  .nav-toggle{ display: none; }
+}
 
 /* -----------------------------------------------------------------------------
   Mobile drawer menu
@@ -207,10 +222,15 @@ a:hover{ text-decoration: underline; }
   color: var(--fg);
   font-weight: 650;
 }
-.nav-drawer a:hover{ background: rgba(17,24,39,0.03); }
+
+.nav-drawer a:hover{
+  background: rgba(17,24,39,0.03);
+}
 
 /* Hide the drawer on desktop regardless of hidden state */
-@media (min-width: 720px){ .nav-drawer{ display: none !important; } }
+@media (min-width: 720px){
+  .nav-drawer{ display: none !important; }
+}
 
 /* =============================================================================
   Typography helpers
@@ -222,6 +242,7 @@ a:hover{ text-decoration: underline; }
 .muted{ color: var(--muted); }
 
 .stack{ display: grid; gap: var(--gap); }
+.tight{ gap: 0.35rem; }
 
 .card{
   border: 1px solid var(--border);
@@ -254,7 +275,9 @@ a:hover{ text-decoration: underline; }
   background: #fff;
   color: var(--fg);
 }
-.btn.secondary:hover{ background: rgba(17,24,39,0.03); }
+.btn.secondary:hover{
+  background: rgba(17,24,39,0.03);
+}
 
 .btn-small{
   padding: 0.55rem 0.75rem;
@@ -266,7 +289,10 @@ a:hover{ text-decoration: underline; }
   Forms
 ============================================================================= */
 
-.search{ display: grid; gap: 0.5rem; }
+.search{
+  display: grid;
+  gap: 0.5rem;
+}
 
 .search-input{
   width: 100%;
@@ -276,6 +302,7 @@ a:hover{ text-decoration: underline; }
   font-size: 1rem;
   background: #fff;
 }
+
 .search-input:focus{
   outline: 2px solid rgba(17,24,39,0.18);
   outline-offset: 2px;
@@ -322,6 +349,7 @@ a:hover{ text-decoration: underline; }
   min-height: 42svh;
   transition: min-height 180ms ease, padding 180ms ease;
 }
+
 body.is-searching #home-search-card{
   min-height: 24svh;
   padding: 0.85rem;
@@ -346,26 +374,34 @@ body.is-searching #home-search-card{
   background: rgba(17,24,39,0.02);
 }
 
-/* Identify hero icon on home */
+/* Identify hero */
 .identify-hero{
   width: 100%;
   border: none;
   background: transparent;
+
   min-height: 10rem;
+
   display: flex;
   align-items: center;
   justify-content: center;
 }
+
 .identify-hero img{
   display: block;
   object-fit: contain;
   width: 96px;
   height: 96px;
+
   opacity: 1;
   transition: opacity 240ms ease;
 }
-.identify-hero img.is-fading{ opacity: 0; }
 
+.identify-hero img.is-fading{
+  opacity: 0;
+}
+
+/* Respect reduced-motion: disable transitions */
 @media (prefers-reduced-motion: reduce){
   .identify-hero img{ transition: none; }
 }
@@ -379,11 +415,13 @@ body.is-searching #home-search-card{
   }
 }
 
-/* Results panel on home */
+/* Results panel */
 .home-results{
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
+
+/* When searching */
 body.is-searching #home-identify-card{ display: none; }
 body.is-searching #home-results-panel{ display: grid; }
 
@@ -473,6 +511,7 @@ body.is-searching #home-results-panel{ display: grid; }
   flex-wrap: wrap;
 }
 
+/* Recently viewed sits at the bottom of the results panel */
 .recent-wrap{
   border-top: 1px dashed var(--border);
   padding-top: 0.75rem;
@@ -487,11 +526,17 @@ body.is-searching #home-results-panel{ display: grid; }
   border-top: 1px solid var(--border);
   background: #fff;
 }
-.site-footer-inner{ padding: 1.25rem var(--pad); }
-.footer-tagline{ margin: 0; }
+
+.site-footer-inner{
+  padding: 1.25rem var(--pad);
+}
+
+.footer-tagline{
+  margin: 0;
+}
 
 /* =============================================================================
-  Mobile bottom navigation (Search / Identify)
+  Mobile bottom navigation (Search / Identify) - FIXED + SEGMENTED
 ============================================================================= */
 
 .bottom-nav{
@@ -502,6 +547,7 @@ body.is-searching #home-results-panel{ display: grid; }
   z-index: 70;
 
   padding: 0.6rem var(--pad) calc(0.6rem + env(safe-area-inset-bottom));
+
   background: rgba(255,255,255,0.92);
   backdrop-filter: blur(10px);
   border-top: 1px solid var(--border);
@@ -519,6 +565,7 @@ body.is-searching #home-results-panel{ display: grid; }
   background: #fff;
   border-radius: 999px;
   overflow: hidden;
+
   padding: 0.2rem;
 }
 
@@ -557,193 +604,161 @@ body.is-searching #home-results-panel{ display: grid; }
   color: var(--muted);
 }
 
-.bottom-nav-link[aria-current="page"]{ color: var(--fg); }
+.bottom-nav-link[aria-current="page"]{
+  color: var(--fg);
+}
 
+/* Hide the bottom nav on tablet/desktop */
 @media (min-width: 720px){
   .bottom-nav{ display: none; }
 }
 
 /* =============================================================================
-  Identify page - UI polish + answer tiles
+  Identify page styling
+  ------------------------------------------------------------------------------
+  - Makes Type cards usable on mobile (2-up)
+  - Centers Matching count
+  - Centers bottom controls
+  - Adds glyph icon for bool questions (Y / N / ?)
 ============================================================================= */
 
-/* “Matching: N” line spacing + centering */
-.identify-meta{
-  text-align: center;
-  padding-top: 0.6rem;
-  padding-bottom: 0.15rem;
-}
-#identify-count{ display: block; }
-
-/* Bottom control bar centering + padding */
-.identify-bottom-bar{
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 0.6rem;
-
-  padding: 0.85rem 0 0.25rem;
-  flex-wrap: wrap;
-}
-
-/* Answer grid container */
-.identify-answers{
+.identify{
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  gap: var(--gap);
 }
 
-/* Answer card polish */
+.identify-card{
+  padding: 1rem;
+}
+
+.identify-question{
+  display: grid;
+  gap: 0.35rem;
+}
+
+.identify-answers{
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+/* Default enum layout - single column for safety */
+.identify-answers[data-kind="enum"]{
+  grid-template-columns: 1fr;
+}
+
+/* Type choices - 2-up on narrow screens */
+@media (max-width: 719px){
+  .identify-answers[data-kind="enum"][data-key="type"]{
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* On wider screens - allow more columns for enum cards */
+@media (min-width: 720px){
+  .identify-answers[data-kind="enum"]{
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Bool questions - 3-up */
+.identify-answers[data-kind="bool"]{
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* Single CTA state */
+.identify-answers[data-kind="single"]{
+  grid-template-columns: 1fr;
+}
+
+/* Answer card button */
 .identify-answer{
-  height: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--card);
-  padding: 0.85rem;
-
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-
-  gap: 0.55rem;
+  width: 100%;
+  text-align: left;
   cursor: pointer;
+
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  background: #fff;
+
+  padding: 0.85rem;
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 0.75rem;
+  align-items: center;
 }
+
 .identify-answer:hover{
   background: rgba(17,24,39,0.02);
 }
 
-/* Answer text block */
+/* Enum images - centered */
+.identify-answer img{
+  width: 56px;
+  height: 56px;
+  display: block;
+  margin: 0 auto;
+  object-fit: contain;
+}
+
 .identify-answer-meta{
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
   min-width: 0;
+}
+
+.identify-answer-title{
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.identify-answer-desc{
+  margin-top: 0.25rem;
+  font-size: 0.92rem;
+}
+
+/* Matching count - centered + padded */
+.identify-meta{
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  display: flex;
+  justify-content: center;
   text-align: center;
 }
 
-/* Icon tile (Option A) */
-.identify-answer > img{
+/* Bottom controls - centered + padded */
+.identify-bottom-bar{
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+
+  padding: 0.75rem 0.25rem;
+}
+
+.identify-results .results-head{
+  display: grid;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+/* -----------------------------------------------------------------------------
+  Bool answer glyph icon (Y / N / ?)
+----------------------------------------------------------------------------- */
+.identify-answer-glyph{
   width: 56px;
   height: 56px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
   border-radius: 14px;
   border: 1px solid var(--border);
   background: #fff;
-  padding: 6px;
-  object-fit: contain;
-  display: block;
+
+  font-weight: 800;
+  font-size: 1.6rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+
+  flex: 0 0 56px;
 }
-
-/* Bool questions: make “Not sure” span full width (JS keeps it last) */
-.identify-answers[data-kind="bool"] .identify-answer:last-child{
-  grid-column: 1 / -1;
-}
-
-/* Expand columns on larger screens */
-@media (min-width: 480px){
-  .identify-answers{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
-}
-@media (min-width: 768px){
-  .identify-answers{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
-
-/* Single-result confirmation CTA full width */
-.identify-answers[data-kind="single"] .btn{
-  width: 100%;
-}
-
-/* =============================================================================
-  /all/ table page styling (unchanged from your base)
-============================================================================= */
-
-.page-header { margin: 0 0 1rem 0; }
-.page-subtitle { margin: 0.25rem 0 0 0; opacity: 0.85; }
-
-.table-tools { margin: 1rem 0; }
-.table-tools__row {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 1rem;
-  align-items: end;
-}
-
-.field__label {
-  display: inline-block;
-  font-weight: 600;
-  margin-bottom: 0.25rem;
-}
-
-.field__input,
-.field__select {
-  width: 100%;
-  max-width: 100%;
-  padding: 0.6rem 0.7rem;
-  border-radius: 0.6rem;
-  border: 1px solid rgba(0, 0, 0, 0.18);
-}
-
-.field__hint { margin: 0.35rem 0 0 0; font-size: 0.9rem; opacity: 0.75; }
-
-.table-meta {
-  display: flex;
-  gap: 0.75rem;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.table-meta__count { font-size: 0.95rem; }
-
-.table-wrap {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-  border-radius: 0.8rem;
-}
-
-.data-table {
-  width: 100%;
-  border-collapse: collapse;
-  min-width: 720px;
-}
-
-.data-table th,
-.data-table td {
-  padding: 0.65rem 0.75rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
-  vertical-align: middle;
-}
-
-.data-table thead th {
-  position: sticky;
-  top: 0;
-  background: white;
-  z-index: 1;
-}
-
-.data-table__thumb { width: 72px; text-align: center; }
-
-.thumb-img { display: inline-block; border-radius: 0.5rem; }
-
-.thumb-placeholder {
-  display: inline-block;
-  width: 56px;
-  height: 56px;
-  border-radius: 0.5rem;
-  background: rgba(0, 0, 0, 0.06);
-}
-
-.data-table__name a { text-decoration: none; }
-.data-table__name a:hover { text-decoration: underline; }
-
-.data-table__sortable { user-select: none; }
-.data-table__sortable:hover { background: rgba(0, 0, 0, 0.03); }
-
-.sort-indicator { display: inline-block; margin-left: 0.35rem; opacity: 0.5; }
-
-@media (min-width: 860px){
-  .table-tools__row{ grid-template-columns: 1.2fr 0.8fr 0.8fr; }
-}
-
-.data-table__left,
-.data-table__name,
-.data-table__detail { text-align: left; }
-.data-table__thumb { text-align: center; }
