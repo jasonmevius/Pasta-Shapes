@@ -1,11 +1,5 @@
 /* =============================================================================
   styles.css
-  -----------------------------------------------------------------------------
-  Single global stylesheet for the entire site.
-
-  Notes:
-  - No inline CSS in templates.
-  - Heavily commented for future-proofing.
 ============================================================================= */
 
 :root{
@@ -24,9 +18,6 @@
 *{ box-sizing: border-box; }
 html, body{ height: 100%; }
 
-/* -----------------------------------------------------------------------------
-  IMPORTANT: make the HTML hidden attribute bulletproof.
------------------------------------------------------------------------------ */
 [hidden]{ display: none !important; }
 
 body{
@@ -42,32 +33,7 @@ body{
 a{ color: inherit; }
 a:hover{ text-decoration: underline; }
 
-/* -----------------------------------------------------------------------------
-  Accessibility: skip link
------------------------------------------------------------------------------ */
-.skip{
-  position: absolute;
-  left: -999px;
-  top: auto;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-}
-.skip:focus{
-  left: 1rem;
-  top: 1rem;
-  width: auto;
-  height: auto;
-  padding: 0.5rem 0.75rem;
-  background: var(--fg);
-  color: var(--bg);
-  border-radius: 10px;
-  z-index: 1000;
-}
-
-/* -----------------------------------------------------------------------------
-  Accessibility: screen-reader-only utility
------------------------------------------------------------------------------ */
+/* Accessibility helpers */
 .sr-only{
   position: absolute !important;
   width: 1px !important;
@@ -80,24 +46,18 @@ a:hover{ text-decoration: underline; }
   border: 0 !important;
 }
 
-/* -----------------------------------------------------------------------------
-  Layout container
------------------------------------------------------------------------------ */
+/* Layout container */
 .container{
   max-width: var(--container);
   margin: 0 auto;
   padding: 1.25rem var(--pad) 3rem;
 }
-
-/* Leave room for fixed bottom nav on mobile so content is never hidden underneath */
 @media (max-width: 719px){
-  .container{
-    padding-bottom: 5rem;
-  }
+  .container{ padding-bottom: 5rem; }
 }
 
 /* =============================================================================
-  Top header (sticky) + mobile hamburger
+  Top header (sticky) + navigation
 ============================================================================= */
 
 .topbar{
@@ -133,49 +93,42 @@ a:hover{ text-decoration: underline; }
   color: var(--muted);
   font-size: 0.95rem;
 }
-
 .nav a{ text-decoration: none; }
 .nav a[aria-current="page"]{
   color: var(--fg);
   font-weight: 600;
 }
 
-/* Desktop nav shown only on wider screens */
+/* ---- Critical: show only ONE nav paradigm per breakpoint ---- */
+
+/* By default (desktop-first): desktop nav visible, hamburger hidden */
+.nav-desktop{ display: flex; }
+.nav-toggle{ display: none; }
+
+/* Mobile: hide desktop nav, show hamburger */
 @media (max-width: 719px){
   .nav-desktop{ display: none; }
-}
-@media (min-width: 720px){
-  .nav-desktop{ display: flex; }
+  .nav-toggle{ display: inline-flex; }
 }
 
-/* -----------------------------------------------------------------------------
-  Mobile hamburger button (shown only on small screens)
------------------------------------------------------------------------------ */
+/* Hamburger button styling */
 .nav-toggle{
-  display: inline-flex;
   align-items: center;
   justify-content: center;
-
   width: 42px;
   height: 42px;
-
   border: 1px solid var(--border);
   border-radius: 12px;
   background: #fff;
   color: var(--fg);
-
   cursor: pointer;
 }
-
-.nav-toggle:hover{
-  background: rgba(17,24,39,0.03);
-}
+.nav-toggle:hover{ background: rgba(17,24,39,0.03); }
 
 .nav-toggle-bars{
   display: grid;
   gap: 5px;
 }
-
 .nav-toggle-bars span{
   display: block;
   width: 18px;
@@ -185,18 +138,7 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  Cards
-============================================================================= */
-
-.card{
-  border: 1px solid var(--border);
-  background: var(--card);
-  border-radius: var(--radius);
-  padding: 0.9rem;
-}
-
-/* =============================================================================
-  Buttons
+  Buttons / forms
 ============================================================================= */
 
 .btn{
@@ -215,7 +157,6 @@ a:hover{ text-decoration: underline; }
 }
 .btn:hover{ text-decoration: none; }
 
-/* Secondary button variant (legacy + alias for templates) */
 .btn.secondary,
 .btn--secondary{
   background: #fff;
@@ -232,14 +173,10 @@ a:hover{ text-decoration: underline; }
   font-size: 0.95rem;
 }
 
-/* =============================================================================
-  Forms (shared)
-============================================================================= */
-
 .field{
   display: grid;
   gap: 0.35rem;
-  min-width: 0; /* prevents grid blowouts when long text appears */
+  min-width: 0;
 }
 
 .field__label{
@@ -247,7 +184,6 @@ a:hover{ text-decoration: underline; }
   font-size: 0.95rem;
 }
 
-/* Inputs and selects share the same “pill-ish” look */
 .field__input,
 .field__select{
   width: 100%;
@@ -266,7 +202,7 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  Page headers (used by All Pastas and other content pages)
+  Page header
 ============================================================================= */
 
 .page-header{
@@ -286,14 +222,7 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  All Pastas page: tools + table styling
-  -----------------------------------------------------------------------------
-  Goals for Jason’s notes:
-  1) Reduce cramped feel above the table
-  2) Remove “Thumb” label but keep structure
-  3) Left-align body row pasta names (th defaults to centered in browsers)
-  4) Make sortable headers visually look clickable
-  5) Make header row sticky to the top of the viewport when scrolling the page
+  All Pastas: tools + table
 ============================================================================= */
 
 .table-tools{
@@ -306,18 +235,12 @@ a:hover{ text-decoration: underline; }
   align-items: end;
 }
 
-/* Mobile: stack fields */
 @media (max-width: 719px){
-  .table-tools__row{
-    grid-template-columns: 1fr;
-  }
+  .table-tools__row{ grid-template-columns: 1fr; }
 }
 
-/* Tablet/desktop: two fields + meta panel */
 @media (min-width: 720px){
-  .table-tools__row{
-    grid-template-columns: 1.4fr 1fr auto;
-  }
+  .table-tools__row{ grid-template-columns: 1.4fr 1fr auto; }
 }
 
 .table-meta{
@@ -332,58 +255,41 @@ a:hover{ text-decoration: underline; }
   font-size: 0.95rem;
 }
 
-/* -----------------------------------------------------------------------------
-  Table container
-  - Keep horizontal scrolling available on small screens.
-  - IMPORTANT: use overflow-x only, not overflow: auto;
-    overflow: auto creates a scroll container that can break sticky headers
-    relative to the viewport.
------------------------------------------------------------------------------ */
+/* Outer wrapper: border + radius. Keep overflow visible for sticky header. */
 .table-wrap{
   margin-top: 0.75rem;
-
-  overflow-x: auto;
-  overflow-y: visible;
-
-  -webkit-overflow-scrolling: touch;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 2px);
   background: #fff;
+  overflow: visible;
+}
+
+/* Inner wrapper: horizontal scroll only */
+.table-scroll{
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Base table styling */
 .data-table{
   width: 100%;
   border-collapse: collapse;
-
-  /* Prevent “content-sized columns” cramped look */
-  table-layout: fixed;
+  table-layout: fixed; /* prevents cramped "content sized" columns */
 }
 
-/* Column widths via <colgroup> for All Pastas */
 .data-table--all .col-thumb{ width: 84px; }
 .data-table--all .col-name{ width: 16rem; }
 .data-table--all .col-category{ width: 11rem; }
-/* col-synonyms intentionally left flexible to fill remaining space */
+/* synonyms fills remaining space */
 
-/* -----------------------------------------------------------------------------
-  Sticky header row
-  - Sticky to the viewport top while the page scrolls.
-  - The topbar is also sticky; we add an offset so the table header
-    sits just under the topbar instead of hiding behind it.
-
-  If you later change topbar height, update --table-sticky-offset.
------------------------------------------------------------------------------ */
-:root{
-  --table-sticky-offset: 58px; /* approx topbar height incl. border */
-}
-
+/* Sticky header */
 .data-table thead th{
   position: sticky;
-  top: var(--table-sticky-offset);
+  top: 0;              /* sticky to the top of the viewport */
   z-index: 5;
-
   background: #fff;
+
   text-align: left;
   font-size: 0.9rem;
   color: var(--muted);
@@ -392,10 +298,8 @@ a:hover{ text-decoration: underline; }
 
   border-bottom: 1px solid var(--border);
   padding: 0.85rem 0.9rem;
-}
 
-/* Subtle shadow so the sticky row reads as “floating” */
-.data-table thead th{
+  /* subtle separation while sticky */
   box-shadow: 0 1px 0 rgba(17,24,39,0.06);
 }
 
@@ -410,15 +314,10 @@ a:hover{ text-decoration: underline; }
   background: rgba(17,24,39,0.02);
 }
 
-/* Thumb column */
-.data-table__thumb{
-  width: 84px;
-}
+/* Thumb */
+.data-table__thumb{ width: 84px; }
 
-/* -----------------------------------------------------------------------------
-  IMPORTANT: Left-align pasta names in body rows
-  - Because they’re <th scope="row">, browsers often center them by default.
------------------------------------------------------------------------------ */
+/* IMPORTANT: left-align row header cells (<th scope="row">) */
 .data-table__name,
 .data-table tbody th{
   text-align: left;
@@ -429,16 +328,11 @@ a:hover{ text-decoration: underline; }
   font-weight: 700;
   letter-spacing: -0.01em;
 }
-.data-table__name a:hover{
-  text-decoration: underline;
-}
+.data-table__name a:hover{ text-decoration: underline; }
 
-/* Category cell */
-.cell-category{
-  color: var(--muted);
-}
+/* Cells */
+.cell-category{ color: var(--muted); }
 
-/* Synonyms cell */
 .cell-synonyms{
   color: var(--muted);
   font-size: 0.92rem;
@@ -451,28 +345,18 @@ a:hover{ text-decoration: underline; }
   color: rgba(107,114,128,0.65);
 }
 
-/* Alignment helpers */
 .data-table__left{ text-align: left; }
 
-/* -----------------------------------------------------------------------------
-  Sortable headers: make them look interactive
-  - Underline style + small “sort glyph” so users know these are clickable.
-  - We style based on aria-sort which your JS can update.
------------------------------------------------------------------------------ */
+/* Sortable header visual cues */
 .data-table__sortable{
   cursor: pointer;
   user-select: none;
-
-  /* Visual cue: subtle dotted underline */
   text-decoration: underline;
   text-decoration-style: dotted;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
-
-.data-table__sortable:hover{
-  color: var(--fg);
-}
+.data-table__sortable:hover{ color: var(--fg); }
 
 .sort-indicator{
   display: inline-block;
@@ -483,18 +367,9 @@ a:hover{ text-decoration: underline; }
   vertical-align: -0.15em;
 }
 
-/* Default (unsorted): show a neutral sort glyph */
-.data-table__sortable[aria-sort="none"] .sort-indicator::before{
-  content: "⇅";
-}
-
-/* Ascending / Descending: show direction */
-.data-table__sortable[aria-sort="ascending"] .sort-indicator::before{
-  content: "↑";
-}
-.data-table__sortable[aria-sort="descending"] .sort-indicator::before{
-  content: "↓";
-}
+.data-table__sortable[aria-sort="none"] .sort-indicator::before{ content: "⇅"; }
+.data-table__sortable[aria-sort="ascending"] .sort-indicator::before{ content: "↑"; }
+.data-table__sortable[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
 
 /* =============================================================================
   Footer
@@ -509,12 +384,10 @@ a:hover{ text-decoration: underline; }
   padding: 1.25rem var(--pad);
 }
 
-.footer-tagline{
-  margin: 0;
-}
+.footer-tagline{ margin: 0; }
 
 /* =============================================================================
-  Mobile bottom navigation (Search / Identify) - FIXED + SEGMENTED
+  Mobile bottom navigation
 ============================================================================= */
 
 .bottom-nav{
@@ -582,11 +455,8 @@ a:hover{ text-decoration: underline; }
   color: var(--muted);
 }
 
-.bottom-nav-link[aria-current="page"]{
-  color: var(--fg);
-}
+.bottom-nav-link[aria-current="page"]{ color: var(--fg); }
 
-/* Hide the bottom nav on tablet/desktop */
 @media (min-width: 720px){
   .bottom-nav{ display: none; }
 }
