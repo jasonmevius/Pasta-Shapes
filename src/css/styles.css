@@ -847,3 +847,61 @@ body.is-searching #home-results-panel{ display: grid; }
   background: rgba(0, 0, 0, 0.07);
   border-color: rgba(0, 0, 0, 0.28);
 }
+
+/* =============================================================================
+  Identify page - Answer grid usability (mobile-first)
+  -----------------------------------------------------------------------------
+  Goals:
+  - Make answer “cards” easier to scan on mobile by using a consistent grid.
+  - Type (enum) questions:
+      - 2-up on small screens for better scanning
+      - expand to 3-up and 4-up as viewport grows
+  - Bool (Yes/No/Not sure) questions:
+      - Keep Yes first, No second (JS enforces ordering)
+      - Force Not sure (always last) to span full width for clarity
+  - Single-result confirmation state:
+      - Make the “View details” button full-width and easy to tap
+============================================================================= */
+
+/* Answer grid container (defaults to 2 columns on narrow screens) */
+.identify-answers{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+/* Ensure each answer card fills its grid cell consistently */
+.identify-answer{
+  height: 100%;
+}
+
+/* Keep the answer text tidy inside a grid cell (prevents overflow issues) */
+.identify-answer-meta{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0; /* important for long labels in grid layouts */
+}
+
+/* Bool questions: make “Not sure” span all columns (it’s always last in JS) */
+.identify-answers[data-kind="bool"] .identify-answer:last-child{
+  grid-column: 1 / -1;
+}
+
+/* As the screen gets wider, show more columns (helps scan Type quickly) */
+@media (min-width: 480px){
+  .identify-answers{
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 768px){
+  .identify-answers{
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* Single-result confirmation state: full-width primary CTA */
+.identify-answers[data-kind="single"] .btn{
+  width: 100%;
+}
