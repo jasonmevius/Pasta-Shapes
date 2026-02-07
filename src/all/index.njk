@@ -37,7 +37,6 @@ permalink: /all/
         placeholder="Type a name, synonym, or category..."
         autocomplete="off"
       />
-      <p class="field__hint">Filters across Name, Synonyms, and Category.</p>
     </div>
 
     <div class="field">
@@ -45,7 +44,6 @@ permalink: /all/
       <select id="allPastaCategory" class="field__select">
         <option value="">All categories</option>
       </select>
-      <p class="field__hint">Quickly isolate a pasta family.</p>
     </div>
 
     <div class="table-meta" aria-live="polite">
@@ -72,7 +70,10 @@ permalink: /all/
 
     <thead>
       <tr>
-        <th scope="col" class="data-table__thumb">Thumb</th>
+        {# Keep the column for alignment, but remove visible label #}
+        <th scope="col" class="data-table__thumb">
+          <span class="sr-only">Thumbnail</span>
+        </th>
 
         <th scope="col"
             class="data-table__sortable data-table__left"
