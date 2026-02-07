@@ -861,9 +861,10 @@ body.is-searching #home-results-panel{ display: grid; }
       - Force Not sure (always last) to span full width for clarity
   - Single-result confirmation state:
       - Make the “View details” button full-width and easy to tap
-  - Icon treatment:
-      - Make icons look intentional on grey cards by giving them the same “thumb”
-        tile language used elsewhere: white tile, border, radius, padding
+  - Icon + card polish:
+      - Center the icon in the card
+      - Add a bit more internal padding
+      - Add vertical separation between icon and title text
 ============================================================================= */
 
 /* Answer grid container (defaults to 2 columns on narrow screens) */
@@ -873,9 +874,38 @@ body.is-searching #home-results-panel{ display: grid; }
   gap: 12px;
 }
 
-/* Ensure each answer card fills its grid cell consistently */
+/* ---------------------------------------------------------------------------
+  Answer card polish
+  - Make cards feel like consistent “tiles”
+  - Center content vertically
+  - Add padding + spacing between icon and text
+--------------------------------------------------------------------------- */
 .identify-answer{
   height: 100%;
+
+  /* Treat each answer as a mini card */
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+
+  /* A touch more padding than the global .card for tap targets */
+  padding: 0.85rem;
+
+  /* Center image + text and create reliable spacing */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+
+  /* Vertical separation between icon tile and the title block */
+  gap: 0.55rem;
+
+  /* Improve tapping feel (optional but nice) */
+  cursor: pointer;
+}
+
+.identify-answer:hover{
+  background: rgba(17,24,39,0.02);
 }
 
 /* Keep the answer text tidy inside a grid cell (prevents overflow issues) */
@@ -883,16 +913,16 @@ body.is-searching #home-results-panel{ display: grid; }
   display: flex;
   flex-direction: column;
   gap: 4px;
-  min-width: 0; /* important for long labels in grid layouts */
+  min-width: 0;
+  text-align: center; /* aligns with centered icon layout */
 }
 
 /* ---------------------------------------------------------------------------
   Identify answer icon tile (Option A)
-  - Problem: grey card background + icons with white backgrounds felt inconsistent
-  - Fix: treat the icon as a deliberate “thumb” tile:
-      - white background
+  - Use the same “thumb” language as elsewhere:
+      - white tile
       - subtle border
-      - consistent rounded corners
+      - rounded corners
       - padding so odd crops feel centered
 --------------------------------------------------------------------------- */
 .identify-answer > img{
