@@ -308,6 +308,11 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   // - "hide": user explicitly collapsed the list
   let resultsPanelPreference = "auto";
 
+  // Prevent iOS scroll jumps:
+  // iOS Safari can snap scroll position when a large DOM subtree is replaced.
+  // We avoid rebuilding the results list unless the match set actually changed.
+  let lastResultsKey = "";
+
   // Always keep any displayed results alphabetical (A–Z).
   const sortWorking = () => {
     working.sort((a, b) =>
@@ -315,6 +320,13 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
         sensitivity: "base",
       })
     );
+  };
+
+  // Create a stable signature for the current match set.
+  // Sorting by slug makes the signature order-independent.
+  const resultsKey = () => {
+    const slugs = working.map((x) => x.slug).slice().sort();
+    return slugs.join("|");
   };
 
   const setText = (el, txt) => { if (el) el.textContent = txt; };
@@ -325,6 +337,15 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
   const renderResultsList = () => {
     if (!els.resultsList) return;
+
+    // If the match set hasn’t changed, do not touch the DOM.
+    // This is the key fix for iOS Safari scroll snapping.
+    const key = resultsKey();
+    if (key === lastResultsKey) {
+      setText(els.resultsCount, `${working.length} match${working.length === 1 ? "" : "es"}`);
+      return;
+    }
+    lastResultsKey = key;
 
     els.resultsList.innerHTML = "";
     for (const item of working.slice(0, 100)) {
@@ -468,6 +489,10 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     working = initial.slice();
     history = [];
     resultsPanelPreference = "auto";
+
+    // Force results list to rebuild after reset.
+    lastResultsKey = "";
+
     render();
   };
 
@@ -636,6 +661,9 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       // Toggle user preference between "show" and "hide".
       resultsPanelPreference = els.resultsCard.hidden ? "show" : "hide";
       showResultsPanel(shouldShowResultsPanel());
+
+      // If the user forces the list open, ensure it renders at least once.
+      renderResultsList();
     });
   }
 
