@@ -8,21 +8,15 @@ permalink: /all/
   src/all/index.njk
   ------------------------------------------------------------------------------
   PURPOSE
-  - Browse all pasta shapes in a clean, readable table.
-  - Provide lightweight client-side filtering (Search + Category).
-  - Remove redundant "Detail" column because Name is already linked.
-  - Add a "Synonyms" (aka "Also known as") column to help discovery.
+  - Browse all pasta shapes in a readable table.
+  - Remove redundant "Detail" column (Name is already linked).
+  - Add "Synonyms" column for alternate names.
 
-  NOTES
-  - Thumbnails use the same ImageKit structure as the Search page:
-      https://ik.imagekit.io/mevius/pasta/thumbs/<slug>.png
-  - We keep data-* attributes for JS filtering/sorting logic you already have.
-  - Synonyms are read from the first populated field among common schema names:
-      Synonyms, Aliases, SearchAliases, AlsoKnownAs, Also_Known_As
-    (If none exist, we render an em dash placeholder.)
+  IMPORTANT
+  - This template avoids the Nunjucks "split" filter (not available in your build),
+    and instead normalizes separators using replace().
 ============================================================================= #}
 
-{# Known-good ImageKit base for this project (matches your Search page snippet) #}
 {% set imagekitBase = "https://ik.imagekit.io/mevius" %}
 
 <header class="page-header">
@@ -40,7 +34,7 @@ permalink: /all/
         id="allPastaSearch"
         class="field__input"
         type="search"
-        placeholder="Type a name, synonym, or category…"
+        placeholder="Type a name, synonym, or category..."
         autocomplete="off"
       />
       <p class="field__hint">Filters across Name, Synonyms, and Category.</p>
@@ -58,8 +52,6 @@ permalink: /all/
       <div class="table-meta__count">
         Showing <strong id="allPastaVisibleCount">{{ pasta.length }}</strong> of <strong>{{ pasta.length }}</strong>
       </div>
-
-      {# Use the button class your stylesheet already supports (and we also alias btn--secondary in CSS) #}
       <button id="allPastaClear" class="btn secondary btn-small" type="button">
         Clear filters
       </button>
@@ -71,13 +63,6 @@ permalink: /all/
   <table id="allPastaTable" class="data-table data-table--all">
     <caption class="sr-only">All pasta shapes with sortable columns</caption>
 
-    {# ----------------------------------------------------------------------------
-      Column sizing
-      - Thumb: fixed
-      - Name: comfortable min width
-      - Category: fixed-ish
-      - Synonyms: takes remaining space
-    ----------------------------------------------------------------------------- #}
     <colgroup>
       <col class="col-thumb" />
       <col class="col-name" />
@@ -113,7 +98,7 @@ permalink: /all/
     <tbody>
       {% for item in pasta %}
 
-        {# Slug: use item.slug if present, otherwise generate from ShapeName #}
+        {# Slug: prefer explicit slug, otherwise generate from ShapeName #}
         {% set slugVal = item.slug %}
         {% if not slugVal %}
           {% set slugVal = item.ShapeName | slug %}
@@ -121,13 +106,14 @@ permalink: /all/
 
         {% set detailUrl = "/pasta/" ~ slugVal ~ "/" %}
 
-        {# Thumbnail URL: match Search page structure exactly #}
+        {# Thumbnail URL (matches your Search page pattern) #}
         {% set thumbUrl = imagekitBase ~ "/pasta/thumbs/" ~ slugVal ~ ".png" %}
         {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
 
-        {# ------------------------------------------------------------------------
-          Synonyms: support multiple schema possibilities without breaking the page
-        ------------------------------------------------------------------------- #}
+        {# ----------------------------------------------------------------------
+          Synonyms: support multiple schema names, but do NOT split into arrays.
+          We just normalize separators into a comma+space list.
+        ---------------------------------------------------------------------- #}
         {% set synRaw =
           item.Synonyms
           or item.Aliases
@@ -137,37 +123,20 @@ permalink: /all/
           or ""
         %}
 
-        {# Normalize separators to commas, then split into a list #}
-        {% set synNormalized = (synRaw | string)
-          | replace(";", ",")
-          | replace("|", ",")
+        {# Normalize common separators into ", " #}
+        {% set synDisplay = (synRaw | string)
+          | replace(";", ", ")
+          | replace("|", ", ")
         %}
 
-        {% set synList = [] %}
-        {% if synNormalized and synNormalized | trim %}
-          {% set synList = synNormalized | split(",") %}
-        {% endif %}
-
-        {# Build a clean, trimmed, non-empty list #}
-        {% set synClean = [] %}
-        {% for s in synList %}
-          {% set t = (s | trim) %}
-          {% if t %}
-            {% set synClean = synClean.concat([t]) %}
-          {% endif %}
-        {% endfor %}
-
-        {# For filtering convenience, store synonyms as a single lowercase string #}
-        {% set synForData = "" %}
-        {% if synClean.length %}
-          {% set synForData = (synClean | join(", ")) %}
-        {% endif %}
+        {# For filtering, store a lowercase version #}
+        {% set synData = (synDisplay | lower) %}
 
         <tr
           class="data-row"
           data-name="{{ (item.ShapeName or '') | lower | escape }}"
           data-category="{{ (item.Category or '') | lower | escape }}"
-          data-synonyms="{{ synForData | lower | escape }}"
+          data-synonyms="{{ synData | escape }}"
         >
           <td class="data-table__thumb">
             <span class="thumb" aria-hidden="true">
@@ -189,10 +158,9 @@ permalink: /all/
           <td class="cell-category">{{ item.Category or "" }}</td>
 
           <td class="cell-synonyms">
-            {% if synClean.length %}
-              {# Comma-delimited list for readability #}
-              <span class="synonyms" title="{{ synClean | join(', ') | escape }}">
-                {{ synClean | join(", ") }}
+            {% if synDisplay and synDisplay | trim %}
+              <span class="synonyms" title="{{ synDisplay | escape }}">
+                {{ synDisplay }}
               </span>
             {% else %}
               <span class="synonyms synonyms--empty" aria-label="No synonyms available">-</span>
