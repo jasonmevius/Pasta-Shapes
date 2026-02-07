@@ -13,8 +13,8 @@ permalink: /all/
   - Add "Synonyms" column for alternate names.
 
   IMPORTANT
-  - This template avoids the Nunjucks "split" filter (not available in your build),
-    and instead normalizes separators using replace().
+  - Avoids the Nunjucks "split" filter.
+  - Uses an inner horizontal scroll wrapper so sticky table headers work.
 ============================================================================= #}
 
 {% set imagekitBase = "https://ik.imagekit.io/mevius" %}
@@ -58,118 +58,112 @@ permalink: /all/
 </section>
 
 <section class="table-wrap" aria-label="All pasta shapes table">
-  <table id="allPastaTable" class="data-table data-table--all">
-    <caption class="sr-only">All pasta shapes with sortable columns</caption>
+  {# Inner wrapper does horizontal scroll; outer wrapper stays overflow: visible
+     so sticky header can stick to the viewport. #}
+  <div class="table-scroll" role="region" aria-label="Scrollable table (horizontal)">
+    <table id="allPastaTable" class="data-table data-table--all">
+      <caption class="sr-only">All pasta shapes with sortable columns</caption>
 
-    <colgroup>
-      <col class="col-thumb" />
-      <col class="col-name" />
-      <col class="col-category" />
-      <col class="col-synonyms" />
-    </colgroup>
+      <colgroup>
+        <col class="col-thumb" />
+        <col class="col-name" />
+        <col class="col-category" />
+        <col class="col-synonyms" />
+      </colgroup>
 
-    <thead>
-      <tr>
-        {# Keep the column for alignment, but remove visible label #}
-        <th scope="col" class="data-table__thumb">
-          <span class="sr-only">Thumbnail</span>
-        </th>
-
-        <th scope="col"
-            class="data-table__sortable data-table__left"
-            data-sort-key="name"
-            aria-sort="ascending">
-          Name <span class="sort-indicator" aria-hidden="true"></span>
-        </th>
-
-        <th scope="col"
-            class="data-table__sortable data-table__left"
-            data-sort-key="category"
-            aria-sort="none">
-          Category <span class="sort-indicator" aria-hidden="true"></span>
-        </th>
-
-        <th scope="col" class="data-table__left">
-          Synonyms
-          <span class="sr-only">(also known as)</span>
-        </th>
-      </tr>
-    </thead>
-
-    <tbody>
-      {% for item in pasta %}
-
-        {# Slug: prefer explicit slug, otherwise generate from ShapeName #}
-        {% set slugVal = item.slug %}
-        {% if not slugVal %}
-          {% set slugVal = item.ShapeName | slug %}
-        {% endif %}
-
-        {% set detailUrl = "/pasta/" ~ slugVal ~ "/" %}
-
-        {# Thumbnail URL (matches your Search page pattern) #}
-        {% set thumbUrl = imagekitBase ~ "/pasta/thumbs/" ~ slugVal ~ ".png" %}
-        {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
-
-        {# ----------------------------------------------------------------------
-          Synonyms: support multiple schema names, but do NOT split into arrays.
-          We just normalize separators into a comma+space list.
-        ---------------------------------------------------------------------- #}
-        {% set synRaw =
-          item.Synonyms
-          or item.Aliases
-          or item.SearchAliases
-          or item.AlsoKnownAs
-          or item.Also_Known_As
-          or ""
-        %}
-
-        {# Normalize common separators into ", " #}
-        {% set synDisplay = (synRaw | string)
-          | replace(";", ", ")
-          | replace("|", ", ")
-        %}
-
-        {# For filtering, store a lowercase version #}
-        {% set synData = (synDisplay | lower) %}
-
-        <tr
-          class="data-row"
-          data-name="{{ (item.ShapeName or '') | lower | escape }}"
-          data-category="{{ (item.Category or '') | lower | escape }}"
-          data-synonyms="{{ synData | escape }}"
-        >
-          <td class="data-table__thumb">
-            <span class="thumb" aria-hidden="true">
-              <img
-                src="{{ thumbUrlTransformed }}"
-                alt=""
-                loading="lazy"
-                decoding="async"
-                width="56"
-                height="56"
-              />
-            </span>
-          </td>
-
-          <th scope="row" class="data-table__name">
-            <a href="{{ detailUrl }}">{{ item.ShapeName }}</a>
+      <thead>
+        <tr>
+          <th scope="col" class="data-table__thumb">
+            <span class="sr-only">Thumbnail</span>
           </th>
 
-          <td class="cell-category">{{ item.Category or "" }}</td>
+          <th scope="col"
+              class="data-table__sortable data-table__left"
+              data-sort-key="name"
+              aria-sort="ascending">
+            Name <span class="sort-indicator" aria-hidden="true"></span>
+          </th>
 
-          <td class="cell-synonyms">
-            {% if synDisplay and synDisplay | trim %}
-              <span class="synonyms" title="{{ synDisplay | escape }}">
-                {{ synDisplay }}
-              </span>
-            {% else %}
-              <span class="synonyms synonyms--empty" aria-label="No synonyms available">-</span>
-            {% endif %}
-          </td>
+          <th scope="col"
+              class="data-table__sortable data-table__left"
+              data-sort-key="category"
+              aria-sort="none">
+            Category <span class="sort-indicator" aria-hidden="true"></span>
+          </th>
+
+          <th scope="col" class="data-table__left">
+            Synonyms <span class="sr-only">(also known as)</span>
+          </th>
         </tr>
+      </thead>
 
-      {% endfor %}
-    </tbody>
-  </table>
+      <tbody>
+        {% for item in pasta %}
+
+          {% set slugVal = item.slug %}
+          {% if not slugVal %}
+            {% set slugVal = item.ShapeName | slug %}
+          {% endif %}
+
+          {% set detailUrl = "/pasta/" ~ slugVal ~ "/" %}
+
+          {% set thumbUrl = imagekitBase ~ "/pasta/thumbs/" ~ slugVal ~ ".png" %}
+          {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
+
+          {% set synRaw =
+            item.Synonyms
+            or item.Aliases
+            or item.SearchAliases
+            or item.AlsoKnownAs
+            or item.Also_Known_As
+            or ""
+          %}
+
+          {% set synDisplay = (synRaw | string)
+            | replace(";", ", ")
+            | replace("|", ", ")
+          %}
+
+          {% set synData = (synDisplay | lower) %}
+
+          <tr
+            class="data-row"
+            data-name="{{ (item.ShapeName or '') | lower | escape }}"
+            data-category="{{ (item.Category or '') | lower | escape }}"
+            data-synonyms="{{ synData | escape }}"
+          >
+            <td class="data-table__thumb">
+              <span class="thumb" aria-hidden="true">
+                <img
+                  src="{{ thumbUrlTransformed }}"
+                  alt=""
+                  loading="lazy"
+                  decoding="async"
+                  width="56"
+                  height="56"
+                />
+              </span>
+            </td>
+
+            <th scope="row" class="data-table__name">
+              <a href="{{ detailUrl }}">{{ item.ShapeName }}</a>
+            </th>
+
+            <td class="cell-category">{{ item.Category or "" }}</td>
+
+            <td class="cell-synonyms">
+              {% if synDisplay and synDisplay | trim %}
+                <span class="synonyms" title="{{ synDisplay | escape }}">
+                  {{ synDisplay }}
+                </span>
+              {% else %}
+                <span class="synonyms synonyms--empty" aria-label="No synonyms available">-</span>
+              {% endif %}
+            </td>
+          </tr>
+
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </section>
