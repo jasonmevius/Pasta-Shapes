@@ -26,9 +26,18 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 {% set identifyData = [] %}
 {% for item in pasta %}
 
+  {# Thumbnail notes:
+     - Could be blank
+     - Could be "penne.png"
+     - Could be a full URL
+     We store raw and normalize in JS.
+  #}
   {% set thumbCandidate = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
   {% set thumbRaw = thumbCandidate if thumbCandidate else (item.Slug ~ ".png") %}
 
+  {# Aliases notes:
+     - CSV has evolved - try multiple possible column names.
+  #}
   {% set alsoRaw =
     item.SearchAliases
     or item.Aliases
@@ -38,6 +47,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     or ""
   %}
 
+  {# Push a normalized object into identifyData array #}
   {% set _ = identifyData.push({
     slug: item.Slug,
     name: item.ShapeName,
@@ -58,6 +68,9 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   <p class="muted">Answer one question at a time. You can always tap “Not sure.”</p>
 </header>
 
+{# -----------------------------------------------------------------------------
+  Identify UI skeleton
+----------------------------------------------------------------------------- #}
 <section id="identify-app" class="identify">
   <div class="card identify-card">
     <div class="identify-question">
@@ -66,6 +79,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       <p class="identify-help muted" id="identify-help"></p>
     </div>
 
+    {# Answer buttons are rendered here by JS. #}
     <div class="identify-answers" id="identify-answers" aria-live="polite"></div>
 
     <div class="identify-meta">
@@ -73,6 +87,10 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     </div>
   </div>
 
+  {# Matches panel
+     - Hidden by default on mobile
+     - Auto-shown when the match set is small
+  #}
   <div class="card identify-results" id="identify-results" hidden>
     <div class="results-head">
       <h2 class="h2">Matches</h2>
@@ -81,6 +99,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     <ul class="results-list" id="identify-results-list"></ul>
   </div>
 
+  {# Bottom control bar #}
   <div class="identify-bottom-bar" role="navigation" aria-label="Identify controls">
     <button class="btn secondary" type="button" id="identify-back" disabled>Back</button>
     <button class="btn secondary" type="button" id="identify-reset">Reset</button>
@@ -88,10 +107,21 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   </div>
 </section>
 
+{# -----------------------------------------------------------------------------
+  JSON payload for JS
+----------------------------------------------------------------------------- #}
 <script type="application/json" id="identify-data">
 {{ identifyData | dump | safe }}
 </script>
 
+{# -----------------------------------------------------------------------------
+  Identify JS (embedded)
+  - FIXED:
+    - Removes the 100-result cap that caused the “Margherite” cutoff.
+    - “Show all” now actually shows all (and toggles to “Show fewer”).
+    - Optional “Show more” button appears when not showing all.
+    - iOS scroll-jump prevention kept, but now respects show-all/show-more toggles.
+----------------------------------------------------------------------------- #}
 <script>
 (function () {
   if (window.__pastaIdentifyInit) return;
@@ -119,7 +149,14 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   const IK_IDENTIFY_BASE = "https://ik.imagekit.io/mevius/pasta/identify/";
   const FALLBACK_THUMB = "pending.png";
 
+  // Auto-show results panel when small
   const AUTO_SHOW_RESULTS_THRESHOLD = 10;
+
+  // Results list display behavior
+  // - Default: show a reasonable chunk (prevents a giant list on first load)
+  // - "Show all": truly shows all matches (fixes the Margherite cutoff)
+  const DEFAULT_RESULTS_LIMIT = 60;
+  const SHOW_MORE_STEP = 60;
 
   const isUrl = (s) => /^https?:\/\//i.test(String(s || "").trim());
 
@@ -151,8 +188,8 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     raw = JSON.parse(els.dataScript.textContent || "[]");
   } catch (e) {
     console.error("Identify: failed to parse identify-data JSON", e);
-    els.title.textContent = "Error loading data";
-    els.help.textContent = "Could not parse pasta data on this page.";
+    if (els.title) els.title.textContent = "Error loading data";
+    if (els.help) els.help.textContent = "Could not parse pasta data on this page.";
     return;
   }
 
@@ -189,6 +226,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       label: (v) => TYPE_LABELS[v] || v,
       desc: (v) => TYPE_DESCS[v] || "",
       icon: (v) => identifyIconUrlFor(`${v}.png`),
+      values: Object.keys(TYPE_LABELS),
     },
     {
       key: "hollow",
@@ -252,9 +290,17 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   let working = initial.slice();
   let history = [];
 
+  // Results panel behavior:
+  // - "auto": show list automatically only when small
+  // - "show": user expanded
+  // - "hide": user collapsed
   let resultsPanelPreference = "auto";
 
-  // iOS scroll-jump prevention: only rebuild results DOM when match set changes.
+  // Results list limiting
+  let showAllResults = false;
+  let resultsLimit = DEFAULT_RESULTS_LIMIT;
+
+  // iOS scroll-jump prevention: only rebuild results DOM when the list or limit changes.
   let lastResultsKey = "";
 
   const sortWorking = () => {
@@ -264,8 +310,9 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   };
 
   const resultsKey = () => {
-    const slugs = working.map((x) => x.slug).slice().sort();
-    return slugs.join("|");
+    // Include limit/showAll so toggling forces a re-render
+    const slugs = working.map((x) => x.slug).slice().sort().join("|");
+    return `${slugs}::${showAllResults ? "all" : resultsLimit}`;
   };
 
   const setText = (el, txt) => { if (el) el.textContent = txt; };
@@ -285,7 +332,10 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     lastResultsKey = key;
 
     els.resultsList.innerHTML = "";
-    for (const item of working.slice(0, 100)) {
+
+    const n = showAllResults ? working.length : Math.min(working.length, resultsLimit);
+
+    for (const item of working.slice(0, n)) {
       const li = document.createElement("li");
       li.className = "result-card";
 
@@ -326,14 +376,46 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       els.resultsList.appendChild(li);
     }
 
+    // Optional "Show more" row when not showing all
+    if (!showAllResults && working.length > resultsLimit) {
+      const li = document.createElement("li");
+      li.className = "result-card";
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn secondary";
+      const remaining = working.length - resultsLimit;
+      btn.textContent = `Show more (${Math.min(remaining, SHOW_MORE_STEP)})`;
+      btn.addEventListener("click", () => {
+        resultsLimit = Math.min(working.length, resultsLimit + SHOW_MORE_STEP);
+        lastResultsKey = ""; // force rebuild
+        renderResultsList();
+        syncToggleLabel();
+      });
+
+      li.appendChild(btn);
+      els.resultsList.appendChild(li);
+    }
+
     setText(els.resultsCount, `${working.length} match${working.length === 1 ? "" : "es"}`);
+  };
+
+  const syncToggleLabel = () => {
+    if (!els.btnToggleResults) return;
+
+    if (els.resultsCard.hidden) {
+      els.btnToggleResults.textContent = "Show all";
+      return;
+    }
+
+    els.btnToggleResults.textContent = showAllResults ? "Show fewer" : "Show all";
   };
 
   const showResultsPanel = (show) => {
     if (!els.resultsCard || !els.btnToggleResults) return;
     els.resultsCard.hidden = !show;
     els.btnToggleResults.hidden = false;
-    els.btnToggleResults.textContent = show ? "Hide list" : "Show all";
+    syncToggleLabel();
   };
 
   const shouldShowResultsPanel = () => {
@@ -370,8 +452,8 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     };
 
     const preferredOrder = ["hollow", "ridged", "twisted", "curved", "size"];
-
     const candidates = [];
+
     for (const key of preferredOrder) {
       if (answered.has(key)) continue;
       if (key === "size" && working.length <= 25) continue;
@@ -384,7 +466,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     }
 
     if (!candidates.length) return null;
-
     candidates.sort((a, b) => b.s - a.s);
     return candidates[0].q;
   };
@@ -400,6 +481,11 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       return itemVal === value;
     });
 
+    // Reset list limiting on each answer so the UX stays predictable
+    showAllResults = false;
+    resultsLimit = DEFAULT_RESULTS_LIMIT;
+    lastResultsKey = "";
+
     render();
   };
 
@@ -407,6 +493,11 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     if (!history.length) return;
     const last = history.pop();
     working = last.prevWorking || initial.slice();
+
+    showAllResults = false;
+    resultsLimit = DEFAULT_RESULTS_LIMIT;
+    lastResultsKey = "";
+
     render();
   };
 
@@ -414,7 +505,11 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     working = initial.slice();
     history = [];
     resultsPanelPreference = "auto";
+
+    showAllResults = false;
+    resultsLimit = DEFAULT_RESULTS_LIMIT;
     lastResultsKey = "";
+
     render();
   };
 
@@ -452,20 +547,15 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       img.width = 56;
       img.height = 56;
 
-      if (q.kind === "bool") {
-        img.src = answerIconFor(q.key, value);
-      } else if (iconUrl) {
-        img.src = iconUrl;
-      }
+      if (q.kind === "bool") img.src = answerIconFor(q.key, value);
+      else if (iconUrl) img.src = iconUrl;
 
       const meta = document.createElement("div");
       meta.className = "identify-answer-meta";
 
       const t = document.createElement("div");
       t.className = "identify-answer-title";
-
-      const projected = countAfterAnswer(q.key, value);
-      t.textContent = `${label} (${projected})`;
+      t.textContent = `${label} (${countAfterAnswer(q.key, value)})`;
 
       const d = document.createElement("div");
       d.className = "identify-answer-desc muted";
@@ -476,7 +566,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
       btn.appendChild(img);
       btn.appendChild(meta);
-
       els.answers.appendChild(btn);
     };
 
@@ -488,10 +577,8 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       return;
     }
 
-    // Enum questions: sort options by projected count DESC for better usability.
-    // (Not sure always last.)
+    // Enum: sort by projected count DESC (Not sure last)
     const values = q.values || Object.keys(TYPE_LABELS);
-
     const rows = values.map((v) => ({
       v,
       label: q.label(v),
@@ -502,24 +589,20 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
     rows.sort((a, b) => {
       if (b.projected !== a.projected) return b.projected - a.projected;
-      // Tie-breaker: alphabetical
       return String(a.label).localeCompare(String(b.label), "en", { sensitivity: "base" });
     });
 
-    for (const r of rows) {
-      addButton(r.label, r.v, r.desc, r.icon);
-    }
-
+    for (const r of rows) addButton(r.label, r.v, r.desc, r.icon);
     addButton("Not sure", "__ns__", "Keep all possibilities.", null);
   };
 
   const render = () => {
     const q = nextQuestion();
-
     sortWorking();
 
     if (els.btnBack) els.btnBack.disabled = history.length === 0;
 
+    // 1 result: confirmation state (no auto-redirect)
     if (working.length === 1) {
       const only = working[0];
 
@@ -547,14 +630,17 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       }
 
       renderMatchesCount();
-
       resultsPanelPreference = "show";
+
+      // In this state it’s helpful to see the match card too.
+      showAllResults = true;
+
       showResultsPanel(true);
       renderResultsList();
-
       return;
     }
 
+    // No more useful questions
     if (!q) {
       setText(els.kicker, "Done");
       setText(els.title, "Here are your matches");
@@ -566,12 +652,14 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
         els.answers.innerHTML = "";
       }
 
+      resultsPanelPreference = "show";
       showResultsPanel(true);
       renderMatchesCount();
       renderResultsList();
       return;
     }
 
+    // Normal flow
     setText(els.kicker, `Question ${history.length + 1}`);
     setText(els.title, q.title);
     setText(els.help, q.help || "");
@@ -580,15 +668,34 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     renderMatchesCount();
 
     showResultsPanel(shouldShowResultsPanel());
+    syncToggleLabel();
     renderResultsList();
   };
 
   if (els.btnBack) els.btnBack.addEventListener("click", goBack);
   if (els.btnReset) els.btnReset.addEventListener("click", reset);
+
   if (els.btnToggleResults) {
     els.btnToggleResults.addEventListener("click", () => {
-      resultsPanelPreference = els.resultsCard.hidden ? "show" : "hide";
-      showResultsPanel(shouldShowResultsPanel());
+      // If list is hidden, show it (default limited)
+      if (els.resultsCard.hidden) {
+        resultsPanelPreference = "show";
+        showAllResults = false;
+        resultsLimit = DEFAULT_RESULTS_LIMIT;
+        lastResultsKey = "";
+        showResultsPanel(true);
+        renderResultsList();
+        return;
+      }
+
+      // If list is visible, toggle between show-all and limited
+      showAllResults = !showAllResults;
+
+      // When switching back to limited, reset to default
+      if (!showAllResults) resultsLimit = DEFAULT_RESULTS_LIMIT;
+
+      lastResultsKey = "";
+      syncToggleLabel();
       renderResultsList();
     });
   }
