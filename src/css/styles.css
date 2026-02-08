@@ -24,13 +24,12 @@
       - Table with synonyms column
       - Sortable header affordance
       - NON-sticky table header (per latest decision)
+      - On narrow screens, Synonyms column is hidden for usability
 
   NOTE ABOUT CLASS NAMES
   - Search input styles target BOTH:
       - .search-input (older / intended search input class)
       - .search .field__input (newer "field" input class used in some templates)
-    This makes the UI resilient if templates differ slightly.
-
 ============================================================================= */
 
 /* =============================================================================
@@ -371,7 +370,7 @@ a:hover{ text-decoration: underline; }
   font-size: 1rem;
   background: #fff;
 
-  /* "Centered hero" feel (this is what you were missing) */
+  /* Centered hero feel */
   text-align: center;
 }
 
@@ -822,7 +821,7 @@ body.is-searching #home-results-panel{ display: grid; }
 .data-table{
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed; /* prevents cramped "content sized" columns */
+  table-layout: fixed;
 }
 
 .data-table--all .col-thumb{ width: 84px; }
@@ -893,7 +892,6 @@ body.is-searching #home-results-panel{ display: grid; }
 .data-table__sortable{
   cursor: pointer;
   user-select: none;
-
   text-decoration: underline;
   text-decoration-style: dotted;
   text-decoration-thickness: 1px;
@@ -914,6 +912,30 @@ body.is-searching #home-results-panel{ display: grid; }
 .data-table__sortable[aria-sort="none"] .sort-indicator::before{ content: "⇅"; }
 .data-table__sortable[aria-sort="ascending"] .sort-indicator::before{ content: "↑"; }
 .data-table__sortable[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
+
+/* =============================================================================
+  13a) All Pastas: hide Synonyms column on narrow screens
+  ------------------------------------------------------------------------------
+  Goal: make the table usable at narrow widths by omitting the Synonyms column.
+  Assumes Synonyms is the 4th column in the All Pastas table.
+============================================================================= */
+
+@media (max-width: 719px){
+  /* Hide Synonyms header */
+  .data-table--all thead th:nth-child(4){
+    display: none;
+  }
+
+  /* Hide Synonyms body cells */
+  .data-table--all tbody td:nth-child(4){
+    display: none;
+  }
+
+  /* Hide the <col> entry (if present) */
+  .data-table--all colgroup col:nth-child(4){
+    display: none;
+  }
+}
 
 /* =============================================================================
   14) Footer (minimal)
