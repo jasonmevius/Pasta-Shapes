@@ -11,17 +11,25 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   - Identify pasta by narrowing down with sequential questions.
   - Mobile-first UI: big tap targets, one question at a time.
   - Show the user how each answer narrows the list using count previews.
-  - When matches become small, show a live “Matches” list (helps confidence).
+  - When matches become small, show a live “Matches” table (helps confidence).
   - When exactly 1 match remains, DO NOT auto-redirect - show a confirmation
     state with a “View details” button so the user can verify or revise.
 
   IMPORTANT NOTES
   - Identify logic is embedded in this template (existing behavior).
   - No inline CSS - styling remains in /src/css/styles.css.
+
+  CHANGE (RESULTS STANDARDIZATION)
+  - Identify "Matches" now renders as an All-Pastas-style TABLE with:
+      - Thumb (not sortable)
+      - Name (sortable)
+      - Category (sortable)
+      - Synonyms (hidden on narrow screens via existing CSS rules)
 ============================================================================= #}
 
 {# -----------------------------------------------------------------------------
   Build identifyData JSON in the template so JS has a compact dataset.
+  NOTE: "category" is populated for the results table.
 ----------------------------------------------------------------------------- #}
 {% set identifyData = [] %}
 {% for item in pasta %}
@@ -38,9 +46,21 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     or ""
   %}
 
+  {# Category support across schema changes:
+     - Prefer "Category" if present, otherwise "Type" (common in your CSV),
+       otherwise fall back to blank. #}
+  {% set categoryRaw =
+    item.Category
+    or item.Type
+    or item.ShapeCategory
+    or item.PastaCategory
+    or ""
+  %}
+
   {% set _ = identifyData.push({
     slug: item.Slug,
     name: item.ShapeName,
+    category: categoryRaw,
     type: item.Type or "",
     size: item.SizeClass or "",
     hollow: item.IsHollow or "",
@@ -73,12 +93,69 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     </div>
   </div>
 
+  {# =============================================================================
+    Matches (standardized table)
+    - Uses the same table classes as All Pastas / Home results.
+    - Sortable headers are wired via the embedded script below.
+  ============================================================================= #}
   <div class="card identify-results" id="identify-results" hidden>
     <div class="results-head">
       <h2 class="h2">Matches</h2>
       <p class="muted" id="identify-results-count"></p>
     </div>
-    <ul class="results-list" id="identify-results-list"></ul>
+
+    <div class="table-wrap table-wrap--results">
+      <div class="table-scroll">
+        <table
+          id="identify-results-table"
+          class="data-table data-table--results js-sortable-table"
+          aria-label="Identify matches table"
+        >
+          <colgroup>
+            <col class="col-thumb" />
+            <col class="col-name" />
+            <col class="col-category" />
+            <col class="col-synonyms" />
+          </colgroup>
+
+          <thead>
+            <tr>
+              <th scope="col" class="data-table__thumb">
+                <span class="sr-only">Thumb</span>
+              </th>
+
+              <th
+                scope="col"
+                class="data-table__sortable"
+                data-sort="name"
+                aria-sort="ascending"
+                tabindex="0"
+                role="button"
+              >
+                Name <span class="sort-indicator" aria-hidden="true"></span>
+              </th>
+
+              <th
+                scope="col"
+                class="data-table__sortable"
+                data-sort="category"
+                aria-sort="none"
+                tabindex="0"
+                role="button"
+              >
+                Category <span class="sort-indicator" aria-hidden="true"></span>
+              </th>
+
+              <th scope="col">Synonyms</th>
+            </tr>
+          </thead>
+
+          <tbody id="identify-results-body">
+            {# Rows rendered by JS #}
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <div class="identify-bottom-bar" role="navigation" aria-label="Identify controls">
@@ -94,6 +171,15 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
 <script>
 (function () {
+  // ============================================================================
+  // Identify logic (embedded)
+  // ----------------------------------------------------------------------------
+  // NOTE
+  // - This script is intentionally embedded to keep Identify self-contained.
+  // - It renders matches into an All-Pastas-style table with sortable headers.
+  // - It sets window.__pastaIdentifyInit to prevent double-init if other scripts
+  //   attempt to attach Identify behavior.
+  // ============================================================================
   if (window.__pastaIdentifyInit) return;
   window.__pastaIdentifyInit = true;
 
@@ -106,12 +192,17 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     help: $("#identify-help"),
     answers: $("#identify-answers"),
     count: $("#identify-count"),
+
     resultsCard: $("#identify-results"),
     resultsCount: $("#identify-results-count"),
-    resultsList: $("#identify-results-list"),
+
+    resultsTable: $("#identify-results-table"),
+    resultsBody: $("#identify-results-body"),
+
     btnBack: $("#identify-back"),
     btnReset: $("#identify-reset"),
     btnToggleResults: $("#identify-toggle-results"),
+
     dataScript: $("#identify-data"),
   };
 
@@ -123,9 +214,13 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   // UX tuning
   const AUTO_SHOW_RESULTS_THRESHOLD = 10;
 
-  // Results list sizing
+  // Results sizing
   const DEFAULT_RESULTS_LIMIT = 60;
   const SHOW_MORE_STEP = 60;
+
+  // Sorting state for the results table
+  let sortKey = "name";
+  let sortDir = "ascending";
 
   const isUrl = (s) => /^https?:\/\//i.test(String(s || "").trim());
 
@@ -144,6 +239,11 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   };
 
   const identifyIconUrlFor = (file) => IK_IDENTIFY_BASE + file;
+
+  const answerIconFor = (questionKey, value) => {
+    if (value === "__ns__") return identifyIconUrlFor(`${questionKey}-notsure.png`);
+    return identifyIconUrlFor(`${questionKey}-${value}.png`);
+  };
 
   if (!els.app || !els.dataScript) return;
 
@@ -181,6 +281,25 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     dumpling: "Pasta-like dumplings (often irregular or rustic).",
   };
 
+  const normalize = (v) => String(v || "").trim().toLowerCase();
+
+  // Canonical dataset (what Identify filters against)
+  const initial = raw.map((r) => ({
+    slug: r.slug,
+    name: r.name,
+    category: String(r.category || r.type || "").trim(),
+    type: normalize(r.type),
+    size: normalize(r.size),
+    hollow: normalize(r.hollow),
+    ridged: normalize(r.ridged),
+    twisted: normalize(r.twisted),
+    curved: normalize(r.curved),
+    stuffed: normalize(r.stuffed),
+    also: String(r.also || ""),
+    thumb: String(r.thumb || ""),
+  }));
+
+  // Question definitions (same as before)
   const QUESTION_DEFS = [
     {
       key: "type",
@@ -235,74 +354,74 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     },
   ];
 
-  const normalize = (v) => String(v || "").trim().toLowerCase();
-
-  const initial = raw.map((r) => ({
-    slug: r.slug,
-    name: r.name,
-    type: normalize(r.type),
-    size: normalize(r.size),
-    hollow: normalize(r.hollow),
-    ridged: normalize(r.ridged),
-    twisted: normalize(r.twisted),
-    curved: normalize(r.curved),
-    stuffed: normalize(r.stuffed),
-    also: String(r.also || ""),
-    thumb: String(r.thumb || ""),
-  }));
-
+  // Working state
   let working = initial.slice();
-  let history = [];
-
-  let resultsPanelPreference = "auto";
-
-  let showAllResults = false;
+  let history = []; // [{ key, value, prevWorking }]
+  let resultsPanelPreference = "auto"; // auto | show | hide
   let resultsLimit = DEFAULT_RESULTS_LIMIT;
-
-  let lastResultsKey = "";
-
-  const sortWorking = () => {
-    working.sort((a, b) =>
-      String(a.name || "").localeCompare(String(b.name || ""), "en", { sensitivity: "base" })
-    );
-  };
-
-  const resultsKey = () => {
-    const slugs = working.map((x) => x.slug).slice().sort().join("|");
-    return `${slugs}::${showAllResults ? "all" : resultsLimit}`;
-  };
 
   const setText = (el, txt) => { if (el) el.textContent = txt; };
 
-  const renderMatchesCount = () => {
+  // Sorting
+  function compare(a, b) {
+    const aKey = (sortKey === "category" ? a.category : a.name) || "";
+    const bKey = (sortKey === "category" ? b.category : b.name) || "";
+    const cmp = String(aKey).localeCompare(String(bKey), "en", { sensitivity: "base" });
+    return sortDir === "descending" ? -cmp : cmp;
+  }
+
+  function sortWorking() {
+    working.sort(compare);
+  }
+
+  // Match count label
+  function renderMatchesCount() {
     setText(els.count, `Matching: ${working.length}`);
-  };
+  }
 
-  const renderResultsList = () => {
-    if (!els.resultsList) return;
+  // Show/hide results panel
+  function showResultsPanel(show) {
+    if (!els.resultsCard || !els.btnToggleResults) return;
+    els.resultsCard.hidden = !show;
+    els.btnToggleResults.hidden = false;
 
-    const key = resultsKey();
-    if (key === lastResultsKey) {
-      setText(els.resultsCount, `${working.length} match${working.length === 1 ? "" : "es"}`);
-      return;
+    if (!show) {
+      els.btnToggleResults.textContent = "Show all";
+    } else {
+      els.btnToggleResults.textContent =
+        resultsLimit >= working.length ? "Hide list" : "Show all";
     }
-    lastResultsKey = key;
+  }
 
-    els.resultsList.innerHTML = "";
+  function shouldShowResultsPanel() {
+    if (resultsPanelPreference === "show") return true;
+    if (resultsPanelPreference === "hide") return false;
+    return working.length <= AUTO_SHOW_RESULTS_THRESHOLD;
+  }
 
-    const n = showAllResults ? working.length : Math.min(working.length, resultsLimit);
+  // Render results into the table body
+  function renderResultsTable() {
+    if (!els.resultsBody) return;
 
-    for (const item of working.slice(0, n)) {
-      const li = document.createElement("li");
-      li.className = "result-card";
+    els.resultsBody.innerHTML = "";
 
-      const a = document.createElement("a");
-      a.className = "result-link";
-      a.href = `/pasta/${item.slug}/`;
-      a.setAttribute("data-recent", "pasta");
+    const n = Math.min(working.length, resultsLimit);
+    const slice = working.slice(0, n);
 
-      const thumb = document.createElement("div");
-      thumb.className = "thumb";
+    for (const item of slice) {
+      const tr = document.createElement("tr");
+      tr.className = "data-row";
+      tr.setAttribute("data-slug", item.slug);
+      tr.setAttribute("data-name", item.name);
+      tr.setAttribute("data-category", item.category || "");
+
+      // Thumb cell
+      const tdThumb = document.createElement("td");
+      tdThumb.className = "data-table__thumb";
+
+      const spanThumb = document.createElement("span");
+      spanThumb.className = "thumb";
+      spanThumb.setAttribute("aria-hidden", "true");
 
       const img = document.createElement("img");
       img.width = 56;
@@ -310,207 +429,204 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       img.loading = "lazy";
       img.decoding = "async";
       img.alt = "";
-      img.src = thumbUrlFor(item.thumb);
+      img.src = thumbUrlFor(item.thumb) + "?tr=w-56,h-56,f-auto,q-50";
 
-      thumb.appendChild(img);
+      spanThumb.appendChild(img);
+      tdThumb.appendChild(spanThumb);
 
-      const body = document.createElement("div");
-      body.className = "result-body";
+      // Name (row header cell)
+      const thName = document.createElement("th");
+      thName.scope = "row";
+      thName.className = "data-table__name";
 
-      const titleRow = document.createElement("div");
-      titleRow.className = "result-title-row";
+      const a = document.createElement("a");
+      a.href = `/pasta/${item.slug}/`;
+      a.textContent = item.name;
+      thName.appendChild(a);
 
-      const strong = document.createElement("strong");
-      strong.className = "result-name";
-      strong.textContent = item.name;
+      // Category
+      const tdCat = document.createElement("td");
+      tdCat.className = "cell-category";
+      tdCat.textContent = item.category || "";
 
-      titleRow.appendChild(strong);
-      body.appendChild(titleRow);
+      // Synonyms
+      const tdSyn = document.createElement("td");
+      tdSyn.className = "cell-synonyms";
+      tdSyn.textContent = item.also || "";
 
-      a.appendChild(thumb);
-      a.appendChild(body);
-      li.appendChild(a);
-      els.resultsList.appendChild(li);
+      tr.appendChild(tdThumb);
+      tr.appendChild(thName);
+      tr.appendChild(tdCat);
+      tr.appendChild(tdSyn);
+
+      els.resultsBody.appendChild(tr);
     }
 
-    if (!showAllResults && working.length > resultsLimit) {
-      const li = document.createElement("li");
-      li.className = "result-card";
+    setText(els.resultsCount, `${working.length} match${working.length === 1 ? "" : "es"}`);
+
+    // Show-more row (spans all columns)
+    if (!els.resultsCard.hidden && resultsLimit < working.length) {
+      const trMore = document.createElement("tr");
+
+      const tdMore = document.createElement("td");
+      tdMore.colSpan = 4;
 
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "btn secondary";
-      const remaining = working.length - resultsLimit;
-      btn.textContent = `Show more (${Math.min(remaining, SHOW_MORE_STEP)})`;
+      btn.textContent = `Show more (${Math.min(working.length - resultsLimit, SHOW_MORE_STEP)})`;
       btn.addEventListener("click", () => {
         resultsLimit = Math.min(working.length, resultsLimit + SHOW_MORE_STEP);
-        lastResultsKey = "";
-        renderResultsList();
+        renderResultsTable();
         syncToggleLabel();
       });
 
-      li.appendChild(btn);
-      els.resultsList.appendChild(li);
+      tdMore.appendChild(btn);
+      trMore.appendChild(tdMore);
+      els.resultsBody.appendChild(trMore);
+    }
+  }
+
+  // Sort header wiring (local to Identify table)
+  function initTableSorting() {
+    if (!els.resultsTable) return;
+
+    const headers = Array.from(els.resultsTable.querySelectorAll("thead th[data-sort]"));
+    if (!headers.length) return;
+
+    function setSortState(activeKey, dir) {
+      for (const th of headers) {
+        const key = th.getAttribute("data-sort");
+        th.setAttribute("aria-sort", key === activeKey ? dir : "none");
+      }
+      sortKey = activeKey;
+      sortDir = dir;
     }
 
-    setText(els.resultsCount, `${working.length} match${working.length === 1 ? "" : "es"}`);
-  };
+    function toggle(th) {
+      const key = th.getAttribute("data-sort");
+      const cur = th.getAttribute("aria-sort") || "none";
 
-  const syncToggleLabel = () => {
-    if (!els.btnToggleResults) return;
+      let next = "ascending";
+      if (cur === "ascending") next = "descending";
+      if (cur === "descending") next = "ascending";
 
+      setSortState(key, next);
+      sortWorking();
+      renderResultsTable();
+    }
+
+    for (const th of headers) {
+      th.addEventListener("click", () => toggle(th));
+      th.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          toggle(th);
+        }
+      });
+    }
+
+    // Ensure initial state
+    setSortState("name", "ascending");
+  }
+
+  function syncToggleLabel() {
+    if (!els.btnToggleResults || !els.resultsCard) return;
     if (els.resultsCard.hidden) {
       els.btnToggleResults.textContent = "Show all";
       return;
     }
+    els.btnToggleResults.textContent =
+      resultsLimit >= working.length ? "Hide list" : "Show all";
+  }
 
-    els.btnToggleResults.textContent = showAllResults ? "Show fewer" : "Show all";
-  };
+  // Identify filtering helpers
+  function questionAlreadyAnswered(key) {
+    return history.some((h) => h.key === key);
+  }
 
-  const showResultsPanel = (show) => {
-    if (!els.resultsCard || !els.btnToggleResults) return;
-    els.resultsCard.hidden = !show;
-    els.btnToggleResults.hidden = false;
-    syncToggleLabel();
-  };
-
-  const shouldShowResultsPanel = () => {
-    if (resultsPanelPreference === "show") return true;
-    if (resultsPanelPreference === "hide") return false;
-    return working.length <= AUTO_SHOW_RESULTS_THRESHOLD;
-  };
-
-  const questionAlreadyAnswered = (key) => history.some((h) => h.key === key);
-
-  const nextQuestion = () => {
+  function nextQuestion() {
     if (!questionAlreadyAnswered("type")) return QUESTION_DEFS.find((q) => q.key === "type");
+    for (const q of QUESTION_DEFS) if (!questionAlreadyAnswered(q.key)) return q;
+    return null;
+  }
 
-    const answered = new Set(history.map((h) => h.key));
+  function applyFilter(key, value) {
+    const prev = working.slice();
 
-    const scoreQuestion = (key) => {
-      const counts = new Map();
-
-      for (const item of working) {
-        const v = String(item[key] || "").trim();
-        if (!v) continue;
-        counts.set(v, (counts.get(v) || 0) + 1);
-      }
-
-      if (counts.size < 2) return 0;
-
-      const total = Array.from(counts.values()).reduce((a, b) => a + b, 0);
-      if (!total) return 0;
-
-      let sumSq = 0;
-      for (const c of counts.values()) {
-        const p = c / total;
-        sumSq += p * p;
-      }
-      return 1 - sumSq;
+    const normalizeBool = (v) => {
+      if (v === "__ns__") return "__ns__";
+      return String(v || "").toLowerCase();
     };
 
-    const preferredOrder = ["hollow", "ridged", "twisted", "curved", "size"];
-
-    const candidates = [];
-    for (const key of preferredOrder) {
-      if (answered.has(key)) continue;
-      if (key === "size" && working.length <= 25) continue;
-
-      const q = QUESTION_DEFS.find((d) => d.key === key);
-      if (!q) continue;
-
-      const s = scoreQuestion(key);
-      if (s > 0) candidates.push({ q, s });
-    }
-
-    if (!candidates.length) return null;
-
-    candidates.sort((a, b) => b.s - a.s);
-    return candidates[0].q;
-  };
-
-  const applyAnswer = (key, value) => {
-    const prev = working;
-    history.push({ key, value, prevWorking: prev });
-
-    working = working.filter((item) => {
-      const itemVal = item[key];
-      if (!itemVal) return true;
+    working = working.filter((p) => {
       if (value === "__ns__") return true;
-      return itemVal === value;
+      const v = normalizeBool(value);
+      const pv = normalizeBool(p[key]);
+      return pv === v;
     });
 
-    showAllResults = false;
-    resultsLimit = DEFAULT_RESULTS_LIMIT;
-    lastResultsKey = "";
+    history.push({ key, value, prevWorking: prev });
+    sortWorking();
+  }
 
-    render();
-  };
-
-  const goBack = () => {
-    if (!history.length) return;
+  function goBack() {
     const last = history.pop();
-    working = last.prevWorking || initial.slice();
+    if (!last) return;
+    working = last.prevWorking.slice();
+    sortWorking();
+  }
 
-    showAllResults = false;
-    resultsLimit = DEFAULT_RESULTS_LIMIT;
-    lastResultsKey = "";
-
-    render();
-  };
-
-  const reset = () => {
-    working = initial.slice();
+  function resetAll() {
     history = [];
-    resultsPanelPreference = "auto";
-
-    showAllResults = false;
+    working = initial.slice();
     resultsLimit = DEFAULT_RESULTS_LIMIT;
-    lastResultsKey = "";
+    resultsPanelPreference = "auto";
+    sortWorking();
+  }
 
-    render();
-  };
+  function renderQuestion() {
+    const q = nextQuestion();
 
-  const countAfterAnswer = (key, value) => {
-    if (value === "__ns__") return working.length;
+    renderMatchesCount();
 
-    let count = 0;
-    for (const item of working) {
-      const itemVal = item[key];
-      if (!itemVal) { count++; continue; }
-      if (itemVal === value) count++;
+    if (!q) {
+      setText(els.title, "Done");
+      setText(els.kicker, "Here are your matches.");
+      setText(els.help, "Use Back to change your last answer, or Reset to start over.");
+      if (els.answers) els.answers.innerHTML = "";
+      showResultsPanel(true);
+      renderResultsTable();
+      syncToggleLabel();
+      return;
     }
-    return count;
-  };
 
-  const renderAnswers = (q) => {
+    setText(els.title, q.title);
+    setText(els.kicker, `Step ${history.length + 1}`);
+    setText(els.help, q.help || "");
+
+    if (els.btnBack) els.btnBack.disabled = history.length === 0;
+    if (els.btnReset) els.btnReset.hidden = history.length === 0;
+
+    showResultsPanel(shouldShowResultsPanel());
+    renderResultsTable();
+    syncToggleLabel();
+
     if (!els.answers) return;
-
-    els.answers.dataset.kind = q.kind || "";
-    els.answers.dataset.key = q.key || "";
-
     els.answers.innerHTML = "";
+    els.answers.setAttribute("data-kind", q.kind);
+    els.answers.setAttribute("data-key", q.key);
 
-    const addButton = (label, value, desc, iconUrl, forceGlyph) => {
+    const makeAnswer = (value, label, desc, iconUrl) => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "identify-answer";
-      btn.addEventListener("click", () => applyAnswer(q.key, value));
 
-      // Leading icon area:
-      // - bool uses glyphs (Y / N / ?)
-      // - enum uses images EXCEPT Not sure, which should be '?'
-      if (q.kind === "bool" || forceGlyph) {
+      // Bool questions use glyphs (Y / N / ?)
+      if (q.kind === "bool") {
         const glyph = document.createElement("span");
         glyph.className = "identify-answer-glyph";
-
-        if (q.kind === "bool") {
-          glyph.textContent = (value === "yes") ? "Y" : (value === "no") ? "N" : "?";
-        } else {
-          // enum "Not sure"
-          glyph.textContent = "?";
-        }
-
+        glyph.textContent = value === "yes" ? "Y" : value === "no" ? "N" : "?";
         btn.appendChild(glyph);
       } else {
         const img = document.createElement("img");
@@ -519,156 +635,101 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
         img.decoding = "async";
         img.width = 56;
         img.height = 56;
-        if (iconUrl) img.src = iconUrl;
+        img.src = iconUrl || "";
         btn.appendChild(img);
       }
 
-      const meta = document.createElement("div");
+      const meta = document.createElement("span");
       meta.className = "identify-answer-meta";
 
-      const t = document.createElement("div");
-      t.className = "identify-answer-title";
+      const title = document.createElement("span");
+      title.className = "identify-answer-title";
+      title.textContent = label;
+      meta.appendChild(title);
 
-      const projected = countAfterAnswer(q.key, value);
-      t.textContent = `${label} (${projected})`;
-
-      const d = document.createElement("div");
-      d.className = "identify-answer-desc muted";
-      d.textContent = desc || "";
-
-      meta.appendChild(t);
-      if (desc) meta.appendChild(d);
+      if (desc) {
+        const d = document.createElement("span");
+        d.className = "identify-answer-desc";
+        d.textContent = desc;
+        meta.appendChild(d);
+      }
 
       btn.appendChild(meta);
-      els.answers.appendChild(btn);
+
+      btn.addEventListener("click", () => {
+        applyFilter(q.key, value);
+        renderQuestion();
+      });
+
+      return btn;
     };
 
-    if (q.kind === "bool") {
-      addButton("Yes", "yes", q.descYes || "", null, false);
-      addButton("No", "no", q.descNo || "", null, false);
-      addButton("Not sure", "__ns__", "Keep all possibilities.", null, false);
-      return;
-    }
+    if (q.kind === "enum") {
+      for (const v of q.values) {
+        els.answers.appendChild(
+          makeAnswer(
+            v,
+            q.label ? q.label(v) : String(v),
+            q.desc ? q.desc(v) : "",
+            q.icon ? q.icon(v) : ""
+          )
+        );
+      }
 
-    const values = q.values || Object.keys(TYPE_LABELS);
-    const rows = values.map((v) => ({
-      v,
-      label: q.label(v),
-      desc: q.desc ? q.desc(v) : "",
-      icon: q.icon ? q.icon(v) : null,
-      projected: countAfterAnswer(q.key, v),
-    }));
-
-    rows.sort((a, b) => {
-      if (b.projected !== a.projected) return b.projected - a.projected;
-      return String(a.label).localeCompare(String(b.label), "en", { sensitivity: "base" });
-    });
-
-    for (const r of rows) {
-      addButton(r.label, r.v, r.desc, r.icon, false);
-    }
-
-    // ✅ Enum "Not sure" now uses the same glyph box with '?'
-    addButton("Not sure", "__ns__", "Keep all possibilities.", null, true);
-  };
-
-  const render = () => {
-    const q = nextQuestion();
-
-    sortWorking();
-
-    if (els.btnBack) els.btnBack.disabled = history.length === 0;
-
-    if (working.length === 1) {
-      const only = working[0];
-
-      setText(els.kicker, "Result");
-      setText(els.title, "Is this your pasta?");
-      setText(
-        els.help,
-        `We narrowed it down to 1 match: ${only.name}. Tap “View details” to confirm, or use Back / Reset to revise your answers.`
+      els.answers.appendChild(
+        makeAnswer("__ns__", "Not sure", "Skip this question.", q.icon ? q.icon("__ns__") : "")
       );
-
-      if (els.answers) {
-        els.answers.dataset.kind = "single";
-        els.answers.dataset.key = "single";
-        els.answers.innerHTML = "";
-
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = "btn";
-        btn.textContent = "View details";
-        btn.addEventListener("click", () => {
-          window.location.href = `/pasta/${only.slug}/`;
-        });
-
-        els.answers.appendChild(btn);
-      }
-
-      renderMatchesCount();
-
-      resultsPanelPreference = "show";
-      showAllResults = true;
-
-      showResultsPanel(true);
-      renderResultsList();
-      return;
     }
 
-    if (!q) {
-      setText(els.kicker, "Done");
-      setText(els.title, "Here are your matches");
-      setText(els.help, "You can refine by restarting or tapping a match.");
-
-      if (els.answers) {
-        els.answers.dataset.kind = "done";
-        els.answers.dataset.key = "done";
-        els.answers.innerHTML = "";
-      }
-
-      resultsPanelPreference = "show";
-      showResultsPanel(true);
-      renderMatchesCount();
-      renderResultsList();
-      return;
+    if (q.kind === "bool") {
+      els.answers.appendChild(makeAnswer("yes", "Yes", q.descYes || "", answerIconFor(q.key, "yes")));
+      els.answers.appendChild(makeAnswer("no", "No", q.descNo || "", answerIconFor(q.key, "no")));
+      els.answers.appendChild(makeAnswer("__ns__", "Not sure", "Skip this question.", answerIconFor(q.key, "__ns__")));
     }
 
-    setText(els.kicker, `Question ${history.length + 1}`);
-    setText(els.title, q.title);
-    setText(els.help, q.help || "");
+    if (q.kind === "single") {
+      els.answers.appendChild(makeAnswer("__ns__", "Continue", "", ""));
+    }
+  }
 
-    renderAnswers(q);
-    renderMatchesCount();
-
-    showResultsPanel(shouldShowResultsPanel());
-    syncToggleLabel();
-    renderResultsList();
-  };
-
-  if (els.btnBack) els.btnBack.addEventListener("click", goBack);
-  if (els.btnReset) els.btnReset.addEventListener("click", reset);
-
-  if (els.btnToggleResults) {
-    els.btnToggleResults.addEventListener("click", () => {
-      if (els.resultsCard.hidden) {
-        resultsPanelPreference = "show";
-        showAllResults = false;
-        resultsLimit = DEFAULT_RESULTS_LIMIT;
-        lastResultsKey = "";
-        showResultsPanel(true);
-        renderResultsList();
-        return;
-      }
-
-      showAllResults = !showAllResults;
-      if (!showAllResults) resultsLimit = DEFAULT_RESULTS_LIMIT;
-
-      lastResultsKey = "";
-      syncToggleLabel();
-      renderResultsList();
+  // Controls
+  if (els.btnBack) {
+    els.btnBack.addEventListener("click", () => {
+      goBack();
+      renderQuestion();
     });
   }
 
-  render();
+  if (els.btnReset) {
+    els.btnReset.addEventListener("click", () => {
+      resetAll();
+      renderQuestion();
+    });
+  }
+
+  if (els.btnToggleResults) {
+    els.btnToggleResults.addEventListener("click", () => {
+      const currentlyHidden = Boolean(els.resultsCard && els.resultsCard.hidden);
+
+      if (currentlyHidden) {
+        resultsPanelPreference = "show";
+        if (els.resultsCard) els.resultsCard.hidden = false;
+
+        // When user explicitly requests the list, show everything.
+        resultsLimit = working.length;
+        renderResultsTable();
+        syncToggleLabel();
+      } else {
+        resultsPanelPreference = "hide";
+        if (els.resultsCard) els.resultsCard.hidden = true;
+        syncToggleLabel();
+      }
+    });
+  }
+
+  // Init
+  sortWorking();
+  initTableSorting();
+  renderQuestion();
 })();
 </script>
