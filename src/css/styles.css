@@ -8,12 +8,11 @@
   - Mobile-first where possible, with clear breakpoints.
   - Heavily commented for maintainability.
 
-  RECENT CHANGES (per our last iterations)
-  - Skip-to-content link is hidden unless focused.
-  - Desktop shows inline nav only; mobile shows hamburger only.
-  - All Pastas table header is NOT sticky (sticky removed by request).
-  - Sortable headers have a clear "clickable" affordance (dotted underline + arrows).
-  - All Pastas spacing above table increased for a cleaner feel.
+  THIS VERSION
+  - Restores Search + Identify styling that was lost in a prior full-file replace.
+  - Keeps All Pastas improvements (synonyms column, spacing, sortable cues).
+  - Table headers are NOT sticky (per your latest decision).
+
 ============================================================================= */
 
 /* =============================================================================
@@ -95,7 +94,7 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  3) Global layout
+  3) Global layout container
 ============================================================================= */
 
 .container{
@@ -110,7 +109,7 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  4) Top navigation
+  4) Top navigation (sticky) + responsive gating
 ============================================================================= */
 
 .topbar{
@@ -153,19 +152,11 @@ a:hover{ text-decoration: underline; }
   font-weight: 600;
 }
 
-/* ---------------------------------------------------------------------------
-  Desktop vs Mobile nav gating
-
-  Goal:
-  - Desktop: show inline nav links, hide hamburger
-  - Mobile: hide inline nav links, show hamburger
---------------------------------------------------------------------------- */
-
-/* Desktop-first defaults */
+/* Desktop-first: show inline nav, hide hamburger */
 .nav-desktop{ display: flex; }
 .nav-toggle{ display: none; }
 
-/* Mobile breakpoint */
+/* Mobile: hide inline nav, show hamburger */
 @media (max-width: 719px){
   .nav-desktop{ display: none; }
   .nav-toggle{ display: inline-flex; }
@@ -198,7 +189,18 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  5) Buttons and form controls
+  5) Cards
+============================================================================= */
+
+.card{
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 0.9rem;
+}
+
+/* =============================================================================
+  6) Buttons and forms
 ============================================================================= */
 
 .btn{
@@ -217,7 +219,7 @@ a:hover{ text-decoration: underline; }
 }
 .btn:hover{ text-decoration: none; }
 
-/* Secondary button variant (supports legacy ".secondary" and BEM-ish ".btn--secondary") */
+/* Secondary button variant (supports legacy ".secondary" and ".btn--secondary") */
 .btn.secondary,
 .btn--secondary{
   background: #fff;
@@ -238,12 +240,18 @@ a:hover{ text-decoration: underline; }
 .field{
   display: grid;
   gap: 0.35rem;
-  min-width: 0; /* prevents grid blowouts on long content */
+  min-width: 0;
 }
 
 .field__label{
   font-weight: 650;
   font-size: 0.95rem;
+}
+
+.field__hint{
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.88rem;
 }
 
 .field__input,
@@ -264,13 +272,13 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  6) Page header
+  7) Page header
 ============================================================================= */
 
 .page-header{
   display: grid;
   gap: 0.25rem;
-  margin-bottom: 1.25rem; /* extra breathing room */
+  margin-bottom: 1.25rem;
 }
 
 .page-header h1{
@@ -284,7 +292,7 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  7) Shared thumbnail component
+  8) Shared thumbnail component (used by Search + All Pastas)
 ============================================================================= */
 
 .thumb{
@@ -307,10 +315,339 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  8) All Pastas page - filter bar + table
+  9) HOME + SEARCH RESULTS UI
+  ------------------------------------------------------------------------------
+  These classes are used by your home/search experience:
+  - suggestions
+  - results list
+  - result cards
+  - recently viewed
 ============================================================================= */
 
-/* Filter controls spacing */
+.suggestions{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.suggestions:empty{ display: none; }
+
+.results-list{
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.65rem;
+}
+
+.result-card{
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 0.75rem;
+}
+
+.result-link{
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 0.75rem;
+  align-items: center;
+  text-decoration: none;
+}
+.result-link:hover{ text-decoration: none; }
+
+.result-body{ min-width: 0; }
+
+.result-title-row{
+  display: flex;
+  gap: 0.5rem;
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+
+.result-name{
+  font-size: 1.02rem;
+  letter-spacing: -0.01em;
+}
+
+.result-also{
+  font-size: 0.88rem;
+  margin-top: 0.25rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+}
+
+.results-tools{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.recent-wrap{
+  border-top: 1px dashed var(--border);
+  padding-top: 0.75rem;
+}
+.recent-wrap[hidden]{ display: none; }
+
+/* =============================================================================
+  10) HOME PANELS (if your homepage uses the two-card layout)
+============================================================================= */
+
+.home-shell{ display: block; }
+
+.home-panels{
+  display: grid;
+  gap: var(--gap);
+  grid-template-columns: 1fr;
+}
+
+/* Landscape phones - allow a 2-up layout */
+@media (max-width: 719px) and (orientation: landscape){
+  .home-panels{
+    grid-template-columns: 1fr 1fr;
+    align-items: stretch;
+  }
+}
+
+.home-card{
+  border-radius: calc(var(--radius) + 4px);
+  padding: 1rem;
+}
+
+.home-card-head{
+  display: grid;
+  gap: 0.25rem;
+  text-align: center;
+}
+
+.home-card-title{
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+}
+
+/* Search card expands by default and shrinks while typing */
+#home-search-card{
+  min-height: 42svh;
+  transition: min-height 180ms ease, padding 180ms ease;
+}
+
+body.is-searching #home-search-card{
+  min-height: 24svh;
+  padding: 0.85rem;
+}
+
+/* In landscape split mode, do not force svh heights */
+@media (max-width: 719px) and (orientation: landscape){
+  #home-search-card{ min-height: 0; }
+  body.is-searching #home-search-card{ min-height: 0; }
+}
+
+body.is-searching #home-identify-card{ display: none; }
+body.is-searching #home-results-panel{ display: grid; }
+
+/* Identify card is one big link */
+.home-card-link{
+  text-decoration: none;
+  cursor: pointer;
+  position: relative;
+}
+.home-card-link:hover{
+  text-decoration: none;
+  background: rgba(17,24,39,0.02);
+}
+
+/* Identify hero image rotation support */
+.identify-hero{
+  width: 100%;
+  border: none;
+  background: transparent;
+  min-height: 10rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.identify-hero img{
+  display: block;
+  object-fit: contain;
+  width: 96px;
+  height: 96px;
+  opacity: 1;
+  transition: opacity 240ms ease;
+}
+
+.identify-hero img.is-fading{ opacity: 0; }
+
+@media (prefers-reduced-motion: reduce){
+  .identify-hero img{ transition: none; }
+}
+
+@media (max-width: 719px){
+  .identify-hero img{
+    max-width: 80px;
+    max-height: 80px;
+    height: 75%;
+    width: 75%;
+  }
+}
+
+/* =============================================================================
+  11) IDENTIFY PAGE UI
+  ------------------------------------------------------------------------------
+  Restores the multi-step, mobile-first Identify layout:
+  - Answer cards in responsive grids
+  - Y / N / ? glyph-style answers (no images) when used
+============================================================================= */
+
+.identify{
+  display: grid;
+  gap: var(--gap);
+}
+
+.identify-card{
+  padding: 1rem;
+}
+
+.identify-question{
+  display: grid;
+  gap: 0.35rem;
+}
+
+.identify-answers{
+  margin-top: 0.75rem;
+  display: grid;
+  gap: 0.65rem;
+}
+
+/* Default enum layout - one column for safety */
+.identify-answers[data-kind="enum"]{
+  grid-template-columns: 1fr;
+}
+
+/* Type choices - 2-up on narrow screens */
+@media (max-width: 719px){
+  .identify-answers[data-kind="enum"][data-key="type"]{
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* On wider screens - more columns for enum cards */
+@media (min-width: 720px){
+  .identify-answers[data-kind="enum"]{
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+/* Bool questions - 3-up */
+.identify-answers[data-kind="bool"]{
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* Single CTA state */
+.identify-answers[data-kind="single"]{
+  grid-template-columns: 1fr;
+}
+
+/* Answer card button */
+.identify-answer{
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) + 2px);
+  background: #fff;
+
+  padding: 0.85rem;
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.identify-answer:hover{
+  background: rgba(17,24,39,0.02);
+}
+
+/* Enum images (when used) - centered */
+.identify-answer img{
+  width: 56px;
+  height: 56px;
+  display: block;
+  margin: 0 auto;
+  object-fit: contain;
+}
+
+.identify-answer-meta{ min-width: 0; }
+
+.identify-answer-title{
+  font-weight: 750;
+  letter-spacing: -0.01em;
+}
+
+.identify-answer-desc{
+  margin-top: 0.25rem;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+/* Bool answer glyph (Y / N / ?) */
+.identify-answer-glyph{
+  width: 56px;
+  height: 56px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+
+  font-weight: 800;
+  font-size: 1.6rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+
+  flex: 0 0 56px;
+}
+
+/* Matching count and bottom bar */
+.identify-meta{
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  display: flex;
+  justify-content: center;
+  text-align: center;
+}
+
+.identify-bottom-bar{
+  display: flex;
+  justify-content: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  padding: 0.75rem 0.25rem;
+}
+
+.identify-results .results-head{
+  display: grid;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+/* =============================================================================
+  12) ALL PASTAS - filter bar + table
+  ------------------------------------------------------------------------------
+  - Non-sticky header (per your decision)
+  - Sortable headers have clickable cues
+============================================================================= */
+
 .table-tools{
   margin: 1.25rem 0 1rem;
 }
@@ -343,14 +680,14 @@ a:hover{ text-decoration: underline; }
 
 /* Table outer shell */
 .table-wrap{
-  margin-top: 1rem; /* increased space above table */
+  margin-top: 1rem;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 2px);
   background: #fff;
   overflow: visible;
 }
 
-/* Horizontal scroll wrapper (prevents layout blowups on narrow screens) */
+/* Horizontal scroll wrapper */
 .table-scroll{
   overflow-x: auto;
   overflow-y: visible;
@@ -361,20 +698,16 @@ a:hover{ text-decoration: underline; }
 .data-table{
   width: 100%;
   border-collapse: collapse;
-
-  /* Prevent “content-sized columns” cramped look */
   table-layout: fixed;
 }
 
-/* Column widths via <colgroup> for All Pastas */
 .data-table--all .col-thumb{ width: 84px; }
 .data-table--all .col-name{ width: 16rem; }
 .data-table--all .col-category{ width: 11rem; }
-/* col-synonyms fills remaining space */
 
-/* Header row styling (NOT sticky per latest decision) */
+/* Header row styling (NOT sticky) */
 .data-table thead th{
-  position: static; /* important: do not stick */
+  position: static;
   top: auto;
 
   background: #fff;
@@ -388,7 +721,7 @@ a:hover{ text-decoration: underline; }
   padding: 0.9rem 0.9rem;
 }
 
-/* Table body cells */
+/* Body cells */
 .data-table tbody td,
 .data-table tbody th{
   border-bottom: 1px solid var(--border);
@@ -400,26 +733,22 @@ a:hover{ text-decoration: underline; }
   background: rgba(17,24,39,0.02);
 }
 
-/* Thumb column cell */
+/* Thumb column */
 .data-table__thumb{ width: 84px; }
 
-/* IMPORTANT: left-align row header cells (<th scope="row">) */
+/* Left-align row header cells (<th scope="row">) */
 .data-table__name,
 .data-table tbody th{
   text-align: left;
 }
 
-/* Pasta name link */
 .data-table__name a{
   text-decoration: none;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
-.data-table__name a:hover{
-  text-decoration: underline;
-}
+.data-table__name a:hover{ text-decoration: underline; }
 
-/* Category and synonyms cells */
 .cell-category{ color: var(--muted); }
 
 .cell-synonyms{
@@ -434,15 +763,12 @@ a:hover{ text-decoration: underline; }
   color: rgba(107,114,128,0.65);
 }
 
-/* Alignment helper */
 .data-table__left{ text-align: left; }
 
-/* Sortable headers - make them look interactive */
+/* Sortable headers - visual cue */
 .data-table__sortable{
   cursor: pointer;
   user-select: none;
-
-  /* visual affordance */
   text-decoration: underline;
   text-decoration-style: dotted;
   text-decoration-thickness: 1px;
@@ -451,7 +777,6 @@ a:hover{ text-decoration: underline; }
 
 .data-table__sortable:hover{ color: var(--fg); }
 
-/* Sort indicator glyphs (the JS updates aria-sort) */
 .sort-indicator{
   display: inline-block;
   width: 1.1em;
@@ -466,7 +791,7 @@ a:hover{ text-decoration: underline; }
 .data-table__sortable[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
 
 /* =============================================================================
-  9) Footer
+  13) Footer
 ============================================================================= */
 
 .site-footer{
@@ -481,7 +806,7 @@ a:hover{ text-decoration: underline; }
 .footer-tagline{ margin: 0; }
 
 /* =============================================================================
-  10) Mobile bottom navigation (Search / Identify)
+  14) Mobile bottom navigation (Search / Identify)
 ============================================================================= */
 
 .bottom-nav{
