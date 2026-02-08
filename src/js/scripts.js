@@ -113,7 +113,7 @@
     let sortKey = "name";
     let sortDir = "ascending";
 
-    // Tokens we should not allow synonyms matching to trigger on.
+    // Tokens we should not allow synonym matching to trigger on.
     // This prevents "alphabet pasta" from matching "p" via the word "pasta".
     const STOP_TOKENS = new Set([
       "pasta",
@@ -128,7 +128,7 @@
     function setSearchingUI(isSearching) {
       document.body.classList.toggle("is-searching", isSearching);
       if (resultsPanel) resultsPanel.hidden = !isSearching;
-      // IMPORTANT: do NOT hide Identify card while searching.
+      // IMPORTANT: Identify card remains visible (CSS must not hide it).
     }
 
     function setControlVisible(el, isVisible) {
@@ -165,6 +165,7 @@
         .filter((t) => !STOP_TOKENS.has(t));
     }
 
+    // Cache initial rows (DOM - data objects)
     const rows = Array.from(tbody.querySelectorAll("tr.data-row")).map((tr) => {
       const name = tr.getAttribute("data-name") || "";
       const category = tr.getAttribute("data-category") || "";
@@ -263,6 +264,7 @@
       render(matches);
     }
 
+    // Paging
     if (nextBtn) {
       nextBtn.addEventListener("click", (e) => {
         e.preventDefault();
@@ -294,11 +296,13 @@
       filterAndRender();
     });
 
+    // Input filtering
     input.addEventListener("input", () => {
       visibleLimit = PAGE_N;
       filterAndRender();
     });
 
+    // Support /?q=... deep links
     (function handleQueryParamOnLoad() {
       const params = new URLSearchParams(window.location.search);
       const q = params.get("q");
@@ -311,6 +315,7 @@
       filterAndRender();
     })();
 
+    // Init
     readSortStateFromHeaders();
     filterAndRender();
   }
