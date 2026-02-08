@@ -6,20 +6,20 @@
   // - One JS bundle for site interactions:
   //   - Mobile hamburger menu
   //   - Homepage linked rotators (search placeholder + icon)
-  //   - Homepage search behavior (prefix matching)
-  //   - Identify page behavior (guided narrowing UI)
+  //   - Homepage search behavior (prefix matching) + table rendering
+  //   - Identify page behavior (guided narrowing UI)  [Identify table pass next]
   //
-  // IMPORTANT SEARCH DECISIONS (per our earlier discussion)
-  // - Typing "P" should return pasta shapes that START WITH "P".
-  // - Synonyms/aliases are also allowed to match via STARTS WITH.
-  // - "Previously searched / Recently viewed" is removed:
-  //     - no localStorage tracking
-  //     - no "recents" UI render
+  // IMPORTANT SEARCH DECISIONS
+  // - Typing "P" returns pasta shapes that START WITH "P".
+  // - Synonyms/aliases also match via STARTS WITH (token-based).
+  // - "Previously searched / Recently viewed" remains removed.
+  //
+  // NOTE ABOUT SORTING
+  // - Homepage results are now in an All-Pastas-style table.
+  // - Clicking sortable headers updates aria-sort and triggers re-render
+  //   using the current query + current sort.
   // =============================================================================
 
-  // =============================================================================
-  // Tiny selector helper
-  // =============================================================================
   const $ = (sel, root = document) => root.querySelector(sel);
 
   // =============================================================================
@@ -77,7 +77,6 @@
 
   // =============================================================================
   // Linked home rotator (Homepage)
-  // - Rotates the input placeholder example + the Identify icon in sync.
   // =============================================================================
   function initLinkedHomeRotators() {
     const input = $("#pasta-q");
@@ -114,16 +113,11 @@
         10
       )
     );
-    const fadeMs = Math.max(
-      120,
-      parseInt(img.getAttribute("data-rotate-fade") || "240", 10)
-    );
+    const fadeMs = Math.max(120, parseInt(img.getAttribute("data-rotate-fade") || "240", 10));
 
     img.style.transitionDuration = `${fadeMs}ms`;
 
-    const tpl =
-      input.getAttribute("data-placeholder-template") ||
-      "Start typing - e.g., {example}";
+    const tpl = input.getAttribute("data-placeholder-template") || "Start typing - e.g., {example}";
 
     // Preload icons so the swap feels instant.
     try {
@@ -147,9 +141,6 @@
     let timer = null;
     let swapping = false;
 
-    // Only rotate when:
-    // - user hasn't typed anything
-    // - input is not focused
     function shouldRun() {
       const hasText = Boolean(String(input.value || "").trim());
       const isFocused = document.activeElement === input;
@@ -197,13 +188,9 @@
       if (shouldRun()) start();
       else stop();
     });
-    input.addEventListener(
-      "blur",
-      () => {
-        if (shouldRun()) start();
-      },
-      { passive: true }
-    );
+    input.addEventListener("blur", () => {
+      if (shouldRun()) start();
+    });
 
     document.addEventListener("visibilitychange", () => {
       if (document.hidden) stop();
@@ -212,33 +199,108 @@
   }
 
   // =============================================================================
-  // Home/Search page behavior (PREFIX matching)
+  // Generic sortable table helper
+  // -----------------------------------------------------------------------------
+  // EXPECTED MARKUP
+  // - <table class="js-sortable-table">
+  // - Sortable headers: <th data-sort="name" aria-sort="...">
+  // - Rows provide:
+  //     data-name, data-category  (and optional others)
+  //
+  // BEHAVIOR
+  // - Toggle aria-sort among: none -> ascending -> descending
+  // - Emits a CustomEvent on the table:
+  //     "pasta:table-sort" { detail: { key, dir } }
+  // =============================================================================
+  function initSortableTables() {
+    const tables = Array.from(document.querySelectorAll("table.js-sortable-table"));
+    if (!tables.length) return;
+
+    for (const table of tables) {
+      const headers = Array.from(table.querySelectorAll("thead th[data-sort]"));
+      if (!headers.length) continue;
+
+      function setSortState(activeKey, dir) {
+        for (const th of headers) {
+          const key = th.getAttribute("data-sort");
+          if (key === activeKey) th.setAttribute("aria-sort", dir);
+          else th.setAttribute("aria-sort", "none");
+        }
+      }
+
+      function currentSort() {
+        const active = headers.find((th) => th.getAttribute("aria-sort") !== "none");
+        if (!active) return { key: headers[0].getAttribute("data-sort"), dir: "ascending" };
+        return {
+          key: active.getAttribute("data-sort"),
+          dir: active.getAttribute("aria-sort"),
+        };
+      }
+
+      function toggle(th) {
+        const key = th.getAttribute("data-sort");
+        const cur = th.getAttribute("aria-sort") || "none";
+
+        // Cycle: none -> ascending -> descending -> ascending ...
+        let next = "ascending";
+        if (cur === "ascending") next = "descending";
+        if (cur === "descending") next = "ascending";
+
+        setSortState(key, next);
+
+        table.dispatchEvent(
+          new CustomEvent("pasta:table-sort", {
+            bubbles: true,
+            detail: { key, dir: next },
+          })
+        );
+      }
+
+      // Click and keyboard activation
+      for (const th of headers) {
+        th.addEventListener("click", () => toggle(th));
+        th.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggle(th);
+          }
+        });
+      }
+
+      // Ensure there is always a sane initial state:
+      // If no header has aria-sort != none, set first to ascending.
+      const s = currentSort();
+      setSortState(s.key, s.dir);
+    }
+  }
+
+  // =============================================================================
+  // Home/Search page behavior (PREFIX matching) + table row filtering
   // =============================================================================
   function initSearchPage() {
     const input = $("#pasta-q");
     const status = $("#pasta-search-status");
-    const list = $("#pasta-results");
-    if (!input || !status || !list) return;
+    const table = $("#pasta-results-table");
+    const tbody = $("#pasta-results-body");
+    if (!input || !status || !table || !tbody) return;
 
     const resultsPanel = $("#home-results-panel");
     const identifyCard = $("#home-identify-card");
 
-    // Note + paging controls
     const note = $("#pasta-results-note");
     const nextBtn = $("#pasta-toggle-all");
 
     const PAGE_N = 10;
     let visibleLimit = PAGE_N;
 
-    // ----------------------------
-    // UI helpers
-    // ----------------------------
+    // Current sort state (driven by aria-sort on header cells)
+    let sortKey = "name";
+    let sortDir = "ascending";
+
     function setSearchingUI(isSearching) {
       document.body.classList.toggle("is-searching", isSearching);
       if (resultsPanel) resultsPanel.hidden = !isSearching;
-      if (identifyCard) {
-        identifyCard.setAttribute("aria-hidden", isSearching ? "true" : "false");
-      }
+      if (identifyCard) identifyCard.setAttribute("aria-hidden", isSearching ? "true" : "false");
     }
 
     function setControlVisible(el, isVisible) {
@@ -248,15 +310,12 @@
       el.setAttribute("aria-hidden", isVisible ? "false" : "true");
     }
 
-    // ----------------------------
     // Normalization helpers
-    // - Make matching robust (case, diacritics, punctuation).
-    // ----------------------------
     function normalize(s) {
       return String(s || "")
         .toLowerCase()
         .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "") // strip diacritics
+        .replace(/[\u0300-\u036f]/g, "")
         .replace(/&/g, "and")
         .replace(/[’']/g, " ")
         .replace(/[^a-z0-9\s-]/g, " ")
@@ -266,75 +325,69 @@
 
     function normalizeQuery(s) {
       const q = normalize(s);
-
-      // If user types spaced letters like "p e n n e", collapse spaces.
-      // (This happens on some mobile keyboards / voice input.)
       if (/^(?:[a-z0-9]\s+){2,}[a-z0-9]$/.test(q)) return q.replace(/\s+/g, "");
       return q;
     }
 
-    // ----------------------------
-    // Build a cache once so every keystroke is fast.
-    // Each <li> is expected to have:
-    // - data-name
-    // - data-search
-    // ----------------------------
-    const cards = Array.from(list.querySelectorAll("[data-slug]"));
-    const cache = cards.map((card) => {
-      const name = card.getAttribute("data-name") || "";
-      const search = card.getAttribute("data-search") || "";
+    // Cache table rows once
+    const rows = Array.from(tbody.querySelectorAll("tr[data-slug]"));
+
+    const cache = rows.map((tr) => {
+      const name = tr.getAttribute("data-name") || "";
+      const category = tr.getAttribute("data-category") || "";
+      const search = tr.getAttribute("data-search") || "";
 
       const nameN = normalize(name);
+      const categoryN = normalize(category);
       const searchN = normalize(search);
 
-      // Tokenize the search surface so synonyms can match by token prefix.
-      // Example: "penne rigate" => tokens include ["penne","rigate"].
+      // Tokenize aliases for token-based prefix hits
       const tokens = searchN.split(" ").filter(Boolean);
 
-      return { card, name, nameN, tokens };
+      return { tr, name, category, nameN, categoryN, tokens };
     });
 
-    // A-Z sort by display name
-    function sortByName(listOfRows) {
-      listOfRows.sort((a, b) =>
-        String(a.name || "").localeCompare(String(b.name || ""), "en", { sensitivity: "base" })
-      );
+    function getSortStateFromHeaders() {
+      const thName = table.querySelector('thead th[data-sort="name"]');
+      const thCat = table.querySelector('thead th[data-sort="category"]');
+
+      const all = [thName, thCat].filter(Boolean);
+      const active = all.find((th) => th.getAttribute("aria-sort") !== "none");
+
+      if (!active) return { key: "name", dir: "ascending" };
+      return { key: active.getAttribute("data-sort"), dir: active.getAttribute("aria-sort") };
     }
 
-    // Show only the provided set of rows (and hide everything else).
-    // Also updates status + paging controls.
-    function renderRows(rows, totalCount) {
-      for (const c of cards) c.hidden = true;
-      for (const r of rows) r.card.hidden = false;
+    function compare(a, b, key, dir) {
+      let av = "";
+      let bv = "";
 
-      // Status should reflect total matches (not just the visible page slice).
-      const count = totalCount ?? rows.length;
-      status.textContent =
-        count === 0 ? "No matches" : `${count} match${count === 1 ? "" : "es"}`;
+      if (key === "category") {
+        av = a.categoryN;
+        bv = b.categoryN;
+      } else {
+        // default to name
+        av = a.nameN;
+        bv = b.nameN;
+      }
 
-      const canShowMore = count > visibleLimit;
-      setControlVisible(nextBtn, canShowMore);
-      if (nextBtn) nextBtn.textContent = canShowMore ? "Next 10" : "Showing all";
-
-      setControlVisible(note, Boolean(String(input.value || "").trim()));
+      const cmp = av.localeCompare(bv, "en", { sensitivity: "base" });
+      return dir === "descending" ? -cmp : cmp;
     }
 
-    // Compute prefix matches:
-    // - Primary: name startsWith(query)
-    // - Secondary: any token in (name + aliases) startsWith(query)
     function computeMatches(qN) {
       const matches = [];
+
       for (const row of cache) {
         if (!row.nameN) continue;
 
-        // Name prefix match is the most important and most intuitive.
+        // Primary: name startsWith
         if (row.nameN.startsWith(qN)) {
           matches.push(row);
           continue;
         }
 
-        // Synonym / alias prefix match (token-based).
-        // This avoids "contains" matching that produces surprising results.
+        // Secondary: any token startsWith (aliases/synonyms)
         for (const t of row.tokens) {
           if (t.startsWith(qN)) {
             matches.push(row);
@@ -343,24 +396,47 @@
         }
       }
 
-      sortByName(matches);
+      // Apply current sort
+      matches.sort((a, b) => compare(a, b, sortKey, sortDir));
+
       return matches;
     }
 
-    function search() {
-      const rawQ = input.value || "";
-      const qN = normalizeQuery(rawQ);
+    function renderRows(visibleRows, totalCount) {
+      for (const r of rows) r.hidden = true;
+      for (const row of visibleRows) row.tr.hidden = false;
+
+      const count = totalCount ?? visibleRows.length;
+      status.textContent = count === 0 ? "No matches" : `${count} match${count === 1 ? "" : "es"}`;
+
+      const canShowMore = count > visibleLimit;
+      setControlVisible(nextBtn, canShowMore);
+      if (nextBtn) nextBtn.textContent = canShowMore ? "Next 10" : "Showing all";
+
+      setControlVisible(note, Boolean(String(input.value || "").trim()));
+    }
+
+    function showAllRows() {
+      for (const r of rows) r.hidden = false;
+      setControlVisible(note, false);
+      setControlVisible(nextBtn, false);
+    }
+
+    function runSearch(resetPaging = true) {
+      const qN = normalizeQuery(input.value || "");
       const isSearching = Boolean(String(qN || "").trim());
       setSearchingUI(isSearching);
 
-      // Reset pagination whenever query changes.
-      visibleLimit = PAGE_N;
+      if (resetPaging) visibleLimit = PAGE_N;
+
+      // Refresh sort state (headers drive truth)
+      const s = getSortStateFromHeaders();
+      sortKey = s.key;
+      sortDir = s.dir;
 
       if (!qN) {
         status.textContent = "Start typing to see matches.";
-        for (const c of cards) c.hidden = false;
-        setControlVisible(note, false);
-        setControlVisible(nextBtn, false);
+        showAllRows();
         return;
       }
 
@@ -369,36 +445,30 @@
       renderRows(page, matches.length);
     }
 
-    input.addEventListener("input", search);
+    // Input-driven searching
+    input.addEventListener("input", () => runSearch(true));
 
+    // Paging
     if (nextBtn) {
       nextBtn.addEventListener("click", (e) => {
         e.preventDefault();
-
-        // Increase limit and re-run without resetting it.
-        // (We recompute matches for correctness if the list changes.)
         visibleLimit += PAGE_N;
-
-        const qN = normalizeQuery(input.value || "");
-        if (!qN) return;
-
-        const matches = computeMatches(qN);
-        const page = matches.slice(0, visibleLimit);
-        renderRows(page, matches.length);
+        runSearch(false);
       });
     }
 
+    // React to table header sort toggles
+    table.addEventListener("pasta:table-sort", () => {
+      runSearch(false);
+    });
+
     // Initial run (supports prefilled q=)
-    search();
+    runSearch(true);
   }
 
   // =============================================================================
-  // Identify page behavior
-  // -----------------------------------------------------------------------------
-  // NOTE
-  // - This is your existing Identify logic, kept as-is.
-  // - We removed "recent click" tracking elsewhere, but Identify still works
-  //   perfectly without it.
+  // Identify page behavior (unchanged for now)
+  // - Next step: convert Identify results to the same table UI.
   // =============================================================================
   function initIdentifyPage() {
     const app = $("#identify-app");
@@ -561,10 +631,8 @@
     }));
 
     let working = initial.slice();
-    let history = []; // [{ key, value, prevWorking }]
-    let resultsPanelPreference = "auto"; // auto | show | hide
-
-    // results rendering limits
+    let history = [];
+    let resultsPanelPreference = "auto";
     let resultsLimit = DEFAULT_RESULTS_LIMIT;
 
     const setText = (el, txt) => { if (el) el.textContent = txt; };
@@ -575,18 +643,15 @@
       );
     };
 
-    const renderMatchesCount = () => {
-      setText(els.count, `Matching: ${working.length}`);
-    };
+    const renderMatchesCount = () => setText(els.count, `Matching: ${working.length}`);
 
     const showResultsPanel = (show) => {
       if (!els.resultsCard || !els.btnToggleResults) return;
       els.resultsCard.hidden = !show;
       els.btnToggleResults.hidden = false;
 
-      if (!show) {
-        els.btnToggleResults.textContent = "Show all";
-      } else {
+      if (!show) els.btnToggleResults.textContent = "Show all";
+      else {
         els.btnToggleResults.textContent =
           resultsLimit >= working.length ? "Hide list" : "Show all";
       }
@@ -673,9 +738,7 @@
 
     const nextQuestion = () => {
       if (!questionAlreadyAnswered("type")) return QUESTION_DEFS.find((q) => q.key === "type");
-      for (const q of QUESTION_DEFS) {
-        if (!questionAlreadyAnswered(q.key)) return q;
-      }
+      for (const q of QUESTION_DEFS) if (!questionAlreadyAnswered(q.key)) return q;
       return null;
     };
 
@@ -716,10 +779,8 @@
     const renderQuestion = () => {
       const q = nextQuestion();
 
-      // Update count
       renderMatchesCount();
 
-      // If no question left, show the results list.
       if (!q) {
         setText(els.title, "Done");
         setText(els.kicker, "Here are your matches.");
@@ -730,20 +791,16 @@
         return;
       }
 
-      // Render current question UI
       setText(els.title, q.title);
       setText(els.kicker, `Step ${history.length + 1}`);
       setText(els.help, q.help || "");
 
-      // Buttons
       if (els.btnBack) els.btnBack.hidden = history.length === 0;
       if (els.btnReset) els.btnReset.hidden = history.length === 0;
 
-      // Auto-show results depending on match count
       showResultsPanel(shouldShowResultsPanel());
       renderResultsList();
 
-      // Answers
       if (!els.answers) return;
       els.answers.innerHTML = "";
       els.answers.setAttribute("data-kind", q.kind);
@@ -754,7 +811,6 @@
         btn.type = "button";
         btn.className = "identify-answer";
 
-        // For bool questions we use glyphs (Y / N / ?) rather than images.
         if (q.kind === "bool") {
           const glyph = document.createElement("span");
           glyph.className = "identify-answer-glyph";
@@ -777,7 +833,6 @@
         const title = document.createElement("span");
         title.className = "identify-answer-title";
         title.textContent = label;
-
         meta.appendChild(title);
 
         if (desc) {
@@ -809,14 +864,8 @@
           );
         }
 
-        // Not sure option for enum questions (optional)
         els.answers.appendChild(
-          makeAnswer(
-            "__ns__",
-            "Not sure",
-            "Skip this question.",
-            q.icon ? q.icon("__ns__") : ""
-          )
+          makeAnswer("__ns__", "Not sure", "Skip this question.", q.icon ? q.icon("__ns__") : "")
         );
       }
 
@@ -831,20 +880,8 @@
       }
     };
 
-    // Bind buttons
-    if (els.btnBack) {
-      els.btnBack.addEventListener("click", () => {
-        goBack();
-        renderQuestion();
-      });
-    }
-
-    if (els.btnReset) {
-      els.btnReset.addEventListener("click", () => {
-        resetAll();
-        renderQuestion();
-      });
-    }
+    if (els.btnBack) els.btnBack.addEventListener("click", () => { goBack(); renderQuestion(); });
+    if (els.btnReset) els.btnReset.addEventListener("click", () => { resetAll(); renderQuestion(); });
 
     if (els.btnToggleResults) {
       els.btnToggleResults.addEventListener("click", () => {
@@ -853,7 +890,6 @@
         if (currentlyHidden) {
           resultsPanelPreference = "show";
           if (els.resultsCard) els.resultsCard.hidden = false;
-          // Expand all at once when explicitly requested.
           resultsLimit = working.length;
           renderResultsList();
           els.btnToggleResults.textContent = "Hide list";
@@ -865,7 +901,6 @@
       });
     }
 
-    // Initial render
     sortWorking();
     renderQuestion();
   }
@@ -876,6 +911,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     initHamburgerMenu();
     initLinkedHomeRotators();
+    initSortableTables(); // must run before initSearchPage reads aria-sort
     initSearchPage();
     initIdentifyPage();
   });
