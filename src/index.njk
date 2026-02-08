@@ -6,10 +6,20 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 
 {# =============================================================================
   index.njk (Homepage)
+  ------------------------------------------------------------------------------
+  PURPOSE
+  - Homepage with two primary actions:
+      1) Search by Name (live filtering)
+      2) Identify by Shape (guided questions)
+  - Mobile-first layout: big tap targets, simple cards.
+  - Home hero rotator: rotates example names + icon in sync.
 
-  Changes in this version:
-  - Recently Viewed moved to the bottom of the results panel.
-  - Everything else stays aligned with the simplified mobile layout.
+  IMPORTANT CHANGES (Search fix)
+  - Each result <li> now contains:
+      - data-name   = display name (for sorting + status)
+      - data-search = name + aliases/synonyms (for matching)
+    This enables the JS to perform deterministic prefix matching.
+  - "Recently viewed / Previously searched" UI removed from homepage.
 ============================================================================= #}
 
 {% set IK_BASE = "https://ik.imagekit.io/mevius" %}
@@ -18,7 +28,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 
 {# -----------------------------------------------------------------------------
   Home hero rotator (linked icon + example placeholder)
-  - These two rotate in sync to reinforce the "name <-> icon" connection.
+  - These rotate in sync to reinforce the "name <-> icon" connection.
   - Icon images live in ImageKit at /pasta/carousel/
 ----------------------------------------------------------------------------- #}
 {% set IK_CAROUSEL_BASE = IK_BASE ~ "/pasta/carousel/" %}
@@ -115,6 +125,10 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       <ul id="pasta-results" class="results-list" aria-label="Pasta results">
         {% for item in pasta %}
 
+          {# ---------------------------------------------------------------------
+            Build a consolidated "also" string for display + search.
+            - This data is used as a matching surface for synonyms/aliases.
+          --------------------------------------------------------------------- #}
           {% set alsoRaw =
             item.SearchAliases
             or item.Aliases
@@ -124,6 +138,9 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
             or ""
           %}
 
+          {# ---------------------------------------------------------------------
+            Thumbnail selection logic (kept consistent with prior working versions)
+          --------------------------------------------------------------------- #}
           {% set thumbRaw = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
           {% set thumbIsUrl = thumbRaw and thumbRaw.startsWith("http") %}
 
@@ -147,8 +164,19 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 
           {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
 
-          <li class="result-card" data-slug="{{ item.Slug }}" data-search="">
-            <a class="result-link" href="/pasta/{{ item.Slug }}/" data-recent="1">
+          {# ---------------------------------------------------------------------
+            IMPORTANT: data attributes for deterministic search behavior.
+
+            data-name   = the pasta name used for sorting + display logic.
+            data-search = "name + alsoRaw" used for synonym token prefix matching.
+          --------------------------------------------------------------------- #}
+          <li
+            class="result-card"
+            data-slug="{{ item.Slug }}"
+            data-name="{{ item.ShapeName }}"
+            data-search="{{ item.ShapeName }} {{ alsoRaw }}"
+          >
+            <a class="result-link" href="/pasta/{{ item.Slug }}/">
               <span class="thumb" aria-hidden="true">
                 <img
                   src="{{ thumbUrlTransformed }}"
@@ -181,11 +209,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         </button>
       </div>
 
-      {# MOVED: Recently Viewed now lives at the bottom of the results panel #}
-      <div id="recently-viewed-wrap" class="recent-wrap" hidden>
-        <h3 class="h3">Recently viewed</h3>
-        <p id="recently-viewed" class="muted"></p>
-      </div>
+      {# NOTE: "Recently viewed / Previously searched" intentionally removed. #}
     </section>
 
   </div>
