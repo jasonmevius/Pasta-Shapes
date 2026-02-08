@@ -1,12 +1,23 @@
 /* =============================================================================
-  styles.css
-  -----------------------------------------------------------------------------
-  Single global stylesheet for the entire site.
+  /src/css/styles.css
+  ------------------------------------------------------------------------------
+  GLOBAL STYLESHEET (single file)
 
-  Key fixes in this version:
-  - Skip link is hidden unless focused (accessibility pattern).
-  - All Pastas table header sticks BELOW the sticky top navigation.
-  - More vertical spacing above the table for a less cramped layout.
+  PRINCIPLES
+  - All styling lives here (no inline CSS).
+  - Mobile-first where possible, with clear breakpoints.
+  - Heavily commented for maintainability.
+
+  RECENT CHANGES (per our last iterations)
+  - Skip-to-content link is hidden unless focused.
+  - Desktop shows inline nav only; mobile shows hamburger only.
+  - All Pastas table header is NOT sticky (sticky removed by request).
+  - Sortable headers have a clear "clickable" affordance (dotted underline + arrows).
+  - All Pastas spacing above table increased for a cleaner feel.
+============================================================================= */
+
+/* =============================================================================
+  1) Design tokens and base resets
 ============================================================================= */
 
 :root{
@@ -20,18 +31,12 @@
   --container: 56rem;
   --pad: 1rem;
   --gap: 0.75rem;
-
-  /* ---------------------------------------------------------------------------
-    Sticky offset for table headers
-    - Set to the approximate height of your sticky top navigation.
-    - If you change the topbar height, adjust this one variable.
-  --------------------------------------------------------------------------- */
-  --topbar-sticky-height: 64px;
 }
 
 *{ box-sizing: border-box; }
 html, body{ height: 100%; }
 
+/* Make the HTML hidden attribute bulletproof across the site */
 [hidden]{ display: none !important; }
 
 body{
@@ -48,10 +53,25 @@ a{ color: inherit; }
 a:hover{ text-decoration: underline; }
 
 /* =============================================================================
-  Accessibility: Skip link
-  -----------------------------------------------------------------------------
-  Hide by default, show only when focused via keyboard navigation.
+  2) Accessibility helpers
 ============================================================================= */
+
+/* Screen-reader-only utility */
+.sr-only{
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0,0,0,0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
+/* Skip-to-content link:
+   - Hidden off-screen by default
+   - Visible only when keyboard-focused */
 .skip{
   position: absolute;
   left: -9999px;
@@ -74,35 +94,25 @@ a:hover{ text-decoration: underline; }
   text-decoration: none;
 }
 
-/* Screen reader only utility */
-.sr-only{
-  position: absolute !important;
-  width: 1px !important;
-  height: 1px !important;
-  padding: 0 !important;
-  margin: -1px !important;
-  overflow: hidden !important;
-  clip: rect(0,0,0,0) !important;
-  white-space: nowrap !important;
-  border: 0 !important;
-}
-
 /* =============================================================================
-  Layout container
+  3) Global layout
 ============================================================================= */
+
 .container{
   max-width: var(--container);
   margin: 0 auto;
   padding: 1.25rem var(--pad) 3rem;
 }
 
+/* Leave room for fixed bottom nav on mobile so content is never hidden underneath */
 @media (max-width: 719px){
   .container{ padding-bottom: 5rem; }
 }
 
 /* =============================================================================
-  Top header (sticky) + navigation
+  4) Top navigation
 ============================================================================= */
+
 .topbar{
   position: sticky;
   top: 0;
@@ -143,16 +153,25 @@ a:hover{ text-decoration: underline; }
   font-weight: 600;
 }
 
-/* Desktop-first: show desktop nav, hide hamburger */
+/* ---------------------------------------------------------------------------
+  Desktop vs Mobile nav gating
+
+  Goal:
+  - Desktop: show inline nav links, hide hamburger
+  - Mobile: hide inline nav links, show hamburger
+--------------------------------------------------------------------------- */
+
+/* Desktop-first defaults */
 .nav-desktop{ display: flex; }
 .nav-toggle{ display: none; }
 
-/* Mobile: hide desktop nav, show hamburger */
+/* Mobile breakpoint */
 @media (max-width: 719px){
   .nav-desktop{ display: none; }
   .nav-toggle{ display: inline-flex; }
 }
 
+/* Hamburger button styling */
 .nav-toggle{
   align-items: center;
   justify-content: center;
@@ -164,14 +183,12 @@ a:hover{ text-decoration: underline; }
   color: var(--fg);
   cursor: pointer;
 }
-
 .nav-toggle:hover{ background: rgba(17,24,39,0.03); }
 
 .nav-toggle-bars{
   display: grid;
   gap: 5px;
 }
-
 .nav-toggle-bars span{
   display: block;
   width: 18px;
@@ -181,8 +198,9 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  Buttons / forms
+  5) Buttons and form controls
 ============================================================================= */
+
 .btn{
   display: inline-flex;
   align-items: center;
@@ -199,6 +217,7 @@ a:hover{ text-decoration: underline; }
 }
 .btn:hover{ text-decoration: none; }
 
+/* Secondary button variant (supports legacy ".secondary" and BEM-ish ".btn--secondary") */
 .btn.secondary,
 .btn--secondary{
   background: #fff;
@@ -215,10 +234,11 @@ a:hover{ text-decoration: underline; }
   font-size: 0.95rem;
 }
 
+/* Shared form field styling */
 .field{
   display: grid;
   gap: 0.35rem;
-  min-width: 0;
+  min-width: 0; /* prevents grid blowouts on long content */
 }
 
 .field__label{
@@ -244,14 +264,13 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  Page header
+  6) Page header
 ============================================================================= */
+
 .page-header{
   display: grid;
   gap: 0.25rem;
-
-  /* More breathing room so the page doesn't feel cramped */
-  margin-bottom: 1.25rem;
+  margin-bottom: 1.25rem; /* extra breathing room */
 }
 
 .page-header h1{
@@ -265,10 +284,33 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  All Pastas: tools + table
+  7) Shared thumbnail component
 ============================================================================= */
 
-/* More space above and below the filter controls */
+.thumb{
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.thumb img{
+  display: block;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+}
+
+/* =============================================================================
+  8) All Pastas page - filter bar + table
+============================================================================= */
+
+/* Filter controls spacing */
 .table-tools{
   margin: 1.25rem 0 1rem;
 }
@@ -299,38 +341,41 @@ a:hover{ text-decoration: underline; }
   font-size: 0.95rem;
 }
 
-/* Outer wrapper: border + radius; keep overflow visible for sticky header */
+/* Table outer shell */
 .table-wrap{
-  margin-top: 1rem; /* increase top spacing above table */
+  margin-top: 1rem; /* increased space above table */
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 2px);
   background: #fff;
   overflow: visible;
 }
 
-/* Inner wrapper: horizontal scroll only */
+/* Horizontal scroll wrapper (prevents layout blowups on narrow screens) */
 .table-scroll{
   overflow-x: auto;
   overflow-y: visible;
   -webkit-overflow-scrolling: touch;
 }
 
-/* Table base */
+/* Base table styling */
 .data-table{
   width: 100%;
   border-collapse: collapse;
+
+  /* Prevent “content-sized columns” cramped look */
   table-layout: fixed;
 }
 
+/* Column widths via <colgroup> for All Pastas */
 .data-table--all .col-thumb{ width: 84px; }
 .data-table--all .col-name{ width: 16rem; }
 .data-table--all .col-category{ width: 11rem; }
+/* col-synonyms fills remaining space */
 
-/* Sticky header: stick BELOW top navigation */
+/* Header row styling (NOT sticky per latest decision) */
 .data-table thead th{
-  position: sticky;
-  top: var(--topbar-sticky-height);
-  z-index: 40; /* below .topbar (50), above table body */
+  position: static; /* important: do not stick */
+  top: auto;
 
   background: #fff;
   text-align: left;
@@ -341,11 +386,9 @@ a:hover{ text-decoration: underline; }
 
   border-bottom: 1px solid var(--border);
   padding: 0.9rem 0.9rem;
-
-  /* Subtle separation when floating */
-  box-shadow: 0 1px 0 rgba(17,24,39,0.06);
 }
 
+/* Table body cells */
 .data-table tbody td,
 .data-table tbody th{
   border-bottom: 1px solid var(--border);
@@ -357,22 +400,26 @@ a:hover{ text-decoration: underline; }
   background: rgba(17,24,39,0.02);
 }
 
-/* Thumb column */
+/* Thumb column cell */
 .data-table__thumb{ width: 84px; }
 
-/* Ensure row header cells (<th scope="row">) are left-aligned */
+/* IMPORTANT: left-align row header cells (<th scope="row">) */
 .data-table__name,
 .data-table tbody th{
   text-align: left;
 }
 
+/* Pasta name link */
 .data-table__name a{
   text-decoration: none;
   font-weight: 700;
   letter-spacing: -0.01em;
 }
-.data-table__name a:hover{ text-decoration: underline; }
+.data-table__name a:hover{
+  text-decoration: underline;
+}
 
+/* Category and synonyms cells */
 .cell-category{ color: var(--muted); }
 
 .cell-synonyms{
@@ -387,17 +434,24 @@ a:hover{ text-decoration: underline; }
   color: rgba(107,114,128,0.65);
 }
 
-/* Sortable header cue */
+/* Alignment helper */
+.data-table__left{ text-align: left; }
+
+/* Sortable headers - make them look interactive */
 .data-table__sortable{
   cursor: pointer;
   user-select: none;
+
+  /* visual affordance */
   text-decoration: underline;
   text-decoration-style: dotted;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
+
 .data-table__sortable:hover{ color: var(--fg); }
 
+/* Sort indicator glyphs (the JS updates aria-sort) */
 .sort-indicator{
   display: inline-block;
   width: 1.1em;
@@ -412,8 +466,9 @@ a:hover{ text-decoration: underline; }
 .data-table__sortable[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
 
 /* =============================================================================
-  Footer
+  9) Footer
 ============================================================================= */
+
 .site-footer{
   border-top: 1px solid var(--border);
   background: #fff;
@@ -426,8 +481,9 @@ a:hover{ text-decoration: underline; }
 .footer-tagline{ margin: 0; }
 
 /* =============================================================================
-  Mobile bottom navigation
+  10) Mobile bottom navigation (Search / Identify)
 ============================================================================= */
+
 .bottom-nav{
   position: fixed;
   left: 0;
@@ -495,6 +551,7 @@ a:hover{ text-decoration: underline; }
 
 .bottom-nav-link[aria-current="page"]{ color: var(--fg); }
 
+/* Hide the bottom nav on tablet/desktop */
 @media (min-width: 720px){
   .bottom-nav{ display: none; }
 }
