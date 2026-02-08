@@ -14,12 +14,11 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   - Mobile-first layout: big tap targets, simple cards.
   - Home hero rotator: rotates example names + icon in sync.
 
-  IMPORTANT CHANGES (Search fix)
-  - Each result <li> now contains:
-      - data-name   = display name (for sorting + status)
-      - data-search = name + aliases/synonyms (for matching)
-    This enables the JS to perform deterministic prefix matching.
-  - "Recently viewed / Previously searched" UI removed from homepage.
+  CHANGE (RESULTS STANDARDIZATION)
+  - Search results are now rendered as an "All Pastas"-style table:
+      - Thumb + Name (sortable) + Category (sortable) + Synonyms
+      - Synonyms column hides on narrow screens for usability
+  - The JS now filters <tr> rows instead of <li> cards.
 ============================================================================= #}
 
 {% set IK_BASE = "https://ik.imagekit.io/mevius" %}
@@ -122,85 +121,155 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
     >
       <ul id="pasta-search-suggestions" class="suggestions" aria-label="Suggestions"></ul>
 
-      <ul id="pasta-results" class="results-list" aria-label="Pasta results">
-        {% for item in pasta %}
-
-          {# ---------------------------------------------------------------------
-            Build a consolidated "also" string for display + search.
-            - This data is used as a matching surface for synonyms/aliases.
-          --------------------------------------------------------------------- #}
-          {% set alsoRaw =
-            item.SearchAliases
-            or item.Aliases
-            or item.Synonyms
-            or item.Also
-            or item.Misspellings
-            or ""
-          %}
-
-          {# ---------------------------------------------------------------------
-            Thumbnail selection logic (kept consistent with prior working versions)
-          --------------------------------------------------------------------- #}
-          {% set thumbRaw = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
-          {% set thumbIsUrl = thumbRaw and thumbRaw.startsWith("http") %}
-
-          {% set thumbClean = thumbRaw %}
-          {% if thumbClean %}
-            {% set thumbClean = thumbClean | replace("https://ik.imagekit.io/mevius/pasta/thumbs/", "") %}
-            {% set thumbClean = thumbClean | replace("https://ik.imagekit.io/mevius/", "") %}
-            {% set thumbClean = thumbClean | replace("/pasta/thumbs/", "") %}
-            {% set thumbClean = thumbClean | replace("pasta/thumbs/", "") %}
-            {% set thumbClean = thumbClean | replace("/thumbs/", "") %}
-            {% set thumbClean = thumbClean | replace("thumbs/", "") %}
-          {% endif %}
-
-          {% if not thumbRaw %}
-            {% set thumbUrl = IK_THUMBS_BASE ~ FALLBACK_THUMB %}
-          {% elseif thumbIsUrl %}
-            {% set thumbUrl = thumbRaw %}
-          {% else %}
-            {% set thumbUrl = IK_THUMBS_BASE ~ thumbClean %}
-          {% endif %}
-
-          {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
-
-          {# ---------------------------------------------------------------------
-            IMPORTANT: data attributes for deterministic search behavior.
-
-            data-name   = the pasta name used for sorting + display logic.
-            data-search = "name + alsoRaw" used for synonym token prefix matching.
-          --------------------------------------------------------------------- #}
-          <li
-            class="result-card"
-            data-slug="{{ item.Slug }}"
-            data-name="{{ item.ShapeName }}"
-            data-search="{{ item.ShapeName }} {{ alsoRaw }}"
+      {# =========================================================================
+        Standardized results table (matches All Pastas look)
+        - Table sorting is handled by JS
+        - Filtering/paging is handled by the Search JS (prefix matching)
+      ========================================================================= #}
+      <div class="table-wrap table-wrap--results">
+        <div class="table-scroll">
+          <table
+            id="pasta-results-table"
+            class="data-table data-table--results js-sortable-table"
+            aria-label="Pasta results table"
           >
-            <a class="result-link" href="/pasta/{{ item.Slug }}/">
-              <span class="thumb" aria-hidden="true">
-                <img
-                  src="{{ thumbUrlTransformed }}"
-                  alt=""
-                  loading="lazy"
-                  decoding="async"
-                />
-              </span>
+            <colgroup>
+              <col class="col-thumb" />
+              <col class="col-name" />
+              <col class="col-category" />
+              <col class="col-synonyms" />
+            </colgroup>
 
-              <span class="result-body">
-                <span class="result-title-row">
-                  <span class="result-name">{{ item.ShapeName }}</span>
-                </span>
+            <thead>
+              <tr>
+                {# Thumb is intentionally NOT sortable #}
+                <th scope="col" class="data-table__thumb">
+                  <span class="sr-only">Thumb</span>
+                </th>
 
-                {% if alsoRaw %}
-                  <span class="result-also muted">
-                    Also: {{ alsoRaw }}
-                  </span>
+                {# Sortable: Name (default sort) #}
+                <th
+                  scope="col"
+                  class="data-table__sortable"
+                  data-sort="name"
+                  aria-sort="ascending"
+                  tabindex="0"
+                  role="button"
+                >
+                  Name <span class="sort-indicator" aria-hidden="true"></span>
+                </th>
+
+                {# Sortable: Category #}
+                <th
+                  scope="col"
+                  class="data-table__sortable"
+                  data-sort="category"
+                  aria-sort="none"
+                  tabindex="0"
+                  role="button"
+                >
+                  Category <span class="sort-indicator" aria-hidden="true"></span>
+                </th>
+
+                {# Synonyms is NOT sortable right now (we can add later if desired) #}
+                <th scope="col">Synonyms</th>
+              </tr>
+            </thead>
+
+            <tbody id="pasta-results-body">
+              {% for item in pasta %}
+
+                {# -----------------------------------------------------------------
+                  Consolidated synonyms/aliases surface.
+                  NOTE: Used for:
+                    - Table "Synonyms" display
+                    - Prefix matching tokens via data-search
+                ----------------------------------------------------------------- #}
+                {% set alsoRaw =
+                  item.SearchAliases
+                  or item.Aliases
+                  or item.Synonyms
+                  or item.Also
+                  or item.Misspellings
+                  or ""
+                %}
+
+                {# -----------------------------------------------------------------
+                  Category field:
+                  - Your CSV schema has varied over time; this gracefully supports
+                    multiple possible field names.
+                ----------------------------------------------------------------- #}
+                {% set categoryRaw =
+                  item.Category
+                  or item.Type
+                  or item.ShapeCategory
+                  or item.PastaCategory
+                  or ""
+                %}
+
+                {# -----------------------------------------------------------------
+                  Thumbnail selection logic (kept consistent with prior working versions)
+                ----------------------------------------------------------------- #}
+                {% set thumbRaw = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
+                {% set thumbIsUrl = thumbRaw and thumbRaw.startsWith("http") %}
+
+                {% set thumbClean = thumbRaw %}
+                {% if thumbClean %}
+                  {% set thumbClean = thumbClean | replace("https://ik.imagekit.io/mevius/pasta/thumbs/", "") %}
+                  {% set thumbClean = thumbClean | replace("https://ik.imagekit.io/mevius/", "") %}
+                  {% set thumbClean = thumbClean | replace("/pasta/thumbs/", "") %}
+                  {% set thumbClean = thumbClean | replace("pasta/thumbs/", "") %}
+                  {% set thumbClean = thumbClean | replace("/thumbs/", "") %}
+                  {% set thumbClean = thumbClean | replace("thumbs/", "") %}
                 {% endif %}
-              </span>
-            </a>
-          </li>
-        {% endfor %}
-      </ul>
+
+                {% if not thumbRaw %}
+                  {% set thumbUrl = IK_THUMBS_BASE ~ FALLBACK_THUMB %}
+                {% elseif thumbIsUrl %}
+                  {% set thumbUrl = thumbRaw %}
+                {% else %}
+                  {% set thumbUrl = IK_THUMBS_BASE ~ thumbClean %}
+                {% endif %}
+
+                {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
+
+                <tr
+                  class="data-row"
+                  data-slug="{{ item.Slug }}"
+                  data-name="{{ item.ShapeName }}"
+                  data-category="{{ categoryRaw }}"
+                  data-search="{{ item.ShapeName }} {{ alsoRaw }}"
+                >
+                  <td class="data-table__thumb">
+                    <span class="thumb" aria-hidden="true">
+                      <img
+                        src="{{ thumbUrlTransformed }}"
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </span>
+                  </td>
+
+                  <th scope="row" class="data-table__name">
+                    <a href="/pasta/{{ item.Slug }}/">{{ item.ShapeName }}</a>
+                  </th>
+
+                  <td class="cell-category">{{ categoryRaw }}</td>
+
+                  <td class="cell-synonyms">
+                    {% if alsoRaw %}
+                      {{ alsoRaw }}
+                    {% else %}
+                      <span class="synonyms--empty"> </span>
+                    {% endif %}
+                  </td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
 
       <div class="results-tools">
         <p id="pasta-results-note" class="muted"></p>
@@ -208,8 +277,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
           Next 10
         </button>
       </div>
-
-      {# NOTE: "Recently viewed / Previously searched" intentionally removed. #}
     </section>
 
   </div>
