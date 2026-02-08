@@ -25,6 +25,11 @@
       - Sortable header affordance
       - NON-sticky table header (per latest decision)
       - On narrow screens, Synonyms column is hidden for usability
+
+  CHANGE NOTES (2026-02-07)
+  - Do NOT hide the Identify card while searching on Home.
+  - Allow table header sort affordance to work on <button> controls by resetting
+    native button styles for .data-table__sortable.
 ============================================================================= */
 
 /* =============================================================================
@@ -538,9 +543,8 @@ body.is-searching #home-search-card{
 }
 
 /* When searching:
-   - Hide Identify card
-   - Show results panel */
-body.is-searching #home-identify-card{ display: none; }
+   - Show results panel
+   - Do NOT hide Identify card (Identify stays visible) */
 body.is-searching #home-results-panel{ display: grid; }
 
 /* =============================================================================
@@ -766,6 +770,24 @@ body.is-searching #home-results-panel{ display: grid; }
 
 .data-table__sortable:hover{ color: var(--fg); }
 
+/* IMPORTANT:
+   Allow .data-table__sortable to be a <button> without looking like a button */
+button.data-table__sortable{
+  background: transparent;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+button.data-table__sortable:focus-visible{
+  outline: 2px solid rgba(17,24,39,0.22);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
 .sort-indicator{
   display: inline-block;
   width: 1.1em;
@@ -778,6 +800,11 @@ body.is-searching #home-results-panel{ display: grid; }
 .data-table__sortable[aria-sort="none"] .sort-indicator::before{ content: "⇅"; }
 .data-table__sortable[aria-sort="ascending"] .sort-indicator::before{ content: "↑"; }
 .data-table__sortable[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
+
+/* Also support aria-sort being placed on the <th> (Home table does this) */
+th[aria-sort="none"] .sort-indicator::before{ content: "⇅"; }
+th[aria-sort="ascending"] .sort-indicator::before{ content: "↑"; }
+th[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
 
 /* =============================================================================
   14a) Hide Synonyms column on narrow screens (All + Results)
