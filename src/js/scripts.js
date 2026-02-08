@@ -6,9 +6,13 @@
   // - Site-wide interactions:
   //   - Hamburger menu
   //   - Homepage linked rotators (placeholder + icon)
-  //   - Homepage search: prefix filtering + sort + paging
+  //   - Homepage search: prefix filtering + sort
   //
-  // SEARCH TUNING (IMPORTANT)
+  // SEARCH BEHAVIOR (CURRENT)
+  // - When search begins (any non-empty query), show ALL matches immediately.
+  // - Paging ("Next 10") is disabled/hidden for now.
+  //
+  // SEARCH TUNING
   // - For 1-character queries, match only pasta names (reduces noise).
   // - For 2+ characters, allow synonym token prefix matches, but remove generic
   //   tokens like "pasta" so phrases like "alphabet pasta" don't match "p".
@@ -93,7 +97,7 @@
   }
 
   // -----------------------------------------------------------------------------
-  // Homepage search: prefix filtering + paging + sortable headers
+  // Homepage search: prefix filtering + sortable headers
   // -----------------------------------------------------------------------------
   function initSearchPage() {
     const input = $("#pasta-q");
@@ -107,6 +111,8 @@
     const note = $("#pasta-results-note");
     const nextBtn = $("#pasta-toggle-all");
 
+    // Paging is currently disabled when searching.
+    // Keep constants in case you re-enable paging later.
     const PAGE_N = 10;
     let visibleLimit = PAGE_N;
 
@@ -114,7 +120,6 @@
     let sortDir = "ascending";
 
     // Tokens we should not allow synonym matching to trigger on.
-    // This prevents "alphabet pasta" from matching "p" via the word "pasta".
     const STOP_TOKENS = new Set([
       "pasta",
       "noodle",
@@ -165,7 +170,7 @@
         .filter((t) => !STOP_TOKENS.has(t));
     }
 
-    // Cache initial rows (DOM - data objects)
+    // Cache initial rows (DOM -> data objects)
     const rows = Array.from(tbody.querySelectorAll("tr.data-row")).map((tr) => {
       const name = tr.getAttribute("data-name") || "";
       const category = tr.getAttribute("data-category") || "";
@@ -218,15 +223,17 @@
     function render(list) {
       tbody.innerHTML = "";
 
+      // Paging disabled when searching: show everything up to visibleLimit.
       const slice = list.slice(0, visibleLimit);
       slice.forEach((r) => tbody.appendChild(r.tr));
 
-      const hasMore = list.length > visibleLimit;
-      setControlVisible(nextBtn, hasMore);
+      // "Next 10" is hidden for now.
+      setControlVisible(nextBtn, false);
+
+      // Show the small note if there are results.
       setControlVisible(note, list.length > 0);
 
       if (!list.length) status.textContent = "No matches.";
-      else if (hasMore) status.textContent = `${list.length} matches - showing ${visibleLimit}.`;
       else status.textContent = `${list.length} matches.`;
     }
 
@@ -242,8 +249,14 @@
         status.textContent = "Start typing to see matches.";
         setControlVisible(nextBtn, false);
         setControlVisible(note, false);
+
+        // Reset limit to default for the next search session.
+        visibleLimit = PAGE_N;
         return;
       }
+
+      // When search begins, show ALL matches.
+      visibleLimit = Number.MAX_SAFE_INTEGER;
 
       // TUNING:
       // - 1 character: match ONLY by name prefix.
@@ -262,15 +275,6 @@
 
       matches.sort(compare);
       render(matches);
-    }
-
-    // Paging
-    if (nextBtn) {
-      nextBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        visibleLimit += PAGE_N;
-        filterAndRender();
-      });
     }
 
     // Sorting - click delegation on header controls
@@ -292,13 +296,12 @@
       sortDir = nextDir;
       setHeaderSortState(sortKey, sortDir);
 
-      visibleLimit = PAGE_N;
+      // Search is already "show all"; just rerender with new sort.
       filterAndRender();
     });
 
     // Input filtering
     input.addEventListener("input", () => {
-      visibleLimit = PAGE_N;
       filterAndRender();
     });
 
@@ -311,7 +314,6 @@
       input.value = q;
       window.history.replaceState({}, "", window.location.pathname);
 
-      visibleLimit = PAGE_N;
       filterAndRender();
     })();
 
