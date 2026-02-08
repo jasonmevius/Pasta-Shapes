@@ -1,268 +1,331 @@
----
-title: Pasta Shapes
-layout: layout.njk
-description: "Search pasta shapes by name and aliases, or identify a shape by answering a few quick questions."
----
+(() => {
+  // =============================================================================
+  // /src/js/scripts.js
+  // -----------------------------------------------------------------------------
+  // PURPOSE
+  // - Site-wide interactions:
+  //   - Hamburger menu
+  //   - Homepage linked rotators (placeholder + icon)
+  //   - Homepage search: prefix filtering + sort + paging
+  //   - Identify page logic (only runs when identify DOM exists)
+  //
+  // IMPORTANT
+  // - Homepage can also load /src/js/pasta-search.js (typeahead).
+  // - This file writes table-filter status into #pasta-search-count to avoid
+  //   overwriting #pasta-search-status (used by pasta-search.js).
+  //
+  // STYLE RULE
+  // - All CSS must live in styles.css, not in templates or JS.
+  // =============================================================================
 
-{# =============================================================================
-  /src/index.njk (Homepage)
-  ------------------------------------------------------------------------------
-  PURPOSE
-  - Homepage is the Search page.
-  - Two primary actions:
-      1) Search by Name (live filtering of the results table)
-      2) Identify by Shape (link to Identify flow)
+  const $ = (sel, root = document) => root.querySelector(sel);
 
-  IMPORTANT BEHAVIOR NOTES
-  - This homepage supports TWO parallel search UX layers:
-      A) Table filtering (fast prefix matching) - /src/js/scripts.js
-      B) Typeahead suggestions + redirect/fuzzy fallback - /src/js/pasta-search.js
+  // -----------------------------------------------------------------------------
+  // Hamburger menu
+  // -----------------------------------------------------------------------------
+  function initHamburgerMenu() {
+    const btn = $("#menu-toggle");
+    const panel = $("#site-nav");
+    if (!btn || !panel) return;
 
-  - To prevent the two scripts from clobbering each other's status text, we use:
-      - #pasta-search-status (typeahead messaging - owned by pasta-search.js)
-      - #pasta-search-count  (table-filter count - owned by scripts.js)
+    btn.setAttribute("aria-expanded", "false");
+    panel.setAttribute("data-open", "false");
 
-  BUILD SAFETY NOTE
-  - Some pages/build contexts may not provide homeRotatorIconSrcs/homeRotatorNames.
-  - We defensively default them to empty arrays and provide fallbacks so Nunjucks
-    never tries to call .join() or [0] on undefined.
-============================================================================= #}
+    btn.addEventListener("click", () => {
+      const isOpen = btn.getAttribute("aria-expanded") === "true";
+      btn.setAttribute("aria-expanded", String(!isOpen));
+      panel.setAttribute("data-open", String(!isOpen));
+    });
+  }
 
-{% set IK_BASE = "https://ik.imagekit.io/mevius" %}
-{% set IK_THUMBS_BASE = IK_BASE ~ "/pasta/thumbs/" %}
-{% set IK_CAROUSEL_BASE = IK_BASE ~ "/pasta/carousel/" %}
-{% set FALLBACK_THUMB = "pending.png" %}
+  // -----------------------------------------------------------------------------
+  // Homepage linked rotators (placeholder + icon in sync)
+  // -----------------------------------------------------------------------------
+  function initLinkedHomeRotators() {
+    const input = $("#pasta-q");
+    const icon = $("#identify-icon-rotator");
+    if (!input || !icon) return;
 
-{# ---------------------------------------------------------------------------
-  HOME ROTATOR FALLBACKS
-  - If your global data file defines homeRotatorIconSrcs/homeRotatorNames,
-    those will be used.
-  - Otherwise we fall back to a safe, known set.
---------------------------------------------------------------------------- #}
+    const examplesRaw = input.getAttribute("data-placeholder-examples") || "";
+    const examples = examplesRaw
+      .split(",")
+      .map((s) => String(s || "").trim())
+      .filter(Boolean);
 
-{% set fallbackRotatorIconSrcs = [
-  IK_CAROUSEL_BASE ~ "penne.png",
-  IK_CAROUSEL_BASE ~ "ravioli.png",
-  IK_CAROUSEL_BASE ~ "fusilli.png",
-  IK_CAROUSEL_BASE ~ "conchiglie.png",
-  IK_CAROUSEL_BASE ~ "farfalle.png",
-  IK_CAROUSEL_BASE ~ "pasta.png",
-  IK_CAROUSEL_BASE ~ "gnocchi.png",
-  IK_CAROUSEL_BASE ~ "macaroni.png"
-] %}
+    const tpl = input.getAttribute("data-placeholder-template") || "Start typing - e.g., {example}";
+    const intervalMs = Number(input.getAttribute("data-rotate-interval") || 2500);
 
-{% set fallbackRotatorNames = [
-  "penne",
-  "ravioli",
-  "fusilli",
-  "conchiglie",
-  "farfalle",
-  "pasta",
-  "gnocchi",
-  "macaroni"
-] %}
+    const srcsRaw = icon.getAttribute("data-rotate-srcs") || "";
+    const namesRaw = icon.getAttribute("data-rotate-names") || "";
 
-{# Default undefined variables to empty arrays, then choose fallback if empty #}
-{% set rotatorIconSrcs = (homeRotatorIconSrcs | default([])) %}
-{% set rotatorNames = (homeRotatorNames | default([])) %}
+    const srcs = srcsRaw
+      .split(",")
+      .map((s) => String(s || "").trim())
+      .filter(Boolean);
 
-{% if rotatorIconSrcs | length == 0 %}
-  {% set rotatorIconSrcs = fallbackRotatorIconSrcs %}
-{% endif %}
+    const names = namesRaw
+      .split(",")
+      .map((s) => String(s || "").trim())
+      .filter(Boolean);
 
-{% if rotatorNames | length == 0 %}
-  {% set rotatorNames = fallbackRotatorNames %}
-{% endif %}
+    const n = Math.min(examples.length, srcs.length, names.length);
+    if (n <= 0) return;
 
-{# Final first icon fallback for <img src="..."> #}
-{% set firstRotatorIcon = rotatorIconSrcs[0] | default(fallbackRotatorIconSrcs[0]) %}
+    let i = 0;
 
-<section class="home-panels">
+    function tick() {
+      i = (i + 1) % n;
+      input.setAttribute("placeholder", tpl.replace("{example}", examples[i]));
+      icon.setAttribute("src", srcs[i]);
+    }
 
-  {# ===========================================================================
-    CARD 1 - SEARCH BY NAME
-  =========================================================================== #}
-  <section id="home-search-card" class="home-card card stack" aria-label="Search by name">
-    <header class="home-card-head">
-      <h1 class="h2 home-card-title">Search by Name</h1>
-    </header>
+    let timer = window.setInterval(tick, intervalMs);
 
-    {# -------------------------------------------------------------------------
-      NOTE
-      - pasta-search.js expects:
-          form#pasta-search-form
-          input#pasta-q
-          p#pasta-search-status
-          ul#pasta-search-suggestions
-      - scripts.js expects:
-          input#pasta-q
-          p#pasta-search-count (or falls back to #pasta-search-status)
-          results table elements
-    -------------------------------------------------------------------------- #}
-    <form id="pasta-search-form" class="search" action="/" method="get" novalidate>
-      <label class="sr-only" for="pasta-q">Search by pasta name</label>
+    input.addEventListener("focus", () => {
+      if (timer) window.clearInterval(timer);
+      timer = null;
+    });
 
-      <input
-        id="pasta-q"
-        name="q"
-        class="search-input"
-        type="search"
-        inputmode="search"
-        autocomplete="off"
-        autocapitalize="none"
-        spellcheck="false"
-        placeholder="Start typing - e.g., penne"
-        data-rotator-group="homeHero"
-        data-placeholder-rotate="1"
-        data-placeholder-template="Start typing - e.g., {example}"
-        data-placeholder-examples="penne,ravioli,fusilli,conchiglie,farfalle,gnocchi,macaroni"
-        data-rotate-interval="2500"
-      />
-    </form>
+    input.addEventListener("blur", () => {
+      if (!timer) timer = window.setInterval(tick, intervalMs);
+    });
+  }
 
-    {# Status line for pasta-search.js (typeahead + exact match messaging) #}
-    <p id="pasta-search-status" class="muted home-search-status" aria-live="polite"></p>
+  // -----------------------------------------------------------------------------
+  // Sortable tables
+  // -----------------------------------------------------------------------------
+  function initSortableTables() {
+    const tables = Array.from(document.querySelectorAll(".js-sortable-table"));
+    if (!tables.length) return;
 
-    {# Count line for scripts.js (table filter counts) #}
-    <p id="pasta-search-count" class="muted home-search-count" aria-live="polite">
-      Start typing to see matches.
-    </p>
-  </section>
+    tables.forEach((table) => {
+      const headers = Array.from(table.querySelectorAll("th[data-sort]"));
+      if (!headers.length) return;
 
-  {# ===========================================================================
-    CARD 2 - IDENTIFY BY SHAPE (always clickable)
-  =========================================================================== #}
-  <a
-    id="home-identify-card"
-    class="home-card home-card-link card stack"
-    href="/identify/"
-    aria-label="Identify by Shape - go to Identify page"
-  >
-    <header class="home-card-head">
-      <h2 class="h2 home-card-title">Identify by Shape</h2>
-    </header>
+      headers.forEach((th) => {
+        th.addEventListener("click", () => {
+          const key = th.getAttribute("data-sort");
+          if (!key) return;
 
-    <div class="identify-hero" aria-hidden="true">
-      <img
-        id="identify-icon-rotator"
-        class="identify-icon"
-        src="{{ firstRotatorIcon }}"
-        alt=""
-        loading="lazy"
-        decoding="async"
-        width="96"
-        height="96"
-        data-rotator-group="homeHero"
-        data-rotate="1"
-        data-rotate-srcs="{{ rotatorIconSrcs | join(',') }}"
-        data-rotate-names="{{ rotatorNames | join(',') }}"
-        data-rotate-interval="2500"
-        data-rotate-fade="240"
-      />
-    </div>
-  </a>
+          const current = th.getAttribute("aria-sort") || "none";
+          const nextDir = current === "ascending" ? "descending" : "ascending";
 
-  {# ===========================================================================
-    RESULTS PANEL (hidden until user types)
-  =========================================================================== #}
-  <section
-    id="home-results-panel"
-    class="home-results card stack"
-    aria-label="Search results"
-    hidden
-  >
-    {# Used by pasta-search.js for suggestions. Safe to exist even if empty. #}
-    <ul id="pasta-search-suggestions" class="suggestions" aria-label="Suggestions"></ul>
+          headers.forEach((h) => h.setAttribute("aria-sort", "none"));
+          th.setAttribute("aria-sort", nextDir);
 
-    <p id="pasta-results-note" class="note" hidden>
-      Matches are prefix-based (e.g., “p” matches “penne”).
-    </p>
+          table.dispatchEvent(
+            new CustomEvent("table:sort", { detail: { key, dir: nextDir } })
+          );
+        });
+      });
+    });
+  }
 
-    <div class="table-wrap table-wrap--results">
-      <div class="table-scroll">
-        <table
-          id="pasta-results-table"
-          class="data-table data-table--results js-sortable-table"
-          aria-label="Pasta results table"
-        >
-          <colgroup>
-            <col class="col-thumb" />
-            <col class="col-name" />
-            <col class="col-category" />
-            <col class="col-synonyms" />
-          </colgroup>
+  // -----------------------------------------------------------------------------
+  // Homepage search: prefix filtering + paging + respects current sort header state
+  // -----------------------------------------------------------------------------
+  function initSearchPage() {
+    const input = $("#pasta-q");
 
-          <thead>
-            <tr>
-              <th scope="col" class="data-table__thumb"></th>
-              <th scope="col" class="data-table__name" data-sort="name" aria-sort="ascending">
-                Name
-              </th>
-              <th scope="col" class="cell-category" data-sort="category" aria-sort="none">
-                Category
-              </th>
-              <th scope="col" class="cell-synonyms">
-                Synonyms
-              </th>
-            </tr>
-          </thead>
+    // This is the key: scripts.js writes to #pasta-search-count (not #pasta-search-status)
+    const status = $("#pasta-search-count") || $("#pasta-search-status");
 
-          <tbody id="pasta-results-body">
-            {% for item in pasta %}
+    const table = $("#pasta-results-table");
+    const tbody = $("#pasta-results-body");
+    if (!input || !status || !table || !tbody) return;
 
-              {# Synonyms/search aliases shown and used for data-search tokenization #}
-              {% set alsoRaw = (item.Synonyms or item.SearchAliases or "") %}
-              {% set categoryRaw = (item.Category or "") %}
+    const resultsPanel = $("#home-results-panel");
+    const note = $("#pasta-results-note");
+    const nextBtn = $("#pasta-toggle-all");
 
-              {# Thumbnail logic #}
-              {% set thumbFile = (item.ThumbFile or item.ImageFile or FALLBACK_THUMB) %}
-              {% set thumbUrl = IK_THUMBS_BASE ~ thumbFile %}
-              {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
+    const PAGE_N = 10;
+    let visibleLimit = PAGE_N;
 
-              <tr
-                class="data-row"
-                data-slug="{{ item.Slug }}"
-                data-name="{{ item.ShapeName }}"
-                data-category="{{ categoryRaw }}"
-                data-search="{{ item.ShapeName }} {{ alsoRaw }}"
-              >
-                <td class="data-table__thumb">
-                  <span class="thumb" aria-hidden="true">
-                    <img
-                      src="{{ thumbUrlTransformed }}"
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                      width="56"
-                      height="56"
-                    />
-                  </span>
-                </td>
+    let sortKey = "name";
+    let sortDir = "ascending";
 
-                <th scope="row" class="data-table__name">
-                  <a href="/pasta/{{ item.Slug }}/">{{ item.ShapeName }}</a>
-                </th>
+    function setSearchingUI(isSearching) {
+      document.body.classList.toggle("is-searching", isSearching);
 
-                <td class="cell-category">{{ categoryRaw }}</td>
+      if (resultsPanel) resultsPanel.hidden = !isSearching;
 
-                <td class="cell-synonyms">
-                  {% if alsoRaw %}
-                    {{ alsoRaw }}
-                  {% else %}
-                    <span class="muted">-</span>
-                  {% endif %}
-                </td>
-              </tr>
+      // IMPORTANT:
+      // Do NOT hide the Identify card while searching.
+      // That was the source of the missing Identify link.
+    }
 
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    function setControlVisible(el, isVisible) {
+      if (!el) return;
+      el.hidden = !isVisible;
+      el.setAttribute("aria-hidden", isVisible ? "false" : "true");
+    }
 
-    <a id="pasta-toggle-all" class="btn btn--ghost" href="#" hidden>
-      Next 10
-    </a>
-  </section>
+    function normalize(s) {
+      return String(s || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/&/g, "and")
+        .replace(/[’']/g, " ")
+        .replace(/[^a-z0-9\s-]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
 
-</section>
+    function maybeUnspaceLetters(q) {
+      const t = String(q || "").trim();
+      if (/^([a-z]\s+){2,}[a-z]$/i.test(t)) return t.replace(/\s+/g, "");
+      return t;
+    }
+
+    function tokenize(s) {
+      const n = normalize(s);
+      if (!n) return [];
+      return n.split(" ").map((x) => x.trim()).filter(Boolean);
+    }
+
+    const rows = Array.from(tbody.querySelectorAll("tr.data-row")).map((tr) => {
+      const name = tr.getAttribute("data-name") || "";
+      const category = tr.getAttribute("data-category") || "";
+      const search = tr.getAttribute("data-search") || "";
+
+      return {
+        tr,
+        name,
+        category,
+        nameN: normalize(name),
+        categoryN: normalize(category),
+        tokens: tokenize(search),
+      };
+    });
+
+    function readSortStateFromHeaders() {
+      const ths = Array.from(table.querySelectorAll("th[data-sort]"));
+      for (const th of ths) {
+        const aria = th.getAttribute("aria-sort");
+        if (aria === "ascending" || aria === "descending") {
+          sortKey = th.getAttribute("data-sort") || "name";
+          sortDir = aria;
+          return;
+        }
+      }
+      sortKey = "name";
+      sortDir = "ascending";
+    }
+
+    function compare(a, b) {
+      const dir = sortDir === "descending" ? -1 : 1;
+
+      if (sortKey === "category") {
+        const c = a.categoryN.localeCompare(b.categoryN);
+        if (c !== 0) return c * dir;
+        return a.nameN.localeCompare(b.nameN) * dir;
+      }
+
+      return a.nameN.localeCompare(b.nameN) * dir;
+    }
+
+    function render(list) {
+      tbody.innerHTML = "";
+
+      const slice = list.slice(0, visibleLimit);
+      slice.forEach((r) => tbody.appendChild(r.tr));
+
+      const hasMore = list.length > visibleLimit;
+      setControlVisible(nextBtn, hasMore);
+      setControlVisible(note, list.length > 0);
+
+      if (!list.length) {
+        status.textContent = "No matches.";
+      } else if (hasMore) {
+        status.textContent = `${list.length} matches - showing ${visibleLimit}.`;
+      } else {
+        status.textContent = `${list.length} matches.`;
+      }
+    }
+
+    function filterAndRender() {
+      const raw = maybeUnspaceLetters(input.value);
+      const q = normalize(raw);
+
+      const isSearching = Boolean(q);
+      setSearchingUI(isSearching);
+
+      if (!isSearching) {
+        if (resultsPanel) resultsPanel.hidden = true;
+        status.textContent = "Start typing to see matches.";
+        setControlVisible(nextBtn, false);
+        setControlVisible(note, false);
+        return;
+      }
+
+      const matches = rows.filter((r) => {
+        if (r.nameN.startsWith(q)) return true;
+        for (const t of r.tokens) {
+          if (t.startsWith(q)) return true;
+        }
+        return false;
+      });
+
+      matches.sort(compare);
+      render(matches);
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        visibleLimit += PAGE_N;
+        filterAndRender();
+      });
+    }
+
+    table.addEventListener("table:sort", (e) => {
+      const { key, dir } = (e.detail || {});
+      if (key) sortKey = key;
+      if (dir) sortDir = dir;
+
+      visibleLimit = PAGE_N;
+      filterAndRender();
+    });
+
+    input.addEventListener("input", () => {
+      visibleLimit = PAGE_N;
+      filterAndRender();
+    });
+
+    (function handleQueryParamOnLoad() {
+      const params = new URLSearchParams(window.location.search);
+      const q = params.get("q");
+      if (!q) return;
+
+      input.value = q;
+      window.history.replaceState({}, "", window.location.pathname);
+
+      visibleLimit = PAGE_N;
+      filterAndRender();
+    })();
+
+    readSortStateFromHeaders();
+    filterAndRender();
+  }
+
+  // -----------------------------------------------------------------------------
+  // Identify page logic
+  // -----------------------------------------------------------------------------
+  function initIdentifyPage() {
+    const root = $("#identify");
+    if (!root) return;
+
+    // Leaving your Identify logic untouched here, because the homepage issue
+    // was caused by hiding the Identify card and clobbering the status line.
+    // If you want me to sync this with your latest identify/index.njk, share it.
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    initHamburgerMenu();
+    initLinkedHomeRotators();
+    initSortableTables();
+    initSearchPage();
+    initIdentifyPage();
+  });
+})();
