@@ -30,6 +30,10 @@
   - Do NOT hide the Identify card while searching on Home.
   - Allow table header sort affordance to work on <button> controls by resetting
     native button styles for .data-table__sortable.
+
+  CHANGE NOTES (2026-02-07 - Identify tweaks)
+  - Identify cards: force title + description onto separate lines with spacing.
+  - Question 1 "Not Sure": display a centered "?" glyph styled like the others.
 ============================================================================= */
 
 /* =============================================================================
@@ -637,14 +641,59 @@ body.is-searching #home-results-panel{ display: grid; }
 .identify-answer-meta{ min-width: 0; }
 
 .identify-answer-title{
+  /* Ensure the title always sits on its own line above the description. */
+  display: block;
   font-weight: 750;
   letter-spacing: -0.01em;
 }
 
 .identify-answer-desc{
-  margin-top: 0.25rem;
+  /* Ensure the description always wraps to a new line with breathing room. */
+  display: block;
+  margin-top: 0.4rem;
   font-size: 0.92rem;
   color: var(--muted);
+}
+
+/* =============================================================================
+  Identify - Question 1 "Not Sure" tile (General type)
+  ---------------------------------------------------------------------------
+  PURPOSE
+  - Question 1 uses enum-style tiles that normally show an image.
+  - You requested the Not Sure option use a centered "?" glyph like the other
+    Not Sure tiles (Y / N / ?).
+  - This CSS overlays a "?" glyph and hides the (often-missing) image.
+============================================================================= */
+
+/* Common keys we’ve used for the first question across iterations. */
+.identify-answers[data-key="type"] .identify-answer[data-value="not_sure"] img,
+.identify-answers[data-key="generalType"] .identify-answer[data-value="not_sure"] img,
+.identify-answers[data-key="general-type"] .identify-answer[data-value="not_sure"] img,
+.identify-answers[data-key="general_type"] .identify-answer[data-value="not_sure"] img{
+  display: none;
+}
+
+/* Render the ? glyph in the left "thumb" slot of the tile */
+.identify-answers[data-key="type"] .identify-answer[data-value="not_sure"]::before,
+.identify-answers[data-key="generalType"] .identify-answer[data-value="not_sure"]::before,
+.identify-answers[data-key="general-type"] .identify-answer[data-value="not_sure"]::before,
+.identify-answers[data-key="general_type"] .identify-answer[data-value="not_sure"]::before{
+  content: "?";
+  width: 56px;
+  height: 56px;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+
+  font-weight: 800;
+  font-size: 1.6rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
 }
 
 .identify-answer-glyph{
