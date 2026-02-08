@@ -8,40 +8,79 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   /src/index.njk (Homepage)
   ------------------------------------------------------------------------------
   PURPOSE
-  - Homepage with two primary actions:
+  - Homepage is the Search page.
+  - Two primary actions:
       1) Search by Name (live filtering of the results table)
       2) Identify by Shape (link to Identify flow)
 
   IMPORTANT BEHAVIOR NOTES
   - This homepage supports TWO parallel search UX layers:
-      A) Table filtering (fast prefix matching) - implemented in /src/js/scripts.js
-      B) Typeahead suggestions + redirect/fuzzy fallback - implemented in
-         /src/js/pasta-search.js (if included on the page)
+      A) Table filtering (fast prefix matching) - /src/js/scripts.js
+      B) Typeahead suggestions + redirect/fuzzy fallback - /src/js/pasta-search.js
 
-  - To prevent the two scripts from clobbering each other's status text,
-    we provide TWO separate status elements:
+  - To prevent the two scripts from clobbering each other's status text, we use:
       - #pasta-search-status (typeahead messaging - owned by pasta-search.js)
       - #pasta-search-count  (table-filter count - owned by scripts.js)
 
-  TEMPLATE NOTES
-  - This file expects "pasta" data to be available (CSV-driven collection)
-  - It expects rotator arrays:
-      - homeRotatorIconSrcs
-      - homeRotatorNames
+  BUILD SAFETY NOTE
+  - Some pages/build contexts may not provide homeRotatorIconSrcs/homeRotatorNames.
+  - We defensively default them to empty arrays and provide fallbacks so Nunjucks
+    never tries to call .join() or [0] on undefined.
 ============================================================================= #}
 
 {% set IK_BASE = "https://ik.imagekit.io/mevius" %}
 {% set IK_THUMBS_BASE = IK_BASE ~ "/pasta/thumbs/" %}
+{% set IK_CAROUSEL_BASE = IK_BASE ~ "/pasta/carousel/" %}
 {% set FALLBACK_THUMB = "pending.png" %}
+
+{# ---------------------------------------------------------------------------
+  HOME ROTATOR FALLBACKS
+  - If your global data file defines homeRotatorIconSrcs/homeRotatorNames,
+    those will be used.
+  - Otherwise we fall back to a safe, known set.
+--------------------------------------------------------------------------- #}
+
+{% set fallbackRotatorIconSrcs = [
+  IK_CAROUSEL_BASE ~ "penne.png",
+  IK_CAROUSEL_BASE ~ "ravioli.png",
+  IK_CAROUSEL_BASE ~ "fusilli.png",
+  IK_CAROUSEL_BASE ~ "conchiglie.png",
+  IK_CAROUSEL_BASE ~ "farfalle.png",
+  IK_CAROUSEL_BASE ~ "pasta.png",
+  IK_CAROUSEL_BASE ~ "gnocchi.png",
+  IK_CAROUSEL_BASE ~ "macaroni.png"
+] %}
+
+{% set fallbackRotatorNames = [
+  "penne",
+  "ravioli",
+  "fusilli",
+  "conchiglie",
+  "farfalle",
+  "pasta",
+  "gnocchi",
+  "macaroni"
+] %}
+
+{# Default undefined variables to empty arrays, then choose fallback if empty #}
+{% set rotatorIconSrcs = (homeRotatorIconSrcs | default([])) %}
+{% set rotatorNames = (homeRotatorNames | default([])) %}
+
+{% if rotatorIconSrcs | length == 0 %}
+  {% set rotatorIconSrcs = fallbackRotatorIconSrcs %}
+{% endif %}
+
+{% if rotatorNames | length == 0 %}
+  {% set rotatorNames = fallbackRotatorNames %}
+{% endif %}
+
+{# Final first icon fallback for <img src="..."> #}
+{% set firstRotatorIcon = rotatorIconSrcs[0] | default(fallbackRotatorIconSrcs[0]) %}
 
 <section class="home-panels">
 
   {# ===========================================================================
     CARD 1 - SEARCH BY NAME
-    - Includes:
-        - Input (#pasta-q)
-        - Status lines (#pasta-search-status, #pasta-search-count)
-    - Table results live in the Results Panel below (initially hidden)
   =========================================================================== #}
   <section id="home-search-card" class="home-card card stack" aria-label="Search by name">
     <header class="home-card-head">
@@ -50,8 +89,15 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 
     {# -------------------------------------------------------------------------
       NOTE
-      - pasta-search.js expects this form id and input id.
-      - scripts.js only needs the input id.
+      - pasta-search.js expects:
+          form#pasta-search-form
+          input#pasta-q
+          p#pasta-search-status
+          ul#pasta-search-suggestions
+      - scripts.js expects:
+          input#pasta-q
+          p#pasta-search-count (or falls back to #pasta-search-status)
+          results table elements
     -------------------------------------------------------------------------- #}
     <form id="pasta-search-form" class="search" action="/" method="get" novalidate>
       <label class="sr-only" for="pasta-q">Search by pasta name</label>
@@ -66,7 +112,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         autocapitalize="none"
         spellcheck="false"
         placeholder="Start typing - e.g., penne"
-        {# Rotator hooks - scripts.js can rotate placeholder and icon together #}
         data-rotator-group="homeHero"
         data-placeholder-rotate="1"
         data-placeholder-template="Start typing - e.g., {example}"
@@ -75,26 +120,17 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       />
     </form>
 
-    {# ---------------------------------------------------------------------------
-      SEARCH STATUS LINES (IMPORTANT)
-      - #pasta-search-status: owned by pasta-search.js (typeahead messages like
-        "Match", "Suggestions", "Did you mean", etc.)
-      - #pasta-search-count: owned by /src/js/scripts.js (table-filter counts like
-        "12 matches" + paging hints)
-      Keeping these separate prevents the two scripts from overwriting each other.
-    --------------------------------------------------------------------------- #}
+    {# Status line for pasta-search.js (typeahead + exact match messaging) #}
     <p id="pasta-search-status" class="muted home-search-status" aria-live="polite"></p>
 
+    {# Count line for scripts.js (table filter counts) #}
     <p id="pasta-search-count" class="muted home-search-count" aria-live="polite">
       Start typing to see matches.
     </p>
   </section>
 
   {# ===========================================================================
-    CARD 2 - IDENTIFY BY SHAPE
-    - IMPORTANT: This must remain visible/clickable at all times.
-    - scripts.js previously set aria-hidden while searching; we removed that
-      behavior in the scripts.js replacement.
+    CARD 2 - IDENTIFY BY SHAPE (always clickable)
   =========================================================================== #}
   <a
     id="home-identify-card"
@@ -110,7 +146,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       <img
         id="identify-icon-rotator"
         class="identify-icon"
-        src="{{ homeRotatorIconSrcs[0] }}"
+        src="{{ firstRotatorIcon }}"
         alt=""
         loading="lazy"
         decoding="async"
@@ -118,8 +154,8 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         height="96"
         data-rotator-group="homeHero"
         data-rotate="1"
-        data-rotate-srcs="{{ homeRotatorIconSrcs | join(',') }}"
-        data-rotate-names="{{ homeRotatorNames | join(',') }}"
+        data-rotate-srcs="{{ rotatorIconSrcs | join(',') }}"
+        data-rotate-names="{{ rotatorNames | join(',') }}"
         data-rotate-interval="2500"
         data-rotate-fade="240"
       />
@@ -127,11 +163,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   </a>
 
   {# ===========================================================================
-    RESULTS PANEL
-    - Hidden by default; scripts.js reveals it when the query is non-empty.
-    - Contains:
-        - Suggestions list (used by pasta-search.js)
-        - Standard results table (rendered by Nunjucks, filtered by scripts.js)
+    RESULTS PANEL (hidden until user types)
   =========================================================================== #}
   <section
     id="home-results-panel"
@@ -139,11 +171,9 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
     aria-label="Search results"
     hidden
   >
-    {# Used by pasta-search.js for typeahead suggestions. If pasta-search.js is
-       not loaded, this list simply stays empty and harmless. #}
+    {# Used by pasta-search.js for suggestions. Safe to exist even if empty. #}
     <ul id="pasta-search-suggestions" class="suggestions" aria-label="Suggestions"></ul>
 
-    {# Optional note area (scripts.js may toggle this) #}
     <p id="pasta-results-note" class="note" hidden>
       Matches are prefix-based (e.g., “p” matches “penne”).
     </p>
@@ -165,16 +195,12 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
           <thead>
             <tr>
               <th scope="col" class="data-table__thumb"></th>
-
-              {# Sortable headers - scripts.js reads aria-sort to determine sort #}
               <th scope="col" class="data-table__name" data-sort="name" aria-sort="ascending">
                 Name
               </th>
-
               <th scope="col" class="cell-category" data-sort="category" aria-sort="none">
                 Category
               </th>
-
               <th scope="col" class="cell-synonyms">
                 Synonyms
               </th>
@@ -184,16 +210,11 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
           <tbody id="pasta-results-body">
             {% for item in pasta %}
 
-              {# -----------------------------------------------------------------
-                SYNONYMS / ALIASES
-                - Displayed in the "Synonyms" column
-                - Also used for prefix-match tokens via data-search
-                - Keep this string broad - scripts.js will normalize/split tokens
-              ------------------------------------------------------------------ #}
+              {# Synonyms/search aliases shown and used for data-search tokenization #}
               {% set alsoRaw = (item.Synonyms or item.SearchAliases or "") %}
               {% set categoryRaw = (item.Category or "") %}
 
-              {# Thumbnail logic - matches your ImageKit usage pattern #}
+              {# Thumbnail logic #}
               {% set thumbFile = (item.ThumbFile or item.ImageFile or FALLBACK_THUMB) %}
               {% set thumbUrl = IK_THUMBS_BASE ~ thumbFile %}
               {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
@@ -239,7 +260,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       </div>
     </div>
 
-    {# Paging button - scripts.js reveals and updates this as needed #}
     <a id="pasta-toggle-all" class="btn btn--ghost" href="#" hidden>
       Next 10
     </a>
