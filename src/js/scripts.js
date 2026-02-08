@@ -7,15 +7,15 @@
   //   - Hamburger menu
   //   - Homepage linked rotators (placeholder + icon)
   //   - Homepage search: prefix filtering + sort + paging
-  //   - Identify page logic (only runs when identify DOM exists)
   //
   // IMPORTANT
-  // - Homepage can also load /src/js/pasta-search.js (typeahead).
-  // - This file writes table-filter status into #pasta-search-count to avoid
-  //   overwriting #pasta-search-status (used by pasta-search.js).
+  // - This homepage may also load /src/js/pasta-search.js (typeahead suggestions).
+  // - To avoid both scripts overwriting the same status line:
+  //     - pasta-search.js uses #pasta-search-status
+  //     - this file uses #pasta-search-count (fallback to status if missing)
   //
   // STYLE RULE
-  // - All CSS must live in styles.css, not in templates or JS.
+  // - All CSS must live in styles.css (no inline styles here).
   // =============================================================================
 
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -52,7 +52,9 @@
       .map((s) => String(s || "").trim())
       .filter(Boolean);
 
-    const tpl = input.getAttribute("data-placeholder-template") || "Start typing - e.g., {example}";
+    const tpl =
+      input.getAttribute("data-placeholder-template") ||
+      "Start typing - e.g., {example}";
     const intervalMs = Number(input.getAttribute("data-rotate-interval") || 2500);
 
     const srcsRaw = icon.getAttribute("data-rotate-srcs") || "";
@@ -68,6 +70,7 @@
       .map((s) => String(s || "").trim())
       .filter(Boolean);
 
+    // Keep arrays aligned by smallest length
     const n = Math.min(examples.length, srcs.length, names.length);
     if (n <= 0) return;
 
@@ -92,46 +95,14 @@
   }
 
   // -----------------------------------------------------------------------------
-  // Sortable tables
-  // -----------------------------------------------------------------------------
-  function initSortableTables() {
-    const tables = Array.from(document.querySelectorAll(".js-sortable-table"));
-    if (!tables.length) return;
-
-    tables.forEach((table) => {
-      const headers = Array.from(table.querySelectorAll("th[data-sort]"));
-      if (!headers.length) return;
-
-      headers.forEach((th) => {
-        th.addEventListener("click", () => {
-          const key = th.getAttribute("data-sort");
-          if (!key) return;
-
-          const current = th.getAttribute("aria-sort") || "none";
-          const nextDir = current === "ascending" ? "descending" : "ascending";
-
-          headers.forEach((h) => h.setAttribute("aria-sort", "none"));
-          th.setAttribute("aria-sort", nextDir);
-
-          table.dispatchEvent(
-            new CustomEvent("table:sort", { detail: { key, dir: nextDir } })
-          );
-        });
-      });
-    });
-  }
-
-  // -----------------------------------------------------------------------------
-  // Homepage search: prefix filtering + paging + respects current sort header state
+  // Homepage search: prefix filtering + paging + sortable headers
   // -----------------------------------------------------------------------------
   function initSearchPage() {
     const input = $("#pasta-q");
-
-    // This is the key: scripts.js writes to #pasta-search-count (not #pasta-search-status)
     const status = $("#pasta-search-count") || $("#pasta-search-status");
-
     const table = $("#pasta-results-table");
     const tbody = $("#pasta-results-body");
+
     if (!input || !status || !table || !tbody) return;
 
     const resultsPanel = $("#home-results-panel");
@@ -141,17 +112,17 @@
     const PAGE_N = 10;
     let visibleLimit = PAGE_N;
 
+    // Default sort state; also read from aria-sort on headers if present.
     let sortKey = "name";
     let sortDir = "ascending";
 
     function setSearchingUI(isSearching) {
       document.body.classList.toggle("is-searching", isSearching);
-
       if (resultsPanel) resultsPanel.hidden = !isSearching;
 
       // IMPORTANT:
       // Do NOT hide the Identify card while searching.
-      // That was the source of the missing Identify link.
+      // The Identify link must remain visible/clickable at all times.
     }
 
     function setControlVisible(el, isVisible) {
@@ -160,6 +131,7 @@
       el.setAttribute("aria-hidden", isVisible ? "false" : "true");
     }
 
+    // Normalization helpers
     function normalize(s) {
       return String(s || "")
         .toLowerCase()
@@ -172,6 +144,7 @@
         .trim();
     }
 
+    // Treat "p e n n e" like "penne"
     function maybeUnspaceLetters(q) {
       const t = String(q || "").trim();
       if (/^([a-z]\s+){2,}[a-z]$/i.test(t)) return t.replace(/\s+/g, "");
@@ -184,6 +157,7 @@
       return n.split(" ").map((x) => x.trim()).filter(Boolean);
     }
 
+    // Cache initial rows (DOM -> data objects)
     const rows = Array.from(tbody.querySelectorAll("tr.data-row")).map((tr) => {
       const name = tr.getAttribute("data-name") || "";
       const category = tr.getAttribute("data-category") || "";
@@ -213,6 +187,15 @@
       sortDir = "ascending";
     }
 
+    function setHeaderSortState(nextKey, nextDir) {
+      const ths = Array.from(table.querySelectorAll("th[data-sort]"));
+      ths.forEach((th) => {
+        const k = th.getAttribute("data-sort");
+        if (k === nextKey) th.setAttribute("aria-sort", nextDir);
+        else th.setAttribute("aria-sort", "none");
+      });
+    }
+
     function compare(a, b) {
       const dir = sortDir === "descending" ? -1 : 1;
 
@@ -222,6 +205,7 @@
         return a.nameN.localeCompare(b.nameN) * dir;
       }
 
+      // Default: name sort
       return a.nameN.localeCompare(b.nameN) * dir;
     }
 
@@ -235,13 +219,9 @@
       setControlVisible(nextBtn, hasMore);
       setControlVisible(note, list.length > 0);
 
-      if (!list.length) {
-        status.textContent = "No matches.";
-      } else if (hasMore) {
-        status.textContent = `${list.length} matches - showing ${visibleLimit}.`;
-      } else {
-        status.textContent = `${list.length} matches.`;
-      }
+      if (!list.length) status.textContent = "No matches.";
+      else if (hasMore) status.textContent = `${list.length} matches - showing ${visibleLimit}.`;
+      else status.textContent = `${list.length} matches.`;
     }
 
     function filterAndRender() {
@@ -259,6 +239,7 @@
         return;
       }
 
+      // Prefix match: name startsWith OR any token startsWith
       const matches = rows.filter((r) => {
         if (r.nameN.startsWith(q)) return true;
         for (const t of r.tokens) {
@@ -271,6 +252,7 @@
       render(matches);
     }
 
+    // Paging
     if (nextBtn) {
       nextBtn.addEventListener("click", (e) => {
         e.preventDefault();
@@ -279,20 +261,39 @@
       });
     }
 
-    table.addEventListener("table:sort", (e) => {
-      const { key, dir } = (e.detail || {});
-      if (key) sortKey = key;
-      if (dir) sortDir = dir;
+    // Sorting - event delegation on header buttons/controls
+    table.addEventListener("click", (e) => {
+      const btn = e.target.closest(".js-sort");
+      if (!btn) return;
 
+      // Supports either data-sort on button or its parent th
+      const key =
+        btn.getAttribute("data-sort") ||
+        btn.closest("th")?.getAttribute("data-sort") ||
+        "";
+      if (!key) return;
+
+      // Determine next direction
+      const th = btn.closest("th");
+      const current = th?.getAttribute("aria-sort") || "none";
+      const nextDir = current === "ascending" ? "descending" : "ascending";
+
+      sortKey = key;
+      sortDir = nextDir;
+      setHeaderSortState(sortKey, sortDir);
+
+      // Reset paging on sort for a predictable UX
       visibleLimit = PAGE_N;
       filterAndRender();
     });
 
+    // Input filtering
     input.addEventListener("input", () => {
       visibleLimit = PAGE_N;
       filterAndRender();
     });
 
+    // Support /?q=... deep links
     (function handleQueryParamOnLoad() {
       const params = new URLSearchParams(window.location.search);
       const q = params.get("q");
@@ -305,27 +306,17 @@
       filterAndRender();
     })();
 
+    // Init
     readSortStateFromHeaders();
     filterAndRender();
   }
 
-  // -----------------------------------------------------------------------------
-  // Identify page logic
-  // -----------------------------------------------------------------------------
-  function initIdentifyPage() {
-    const root = $("#identify");
-    if (!root) return;
-
-    // Leaving your Identify logic untouched here, because the homepage issue
-    // was caused by hiding the Identify card and clobbering the status line.
-    // If you want me to sync this with your latest identify/index.njk, share it.
-  }
-
+  // =============================================================================
+  // Boot
+  // =============================================================================
   document.addEventListener("DOMContentLoaded", () => {
     initHamburgerMenu();
     initLinkedHomeRotators();
-    initSortableTables();
     initSearchPage();
-    initIdentifyPage();
   });
 })();
