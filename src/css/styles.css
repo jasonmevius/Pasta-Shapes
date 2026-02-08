@@ -1,29 +1,40 @@
 /* =============================================================================
   /src/css/styles.css
   ------------------------------------------------------------------------------
-  GLOBAL STYLESHEET (single file)
+  SINGLE GLOBAL STYLESHEET (complete file)
 
-  PRINCIPLES
-  - All styling lives here (no inline CSS).
-  - Mobile-first where possible, with clear breakpoints.
-  - Heavily commented for maintainability.
+  PURPOSE
+  - One stylesheet for the whole Pasta Shapes site.
+  - No inline CSS in templates.
+  - Mobile-first patterns with explicit desktop breakpoints.
 
-  THIS VERSION
-  - Keeps All Pastas improvements (synonyms column, spacing, sortable cues).
-  - Restores Search + Identify styling.
-  - FIXES:
-    1) Mobile hamburger menu drawer styling (panel + links + backdrop).
-    2) Homepage search input returns to "hero" sizing + centered alignment.
+  MAJOR UI BEHAVIORS SUPPORTED
+  - Sticky top bar with:
+      - Desktop inline nav (>= 720px)
+      - Mobile hamburger button + drawer (< 720px)
+  - Home/Search experience:
+      - Oversized, centered "hero" search input on the Home Search card
+      - Suggestions + results list styling
+      - Recently viewed section styling
+  - Identify page:
+      - Card layout
+      - Answer tiles (enum images + bool glyphs Y / N / ?)
+  - All Pastas page:
+      - Filter bar
+      - Table with synonyms column
+      - Sortable header affordance
+      - NON-sticky table header (per latest decision)
 
-  NOTE ABOUT MOBILE MENU MARKUP
-  - Different templates name the drawer differently. This CSS supports:
-      .nav-drawer, .mobile-drawer, .nav-mobile
-    and toggles like:
-      body.nav-open, [aria-expanded="true"] on the toggle, and [hidden] on drawer.
+  NOTE ABOUT CLASS NAMES
+  - Search input styles target BOTH:
+      - .search-input (older / intended search input class)
+      - .search .field__input (newer "field" input class used in some templates)
+    This makes the UI resilient if templates differ slightly.
+
 ============================================================================= */
 
 /* =============================================================================
-  1) Design tokens and base resets
+  1) Design tokens + base resets
 ============================================================================= */
 
 :root{
@@ -38,13 +49,15 @@
   --pad: 1rem;
   --gap: 0.75rem;
 
-  /* Height of sticky topbar area (used by drawer positioning).
-     If your topbar changes height, adjust this value. */
+  /* Approx sticky topbar height used for positioning the mobile drawer.
+     If your topbar padding/font changes, adjust this (usually 56 - 68px). */
   --topbar-h: 60px;
 }
 
 *{ box-sizing: border-box; }
 html, body{ height: 100%; }
+
+/* IMPORTANT: Make the HTML hidden attribute bulletproof site-wide */
 [hidden]{ display: none !important; }
 
 body{
@@ -64,6 +77,7 @@ a:hover{ text-decoration: underline; }
   2) Accessibility helpers
 ============================================================================= */
 
+/* Screen reader only (utility) */
 .sr-only{
   position: absolute !important;
   width: 1px !important;
@@ -76,9 +90,7 @@ a:hover{ text-decoration: underline; }
   border: 0 !important;
 }
 
-/* Skip-to-content link:
-   - hidden offscreen
-   - visible only when focused */
+/* Skip-to-content link: hidden offscreen unless focused */
 .skip{
   position: absolute;
   left: -9999px;
@@ -87,6 +99,7 @@ a:hover{ text-decoration: underline; }
   height: 1px;
   overflow: hidden;
 }
+
 .skip:focus{
   left: 1rem;
   top: 0.75rem;
@@ -110,13 +123,13 @@ a:hover{ text-decoration: underline; }
   padding: 1.25rem var(--pad) 3rem;
 }
 
+/* Leave room for fixed bottom nav on mobile so content is not hidden behind it */
 @media (max-width: 719px){
-  /* Leave room for fixed bottom nav on mobile */
   .container{ padding-bottom: 5rem; }
 }
 
 /* =============================================================================
-  4) Top navigation (sticky) + responsive gating
+  4) Top navigation (sticky) + desktop/mobile gating
 ============================================================================= */
 
 .topbar{
@@ -128,8 +141,7 @@ a:hover{ text-decoration: underline; }
   border-bottom: 1px solid var(--border);
 }
 
-/* IMPORTANT: Keep this in sync with --topbar-h.
-   This padding generally yields a ~60px topbar. */
+/* The padding here is what makes the topbar roughly --topbar-h tall */
 .topbar-inner{
   max-width: var(--container);
   margin: 0 auto;
@@ -171,7 +183,10 @@ a:hover{ text-decoration: underline; }
   .nav-toggle{ display: inline-flex; }
 }
 
-/* Hamburger button styling */
+/* =============================================================================
+  4a) Hamburger button (mobile)
+============================================================================= */
+
 .nav-toggle{
   align-items: center;
   justify-content: center;
@@ -183,12 +198,14 @@ a:hover{ text-decoration: underline; }
   color: var(--fg);
   cursor: pointer;
 }
+
 .nav-toggle:hover{ background: rgba(17,24,39,0.03); }
 
 .nav-toggle-bars{
   display: grid;
   gap: 5px;
 }
+
 .nav-toggle-bars span{
   display: block;
   width: 18px;
@@ -197,91 +214,51 @@ a:hover{ text-decoration: underline; }
   border-radius: 999px;
 }
 
+/* Hide hamburger button on desktop regardless */
+@media (min-width: 720px){
+  .nav-toggle{ display: none; }
+}
+
 /* =============================================================================
-  4a) Mobile hamburger drawer (RESTORED)
+  4b) Hamburger drawer (mobile)
   ------------------------------------------------------------------------------
-  This styles the dropdown/drawer when the hamburger is opened.
-
-  Supported markup patterns (any one is fine):
-  - <nav class="nav-drawer">...</nav>
-  - <div class="nav-drawer">...</div>
-  - <div class="nav-mobile">...</div>
-
-  Supported open-state patterns:
-  - body.nav-open
-  - .nav-toggle[aria-expanded="true"]
-  - drawer without [hidden]
+  EXPECTED MARKUP PATTERN
+  - Drawer element uses class: .nav-drawer
+  - It is toggled via [hidden] in HTML/JS (recommended)
+  - The global [hidden] rule above enforces the closed state.
 ============================================================================= */
 
-/* Backdrop overlay (optional): create a dimmer if your markup includes it */
-.nav-backdrop,
-.mobile-backdrop{
-  position: fixed;
-  inset: 0;
-  background: rgba(17,24,39,0.35);
-  z-index: 55; /* above content, below drawer */
-}
+.nav-drawer{
+  max-width: var(--container);
+  margin: 0 auto;
+  padding: 0 var(--pad) 0.75rem;
 
-/* Drawer panel */
-.nav-drawer,
-.mobile-drawer,
-.nav-mobile{
-  position: fixed;
-  left: 0;
-  right: 0;
-  top: var(--topbar-h);
-  z-index: 60; /* above backdrop and topbar */
-  background: rgba(255,255,255,0.98);
-  backdrop-filter: blur(10px);
+  display: grid;
+  gap: 0.35rem;
+
   border-bottom: 1px solid var(--border);
-  box-shadow: 0 10px 25px rgba(17,24,39,0.10);
-
-  padding: 0.75rem var(--pad) 1rem;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(10px);
 }
 
-/* Make sure the drawer never appears on desktop */
-@media (min-width: 720px){
-  .nav-drawer,
-  .mobile-drawer,
-  .nav-mobile,
-  .nav-backdrop,
-  .mobile-backdrop{
-    display: none !important;
-  }
-}
-
-/* Drawer links layout */
-.nav-drawer a,
-.mobile-drawer a,
-.nav-mobile a{
-  display: block;
-  padding: 0.85rem 0.9rem;
+/* Drawer links - "button-like" */
+.nav-drawer a{
+  text-decoration: none;
+  padding: 0.85rem 0.85rem;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  text-decoration: none;
-  font-weight: 650;
+  background: #fff;
   color: var(--fg);
+  font-weight: 650;
 }
 
-.nav-drawer a:hover,
-.mobile-drawer a:hover,
-.nav-mobile a:hover{
-  background: rgba(17,24,39,0.04);
-  text-decoration: none;
+.nav-drawer a:hover{
+  background: rgba(17,24,39,0.03);
 }
 
-/* Optional: separate groups inside the drawer */
-.nav-drawer hr,
-.mobile-drawer hr,
-.nav-mobile hr{
-  border: 0;
-  border-top: 1px solid var(--border);
-  margin: 0.5rem 0;
-}
-
-/* If your JS toggles a body class, use it to show/hide backdrop + drawer */
-body:not(.nav-open) .nav-backdrop,
-body:not(.nav-open) .mobile-backdrop{
-  display: none;
+/* Ensure drawer never renders on desktop */
+@media (min-width: 720px){
+  .nav-drawer{ display: none !important; }
 }
 
 /* =============================================================================
@@ -296,7 +273,7 @@ body:not(.nav-open) .mobile-backdrop{
 }
 
 /* =============================================================================
-  6) Buttons and forms
+  6) Buttons
 ============================================================================= */
 
 .btn{
@@ -315,6 +292,7 @@ body:not(.nav-open) .mobile-backdrop{
 }
 .btn:hover{ text-decoration: none; }
 
+/* Secondary variant supports both ".secondary" and ".btn--secondary" naming */
 .btn.secondary,
 .btn--secondary{
   background: #fff;
@@ -330,6 +308,10 @@ body:not(.nav-open) .mobile-backdrop{
   border-radius: 10px;
   font-size: 0.95rem;
 }
+
+/* =============================================================================
+  7) Form fields (general)
+============================================================================= */
 
 .field{
   display: grid;
@@ -366,25 +348,51 @@ body:not(.nav-open) .mobile-backdrop{
 }
 
 /* =============================================================================
-  6a) Home Search "hero" input (RESTORED)
+  7a) Search bar styles (restored)
   ------------------------------------------------------------------------------
-  Scoped to the homepage search card so it doesn't affect All Pastas filters.
+  Supports both historical markup:
+    - <input class="search-input" ...>
+  and newer "field" markup:
+    - <div class="search"><input class="field__input" ...></div>
 ============================================================================= */
 
-#home-search-card input[type="search"],
-#home-search-card input[type="text"]{
-  font-size: 1.15rem;
-  padding: 1.05rem 1.1rem;
-  border-radius: 16px;
+.search{
+  display: grid;
+  gap: 0.5rem;
+}
 
-  /* Centered + prominent */
+/* Baseline search input look */
+.search-input,
+.search .field__input{
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem 0.9rem;
+  font-size: 1rem;
+  background: #fff;
+
+  /* "Centered hero" feel (this is what you were missing) */
   text-align: center;
 }
 
-/* On desktop, keep the hero input comfortably wide but not full-bleed */
+.search-input:focus,
+.search .field__input:focus{
+  outline: 2px solid rgba(17,24,39,0.18);
+  outline-offset: 2px;
+}
+
+/* Home-only: make search input intentionally oversized */
+#home-search-card .search-input,
+#home-search-card .search .field__input{
+  font-size: 1.15rem;
+  padding: 1.05rem 1.1rem;
+  border-radius: 16px;
+}
+
+/* Home-only: avoid full-bleed input on desktop */
 @media (min-width: 720px){
-  #home-search-card input[type="search"],
-  #home-search-card input[type="text"]{
+  #home-search-card .search-input,
+  #home-search-card .search .field__input{
     max-width: 34rem;
     margin-left: auto;
     margin-right: auto;
@@ -392,7 +400,7 @@ body:not(.nav-open) .mobile-backdrop{
 }
 
 /* =============================================================================
-  7) Page header
+  8) Page headers
 ============================================================================= */
 
 .page-header{
@@ -412,7 +420,7 @@ body:not(.nav-open) .mobile-backdrop{
 }
 
 /* =============================================================================
-  8) Shared thumbnail component
+  9) Shared thumbnail component
 ============================================================================= */
 
 .thumb{
@@ -435,7 +443,7 @@ body:not(.nav-open) .mobile-backdrop{
 }
 
 /* =============================================================================
-  9) HOME + SEARCH RESULTS UI
+  10) Home + Search results UI
 ============================================================================= */
 
 .suggestions{
@@ -510,7 +518,7 @@ body:not(.nav-open) .mobile-backdrop{
 .recent-wrap[hidden]{ display: none; }
 
 /* =============================================================================
-  10) HOME PANELS (two-card layout)
+  11) Home panels (Search / Identify cards)
 ============================================================================= */
 
 .home-shell{ display: block; }
@@ -521,6 +529,7 @@ body:not(.nav-open) .mobile-backdrop{
   grid-template-columns: 1fr;
 }
 
+/* Landscape phones: allow a 2-up layout */
 @media (max-width: 719px) and (orientation: landscape){
   .home-panels{
     grid-template-columns: 1fr 1fr;
@@ -544,6 +553,7 @@ body:not(.nav-open) .mobile-backdrop{
   letter-spacing: -0.01em;
 }
 
+/* Search card expands by default and shrinks while typing */
 #home-search-card{
   min-height: 42svh;
   transition: min-height 180ms ease, padding 180ms ease;
@@ -554,14 +564,13 @@ body.is-searching #home-search-card{
   padding: 0.85rem;
 }
 
+/* In landscape split mode, don’t force svh heights */
 @media (max-width: 719px) and (orientation: landscape){
   #home-search-card{ min-height: 0; }
   body.is-searching #home-search-card{ min-height: 0; }
 }
 
-body.is-searching #home-identify-card{ display: none; }
-body.is-searching #home-results-panel{ display: grid; }
-
+/* Identify card is one big link */
 .home-card-link{
   text-decoration: none;
   cursor: pointer;
@@ -572,6 +581,7 @@ body.is-searching #home-results-panel{ display: grid; }
   background: rgba(17,24,39,0.02);
 }
 
+/* Identify hero (icon rotation area) */
 .identify-hero{
   width: 100%;
   border: none;
@@ -591,6 +601,7 @@ body.is-searching #home-results-panel{ display: grid; }
   transition: opacity 240ms ease;
 }
 
+/* JS toggles this class briefly during icon swaps */
 .identify-hero img.is-fading{ opacity: 0; }
 
 @media (prefers-reduced-motion: reduce){
@@ -606,8 +617,20 @@ body.is-searching #home-results-panel{ display: grid; }
   }
 }
 
+/* Results panel on home (hidden by default via [hidden]) */
+.home-results{
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* When searching:
+   - Hide Identify card
+   - Show results panel */
+body.is-searching #home-identify-card{ display: none; }
+body.is-searching #home-results-panel{ display: grid; }
+
 /* =============================================================================
-  11) IDENTIFY PAGE UI
+  12) Identify page UI (answer tiles + glyphs)
 ============================================================================= */
 
 .identify{
@@ -630,30 +653,36 @@ body.is-searching #home-results-panel{ display: grid; }
   gap: 0.65rem;
 }
 
+/* Enum default */
 .identify-answers[data-kind="enum"]{
   grid-template-columns: 1fr;
 }
 
+/* Special-case: "type" question - 2-up on small screens */
 @media (max-width: 719px){
   .identify-answers[data-kind="enum"][data-key="type"]{
     grid-template-columns: 1fr 1fr;
   }
 }
 
+/* Wider screens: enum cards in 3 columns */
 @media (min-width: 720px){
   .identify-answers[data-kind="enum"]{
     grid-template-columns: repeat(3, 1fr);
   }
 }
 
+/* Bool questions: always 3 choices (Yes/No/Not sure) */
 .identify-answers[data-kind="bool"]{
   grid-template-columns: repeat(3, 1fr);
 }
 
+/* Single CTA state */
 .identify-answers[data-kind="single"]{
   grid-template-columns: 1fr;
 }
 
+/* Answer tile (button) */
 .identify-answer{
   width: 100%;
   text-align: left;
@@ -674,6 +703,7 @@ body.is-searching #home-results-panel{ display: grid; }
   background: rgba(17,24,39,0.02);
 }
 
+/* Enum images (when used) */
 .identify-answer img{
   width: 56px;
   height: 56px;
@@ -695,10 +725,10 @@ body.is-searching #home-results-panel{ display: grid; }
   color: var(--muted);
 }
 
+/* Bool answer glyph (Y / N / ?) */
 .identify-answer-glyph{
   width: 56px;
   height: 56px;
-
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -738,9 +768,10 @@ body.is-searching #home-results-panel{ display: grid; }
 }
 
 /* =============================================================================
-  12) ALL PASTAS - filter bar + table
+  13) All Pastas page (filters + table)
 ============================================================================= */
 
+/* Filters / tools row */
 .table-tools{
   margin: 1.25rem 0 1rem;
 }
@@ -771,6 +802,7 @@ body.is-searching #home-results-panel{ display: grid; }
   font-size: 0.95rem;
 }
 
+/* Table shell */
 .table-wrap{
   margin-top: 1rem;
   border: 1px solid var(--border);
@@ -779,24 +811,28 @@ body.is-searching #home-results-panel{ display: grid; }
   overflow: visible;
 }
 
+/* Horizontal scroll wrapper */
 .table-scroll{
   overflow-x: auto;
   overflow-y: visible;
   -webkit-overflow-scrolling: touch;
 }
 
+/* Table layout */
 .data-table{
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
+  table-layout: fixed; /* prevents cramped "content sized" columns */
 }
 
 .data-table--all .col-thumb{ width: 84px; }
 .data-table--all .col-name{ width: 16rem; }
 .data-table--all .col-category{ width: 11rem; }
+/* col-synonyms consumes remaining width */
 
+/* Header row (NOT sticky) */
 .data-table thead th{
-  position: static; /* not sticky */
+  position: static;
   top: auto;
 
   background: #fff;
@@ -810,6 +846,7 @@ body.is-searching #home-results-panel{ display: grid; }
   padding: 0.9rem 0.9rem;
 }
 
+/* Body cells */
 .data-table tbody td,
 .data-table tbody th{
   border-bottom: 1px solid var(--border);
@@ -823,6 +860,7 @@ body.is-searching #home-results-panel{ display: grid; }
 
 .data-table__thumb{ width: 84px; }
 
+/* Ensure <th scope="row"> aligns left */
 .data-table__name,
 .data-table tbody th{
   text-align: left;
@@ -845,18 +883,23 @@ body.is-searching #home-results-panel{ display: grid; }
   word-break: break-word;
 }
 
-.synonyms--empty{ color: rgba(107,114,128,0.65); }
+.synonyms--empty{
+  color: rgba(107,114,128,0.65);
+}
 
 .data-table__left{ text-align: left; }
 
+/* Sortable headers: clickable affordance */
 .data-table__sortable{
   cursor: pointer;
   user-select: none;
+
   text-decoration: underline;
   text-decoration-style: dotted;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
+
 .data-table__sortable:hover{ color: var(--fg); }
 
 .sort-indicator{
@@ -873,7 +916,7 @@ body.is-searching #home-results-panel{ display: grid; }
 .data-table__sortable[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
 
 /* =============================================================================
-  13) Footer
+  14) Footer (minimal)
 ============================================================================= */
 
 .site-footer{
@@ -888,7 +931,7 @@ body.is-searching #home-results-panel{ display: grid; }
 .footer-tagline{ margin: 0; }
 
 /* =============================================================================
-  14) Mobile bottom navigation (Search / Identify)
+  15) Mobile bottom navigation (Search / Identify)
 ============================================================================= */
 
 .bottom-nav{
@@ -958,6 +1001,7 @@ body.is-searching #home-results-panel{ display: grid; }
 
 .bottom-nav-link[aria-current="page"]{ color: var(--fg); }
 
+/* Hide the bottom nav on tablet/desktop */
 @media (min-width: 720px){
   .bottom-nav{ display: none; }
 }
