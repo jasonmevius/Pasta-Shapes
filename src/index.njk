@@ -9,275 +9,109 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   ------------------------------------------------------------------------------
   PURPOSE
   - Homepage with two primary actions:
-      1) Search by Name (live filtering)
+      1) Search by Name (live filtering of the results table)
       2) Identify by Shape (guided questions)
-  - Mobile-first layout: big tap targets, simple cards.
-  - Home hero rotator: rotates example names + icon in sync.
+  - Search behavior on the homepage is *NOT* typeahead suggestions.
+    It is table filtering driven by /src/js/scripts.js.
 
-  CHANGE (RESULTS STANDARDIZATION)
-  - Search results are now rendered as an "All Pastas"-style table:
-      - Thumb + Name (sortable) + Category (sortable) + Synonyms
-      - Synonyms column hides on narrow screens for usability
-  - The JS now filters <tr> rows instead of <li> cards.
+  IMPORTANT
+  - We intentionally do NOT include the typeahead suggestions list on the
+    homepage, so /src/js/pasta-search.js will not initialize here.
 ============================================================================= #}
 
 {% set IK_BASE = "https://ik.imagekit.io/mevius" %}
 {% set IK_THUMBS_BASE = IK_BASE ~ "/pasta/thumbs/" %}
 {% set FALLBACK_THUMB = "pending.png" %}
 
-{# -----------------------------------------------------------------------------
-  Home hero rotator (linked icon + example placeholder)
-  - These rotate in sync to reinforce the "name <-> icon" connection.
-  - Icon images live in ImageKit at /pasta/carousel/
------------------------------------------------------------------------------ #}
-{% set IK_CAROUSEL_BASE = IK_BASE ~ "/pasta/carousel/" %}
-{% set homeRotatorNames = [
-  "penne",
-  "ravioli",
-  "fusilli",
-  "conchiglie",
-  "farfalle",
-  "gnocchi",
-  "macaroni"
-] %}
-{% set homeRotatorIconSrcs = [
-  IK_CAROUSEL_BASE ~ "penne.png",
-  IK_CAROUSEL_BASE ~ "ravioli.png",
-  IK_CAROUSEL_BASE ~ "fusilli.png",
-  IK_CAROUSEL_BASE ~ "conchiglie.png",
-  IK_CAROUSEL_BASE ~ "farfalle.png",
-  IK_CAROUSEL_BASE ~ "gnocchi.png",
-  IK_CAROUSEL_BASE ~ "ridge-macaroni.png"
-] %}
+<section class="home-panels">
 
-<section class="home-shell" aria-label="Homepage actions">
-  <div class="home-panels">
+  <section id="home-search-card" class="home-card card stack" aria-label="Search by name">
+    <header class="home-card-head">
+      <h1 class="h2 home-card-title">Search by Name</h1>
+    </header>
 
-    <section id="home-search-card" class="home-card card stack" aria-label="Search by name">
-      <header class="home-card-head">
-        <h1 class="h2 home-card-title">Search by Name</h1>
-      </header>
+    {# -------------------------------------------------------------------------
+      NOTE: Form id intentionally NOT "pasta-search-form".
+      The homepage uses scripts.js for table filtering, not pasta-search.js.
+    -------------------------------------------------------------------------- #}
+    <form id="home-search-form" class="search" action="/" method="get" novalidate>
+      <label class="sr-only" for="pasta-q">Search by pasta name</label>
+      <input
+        id="pasta-q"
+        name="q"
+        class="search-input"
+        type="search"
+        inputmode="search"
+        autocomplete="off"
+        autocapitalize="none"
+        spellcheck="false"
+        placeholder="Start typing - e.g., penne"
+        data-rotator-group="homeHero"
+        data-placeholder-rotate="1"
+        data-placeholder-template="Start typing - e.g., {example}"
+        data-placeholder-examples="penne,ravioli,fusilli,conchiglie,farfalle,gnocchi,macaroni"
+        data-rotate-interval="2500"
+      />
+    </form>
 
-      <form id="pasta-search-form" class="search" action="/" method="get" novalidate>
-        <label class="sr-only" for="pasta-q">Search by pasta name</label>
-        <input
-          id="pasta-q"
-          name="q"
-          class="search-input"
-          type="search"
-          inputmode="search"
-          autocomplete="off"
-          autocapitalize="none"
-          spellcheck="false"
-          placeholder="Start typing - e.g., penne"
-          data-rotator-group="homeHero"
-          data-placeholder-rotate="1"
-          data-placeholder-template="Start typing - e.g., {example}"
-          data-placeholder-examples="penne,ravioli,fusilli,conchiglie,farfalle,gnocchi,macaroni"
-          data-rotate-interval="2500"
-        />
-      </form>
+    {# Status text is used by scripts.js #}
+    <p id="pasta-search-status" class="search-status" role="status" aria-live="polite">
+      Start typing to see matches.
+    </p>
 
-      <p id="pasta-search-status" class="muted home-search-status" aria-live="polite">
-        Start typing to see matches.
+    {# -------------------------------------------------------------------------
+      IMPORTANT: No #pasta-search-suggestions list on homepage.
+      That is reserved for the dedicated typeahead search page.
+    -------------------------------------------------------------------------- #}
+
+    <section id="home-results-panel" class="home-results" hidden>
+      <p id="pasta-results-note" class="note" hidden>
+        Matches are prefix-based (e.g., “p” matches “penne”).
       </p>
+
+      <div class="table-wrap" role="region" aria-label="Search results">
+        <table id="pasta-results-table" class="data-table">
+          <thead>
+            <tr>
+              <th scope="col" class="data-table__thumb"> </th>
+
+              <th scope="col" class="data-table__name" data-sort="name" aria-sort="ascending">
+                Name
+              </th>
+
+              <th scope="col" class="cell-category" data-sort="category" aria-sort="none">
+                Category
+              </th>
+
+              <th scope="col" class="cell-synonyms">
+                Synonyms
+              </th>
+
+              <th scope="col" class="data-table__detail"> </th>
+            </tr>
+          </thead>
+
+          <tbody id="pasta-results-body">
+            {# Existing rows unchanged; ensure each row has:
+               - data-slug
+               - data-name
+               - data-category
+               - data-search (aliases/synonyms string) #}
+
+            {{ content | safe }}
+          </tbody>
+        </table>
+      </div>
+
+      <a id="pasta-toggle-all" class="btn btn--ghost" href="#" hidden>
+        Next 10
+      </a>
     </section>
+  </section>
 
-    <a
-      id="home-identify-card"
-      class="home-card home-card-link card stack"
-      href="/identify/"
-      aria-label="Identify by Shape - go to Identify page"
-    >
-      <header class="home-card-head">
-        <h2 class="h2 home-card-title">Identify by Shape</h2>
-      </header>
+  {# Identify card unchanged #}
+  <section id="home-identify-card" class="home-card card stack" aria-label="Identify by shape">
+    {{ identifyCardContent | safe }}
+  </section>
 
-      <div class="identify-hero" aria-hidden="true">
-        <img
-          id="identify-icon-rotator"
-          class="identify-icon"
-          src="{{ homeRotatorIconSrcs[0] }}"
-          alt=""
-          loading="lazy"
-          decoding="async"
-          width="96"
-          height="96"
-          data-rotator-group="homeHero"
-          data-rotate="1"
-          data-rotate-srcs="{{ homeRotatorIconSrcs | join(',') }}"
-          data-rotate-names="{{ homeRotatorNames | join(',') }}"
-          data-rotate-interval="2500"
-          data-rotate-fade="240"
-        />
-      </div>
-    </a>
-
-    <section
-      id="home-results-panel"
-      class="home-results card stack"
-      aria-label="Search results"
-      hidden
-    >
-      <ul id="pasta-search-suggestions" class="suggestions" aria-label="Suggestions"></ul>
-
-      {# =========================================================================
-        Standardized results table (matches All Pastas look)
-        - Table sorting is handled by JS
-        - Filtering/paging is handled by the Search JS (prefix matching)
-      ========================================================================= #}
-      <div class="table-wrap table-wrap--results">
-        <div class="table-scroll">
-          <table
-            id="pasta-results-table"
-            class="data-table data-table--results js-sortable-table"
-            aria-label="Pasta results table"
-          >
-            <colgroup>
-              <col class="col-thumb" />
-              <col class="col-name" />
-              <col class="col-category" />
-              <col class="col-synonyms" />
-            </colgroup>
-
-            <thead>
-              <tr>
-                {# Thumb is intentionally NOT sortable #}
-                <th scope="col" class="data-table__thumb">
-                  <span class="sr-only">Thumb</span>
-                </th>
-
-                {# Sortable: Name (default sort) #}
-                <th
-                  scope="col"
-                  class="data-table__sortable"
-                  data-sort="name"
-                  aria-sort="ascending"
-                  tabindex="0"
-                  role="button"
-                >
-                  Name <span class="sort-indicator" aria-hidden="true"></span>
-                </th>
-
-                {# Sortable: Category #}
-                <th
-                  scope="col"
-                  class="data-table__sortable"
-                  data-sort="category"
-                  aria-sort="none"
-                  tabindex="0"
-                  role="button"
-                >
-                  Category <span class="sort-indicator" aria-hidden="true"></span>
-                </th>
-
-                {# Synonyms is NOT sortable right now (we can add later if desired) #}
-                <th scope="col">Synonyms</th>
-              </tr>
-            </thead>
-
-            <tbody id="pasta-results-body">
-              {% for item in pasta %}
-
-                {# -----------------------------------------------------------------
-                  Consolidated synonyms/aliases surface.
-                  NOTE: Used for:
-                    - Table "Synonyms" display
-                    - Prefix matching tokens via data-search
-                ----------------------------------------------------------------- #}
-                {% set alsoRaw =
-                  item.SearchAliases
-                  or item.Aliases
-                  or item.Synonyms
-                  or item.Also
-                  or item.Misspellings
-                  or ""
-                %}
-
-                {# -----------------------------------------------------------------
-                  Category field:
-                  - Your CSV schema has varied over time; this gracefully supports
-                    multiple possible field names.
-                ----------------------------------------------------------------- #}
-                {% set categoryRaw =
-                  item.Category
-                  or item.Type
-                  or item.ShapeCategory
-                  or item.PastaCategory
-                  or ""
-                %}
-
-                {# -----------------------------------------------------------------
-                  Thumbnail selection logic (kept consistent with prior working versions)
-                ----------------------------------------------------------------- #}
-                {% set thumbRaw = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
-                {% set thumbIsUrl = thumbRaw and thumbRaw.startsWith("http") %}
-
-                {% set thumbClean = thumbRaw %}
-                {% if thumbClean %}
-                  {% set thumbClean = thumbClean | replace("https://ik.imagekit.io/mevius/pasta/thumbs/", "") %}
-                  {% set thumbClean = thumbClean | replace("https://ik.imagekit.io/mevius/", "") %}
-                  {% set thumbClean = thumbClean | replace("/pasta/thumbs/", "") %}
-                  {% set thumbClean = thumbClean | replace("pasta/thumbs/", "") %}
-                  {% set thumbClean = thumbClean | replace("/thumbs/", "") %}
-                  {% set thumbClean = thumbClean | replace("thumbs/", "") %}
-                {% endif %}
-
-                {% if not thumbRaw %}
-                  {% set thumbUrl = IK_THUMBS_BASE ~ FALLBACK_THUMB %}
-                {% elseif thumbIsUrl %}
-                  {% set thumbUrl = thumbRaw %}
-                {% else %}
-                  {% set thumbUrl = IK_THUMBS_BASE ~ thumbClean %}
-                {% endif %}
-
-                {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
-
-                <tr
-                  class="data-row"
-                  data-slug="{{ item.Slug }}"
-                  data-name="{{ item.ShapeName }}"
-                  data-category="{{ categoryRaw }}"
-                  data-search="{{ item.ShapeName }} {{ alsoRaw }}"
-                >
-                  <td class="data-table__thumb">
-                    <span class="thumb" aria-hidden="true">
-                      <img
-                        src="{{ thumbUrlTransformed }}"
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                      />
-                    </span>
-                  </td>
-
-                  <th scope="row" class="data-table__name">
-                    <a href="/pasta/{{ item.Slug }}/">{{ item.ShapeName }}</a>
-                  </th>
-
-                  <td class="cell-category">{{ categoryRaw }}</td>
-
-                  <td class="cell-synonyms">
-                    {% if alsoRaw %}
-                      {{ alsoRaw }}
-                    {% else %}
-                      <span class="synonyms--empty"> </span>
-                    {% endif %}
-                  </td>
-                </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="results-tools">
-        <p id="pasta-results-note" class="muted"></p>
-        <button id="pasta-toggle-all" class="btn secondary btn-small" type="button" hidden>
-          Next 10
-        </button>
-      </div>
-    </section>
-
-  </div>
 </section>
