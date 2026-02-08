@@ -12,23 +12,13 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   - Search filters the results table as the user types.
   - Identify card links to /identify/.
 
-  IMPORTANT
-  - Two JS layers may run on this page:
-      1) /src/js/scripts.js
-         - Filters table results (prefix matching)
-         - Handles sorting + paging
-         - Keeps Identify card visible
-      2) /src/js/pasta-search.js (optional include)
-         - Suggestions + exact match redirect + fuzzy fallback
-
-  STATUS LINES
-  - #pasta-search-status: owned by pasta-search.js (typeahead messaging)
-  - #pasta-search-count : owned by scripts.js (table filter counts)
-
-  IMAGEKIT
-  - Use the same ImageKit base path pattern as the rest of the site:
-      paths.imagekitBase (preferred)
-    with a safe fallback to your known ImageKit endpoint.
+  IMAGEKIT THUMBNAILS
+  - Thumbnails should resolve to:
+      https://ik.imagekit.io/mevius/pasta/thumbs/<ThumbnailImage>
+  - Your CSV provides the filename in the field:
+      ThumbnailImage
+  - If that field is missing for a row, we fall back (legacy fields), then to
+    pending.png so the build never breaks.
 ============================================================================= #}
 
 {# Preferred ImageKit base from your Eleventy global paths object #}
@@ -38,9 +28,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 {% set FALLBACK_THUMB = "pending.png" %}
 
 {# -----------------------------------------------------------------------------
-  Home rotator fallbacks
-  - If your build provides homeRotatorIconSrcs/homeRotatorNames, use them.
-  - Otherwise, use a safe set.
+  Home rotator fallbacks (build-safe)
 ----------------------------------------------------------------------------- #}
 {% set fallbackRotatorIconSrcs = [
   IK_CAROUSEL_BASE ~ "penne.png",
@@ -116,7 +104,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   </section>
 
   {# ===========================================================================
-    CARD 2 - IDENTIFY BY SHAPE (always visible and clickable)
+    CARD 2 - IDENTIFY BY SHAPE
   =========================================================================== #}
   <a
     id="home-identify-card"
@@ -157,7 +145,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
     aria-label="Search results"
     hidden
   >
-    {# Used by pasta-search.js for suggestions; harmless if empty #}
     <ul id="pasta-search-suggestions" class="suggestions" aria-label="Suggestions"></ul>
 
     <p id="pasta-results-note" class="note" hidden>
@@ -182,14 +169,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
             <tr>
               <th scope="col" class="data-table__thumb"></th>
 
-              {# -----------------------------------------------------------------
-                SORTABLE HEADER CONTROLS
-                - We render a button inside the th so:
-                    1) it’s an obvious tap/click target
-                    2) your existing CSS patterns for “sortable header” are more
-                       likely to apply
-                - scripts.js will listen for clicks on .js-sort
-              ------------------------------------------------------------------ #}
               <th scope="col" class="data-table__name" data-sort="name" aria-sort="ascending">
                 <button type="button" class="sort-btn js-sort" data-sort="name">
                   Name
@@ -215,12 +194,20 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
               {% set categoryRaw = (item.Category or "") %}
 
               {# -----------------------------------------------------------------
-                THUMBNAIL SOURCE LOGIC
-                - Many of your CSV rows store just a filename (e.g. bucatini.png)
-                - Some might store a full URL (rare, but safe to support)
-                - We build the final URL accordingly
+                THUMBNAIL SOURCE LOGIC (FIXED)
+                - PRIMARY (your intended field): item.ThumbnailImage
+                - FALLBACKS (legacy): ThumbImage / ThumbFile / ImageFile
+                - FINAL fallback: pending.png
               ------------------------------------------------------------------ #}
-              {% set thumbFile = (item.ThumbFile or item.ImageFile or FALLBACK_THUMB) %}
+              {% set thumbFile =
+                (item.ThumbnailImage
+                  or item.ThumbImage
+                  or item.ThumbFile
+                  or item.ImageFile
+                  or FALLBACK_THUMB)
+              %}
+
+              {# Allow full URLs if ever present; otherwise build from thumbs base #}
               {% set thumbIsUrl = (thumbFile and (thumbFile | lower | slice(0, 4) == "http")) %}
               {% set thumbUrl = thumbFile if thumbIsUrl else (IK_THUMBS_BASE ~ thumbFile) %}
               {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
