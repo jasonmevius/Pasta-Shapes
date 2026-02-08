@@ -5,18 +5,29 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 ---
 
 {# =============================================================================
-  index.njk (Homepage)
+  /src/index.njk (Homepage)
   ------------------------------------------------------------------------------
   PURPOSE
   - Homepage with two primary actions:
       1) Search by Name (live filtering of the results table)
-      2) Identify by Shape (guided questions)
-  - Search behavior on the homepage is *NOT* typeahead suggestions.
-    It is table filtering driven by /src/js/scripts.js.
+      2) Identify by Shape (link to Identify flow)
 
-  IMPORTANT
-  - We intentionally do NOT include the typeahead suggestions list on the
-    homepage, so /src/js/pasta-search.js will not initialize here.
+  IMPORTANT BEHAVIOR NOTES
+  - This homepage supports TWO parallel search UX layers:
+      A) Table filtering (fast prefix matching) - implemented in /src/js/scripts.js
+      B) Typeahead suggestions + redirect/fuzzy fallback - implemented in
+         /src/js/pasta-search.js (if included on the page)
+
+  - To prevent the two scripts from clobbering each other's status text,
+    we provide TWO separate status elements:
+      - #pasta-search-status (typeahead messaging - owned by pasta-search.js)
+      - #pasta-search-count  (table-filter count - owned by scripts.js)
+
+  TEMPLATE NOTES
+  - This file expects "pasta" data to be available (CSV-driven collection)
+  - It expects rotator arrays:
+      - homeRotatorIconSrcs
+      - homeRotatorNames
 ============================================================================= #}
 
 {% set IK_BASE = "https://ik.imagekit.io/mevius" %}
@@ -25,17 +36,26 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 
 <section class="home-panels">
 
+  {# ===========================================================================
+    CARD 1 - SEARCH BY NAME
+    - Includes:
+        - Input (#pasta-q)
+        - Status lines (#pasta-search-status, #pasta-search-count)
+    - Table results live in the Results Panel below (initially hidden)
+  =========================================================================== #}
   <section id="home-search-card" class="home-card card stack" aria-label="Search by name">
     <header class="home-card-head">
       <h1 class="h2 home-card-title">Search by Name</h1>
     </header>
 
     {# -------------------------------------------------------------------------
-      NOTE: Form id intentionally NOT "pasta-search-form".
-      The homepage uses scripts.js for table filtering, not pasta-search.js.
+      NOTE
+      - pasta-search.js expects this form id and input id.
+      - scripts.js only needs the input id.
     -------------------------------------------------------------------------- #}
-    <form id="home-search-form" class="search" action="/" method="get" novalidate>
+    <form id="pasta-search-form" class="search" action="/" method="get" novalidate>
       <label class="sr-only" for="pasta-q">Search by pasta name</label>
+
       <input
         id="pasta-q"
         name="q"
@@ -46,6 +66,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         autocapitalize="none"
         spellcheck="false"
         placeholder="Start typing - e.g., penne"
+        {# Rotator hooks - scripts.js can rotate placeholder and icon together #}
         data-rotator-group="homeHero"
         data-placeholder-rotate="1"
         data-placeholder-template="Start typing - e.g., {example}"
@@ -54,27 +75,98 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       />
     </form>
 
-    {# Status text is used by scripts.js #}
-    <p id="pasta-search-status" class="search-status" role="status" aria-live="polite">
+    {# ---------------------------------------------------------------------------
+      SEARCH STATUS LINES (IMPORTANT)
+      - #pasta-search-status: owned by pasta-search.js (typeahead messages like
+        "Match", "Suggestions", "Did you mean", etc.)
+      - #pasta-search-count: owned by /src/js/scripts.js (table-filter counts like
+        "12 matches" + paging hints)
+      Keeping these separate prevents the two scripts from overwriting each other.
+    --------------------------------------------------------------------------- #}
+    <p id="pasta-search-status" class="muted home-search-status" aria-live="polite"></p>
+
+    <p id="pasta-search-count" class="muted home-search-count" aria-live="polite">
       Start typing to see matches.
     </p>
+  </section>
 
-    {# -------------------------------------------------------------------------
-      IMPORTANT: No #pasta-search-suggestions list on homepage.
-      That is reserved for the dedicated typeahead search page.
-    -------------------------------------------------------------------------- #}
+  {# ===========================================================================
+    CARD 2 - IDENTIFY BY SHAPE
+    - IMPORTANT: This must remain visible/clickable at all times.
+    - scripts.js previously set aria-hidden while searching; we removed that
+      behavior in the scripts.js replacement.
+  =========================================================================== #}
+  <a
+    id="home-identify-card"
+    class="home-card home-card-link card stack"
+    href="/identify/"
+    aria-label="Identify by Shape - go to Identify page"
+  >
+    <header class="home-card-head">
+      <h2 class="h2 home-card-title">Identify by Shape</h2>
+    </header>
 
-    <section id="home-results-panel" class="home-results" hidden>
-      <p id="pasta-results-note" class="note" hidden>
-        Matches are prefix-based (e.g., “p” matches “penne”).
-      </p>
+    <div class="identify-hero" aria-hidden="true">
+      <img
+        id="identify-icon-rotator"
+        class="identify-icon"
+        src="{{ homeRotatorIconSrcs[0] }}"
+        alt=""
+        loading="lazy"
+        decoding="async"
+        width="96"
+        height="96"
+        data-rotator-group="homeHero"
+        data-rotate="1"
+        data-rotate-srcs="{{ homeRotatorIconSrcs | join(',') }}"
+        data-rotate-names="{{ homeRotatorNames | join(',') }}"
+        data-rotate-interval="2500"
+        data-rotate-fade="240"
+      />
+    </div>
+  </a>
 
-      <div class="table-wrap" role="region" aria-label="Search results">
-        <table id="pasta-results-table" class="data-table">
+  {# ===========================================================================
+    RESULTS PANEL
+    - Hidden by default; scripts.js reveals it when the query is non-empty.
+    - Contains:
+        - Suggestions list (used by pasta-search.js)
+        - Standard results table (rendered by Nunjucks, filtered by scripts.js)
+  =========================================================================== #}
+  <section
+    id="home-results-panel"
+    class="home-results card stack"
+    aria-label="Search results"
+    hidden
+  >
+    {# Used by pasta-search.js for typeahead suggestions. If pasta-search.js is
+       not loaded, this list simply stays empty and harmless. #}
+    <ul id="pasta-search-suggestions" class="suggestions" aria-label="Suggestions"></ul>
+
+    {# Optional note area (scripts.js may toggle this) #}
+    <p id="pasta-results-note" class="note" hidden>
+      Matches are prefix-based (e.g., “p” matches “penne”).
+    </p>
+
+    <div class="table-wrap table-wrap--results">
+      <div class="table-scroll">
+        <table
+          id="pasta-results-table"
+          class="data-table data-table--results js-sortable-table"
+          aria-label="Pasta results table"
+        >
+          <colgroup>
+            <col class="col-thumb" />
+            <col class="col-name" />
+            <col class="col-category" />
+            <col class="col-synonyms" />
+          </colgroup>
+
           <thead>
             <tr>
-              <th scope="col" class="data-table__thumb"> </th>
+              <th scope="col" class="data-table__thumb"></th>
 
+              {# Sortable headers - scripts.js reads aria-sort to determine sort #}
               <th scope="col" class="data-table__name" data-sort="name" aria-sort="ascending">
                 Name
               </th>
@@ -86,32 +178,71 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
               <th scope="col" class="cell-synonyms">
                 Synonyms
               </th>
-
-              <th scope="col" class="data-table__detail"> </th>
             </tr>
           </thead>
 
           <tbody id="pasta-results-body">
-            {# Existing rows unchanged; ensure each row has:
-               - data-slug
-               - data-name
-               - data-category
-               - data-search (aliases/synonyms string) #}
+            {% for item in pasta %}
 
-            {{ content | safe }}
+              {# -----------------------------------------------------------------
+                SYNONYMS / ALIASES
+                - Displayed in the "Synonyms" column
+                - Also used for prefix-match tokens via data-search
+                - Keep this string broad - scripts.js will normalize/split tokens
+              ------------------------------------------------------------------ #}
+              {% set alsoRaw = (item.Synonyms or item.SearchAliases or "") %}
+              {% set categoryRaw = (item.Category or "") %}
+
+              {# Thumbnail logic - matches your ImageKit usage pattern #}
+              {% set thumbFile = (item.ThumbFile or item.ImageFile or FALLBACK_THUMB) %}
+              {% set thumbUrl = IK_THUMBS_BASE ~ thumbFile %}
+              {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
+
+              <tr
+                class="data-row"
+                data-slug="{{ item.Slug }}"
+                data-name="{{ item.ShapeName }}"
+                data-category="{{ categoryRaw }}"
+                data-search="{{ item.ShapeName }} {{ alsoRaw }}"
+              >
+                <td class="data-table__thumb">
+                  <span class="thumb" aria-hidden="true">
+                    <img
+                      src="{{ thumbUrlTransformed }}"
+                      alt=""
+                      loading="lazy"
+                      decoding="async"
+                      width="56"
+                      height="56"
+                    />
+                  </span>
+                </td>
+
+                <th scope="row" class="data-table__name">
+                  <a href="/pasta/{{ item.Slug }}/">{{ item.ShapeName }}</a>
+                </th>
+
+                <td class="cell-category">{{ categoryRaw }}</td>
+
+                <td class="cell-synonyms">
+                  {% if alsoRaw %}
+                    {{ alsoRaw }}
+                  {% else %}
+                    <span class="muted">-</span>
+                  {% endif %}
+                </td>
+              </tr>
+
+            {% endfor %}
           </tbody>
         </table>
       </div>
+    </div>
 
-      <a id="pasta-toggle-all" class="btn btn--ghost" href="#" hidden>
-        Next 10
-      </a>
-    </section>
-  </section>
-
-  {# Identify card unchanged #}
-  <section id="home-identify-card" class="home-card card stack" aria-label="Identify by shape">
-    {{ identifyCardContent | safe }}
+    {# Paging button - scripts.js reveals and updates this as needed #}
+    <a id="pasta-toggle-all" class="btn btn--ghost" href="#" hidden>
+      Next 10
+    </a>
   </section>
 
 </section>
