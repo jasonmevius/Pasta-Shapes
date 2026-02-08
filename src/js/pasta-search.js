@@ -2,41 +2,78 @@
 // ============================================================================
 // Pasta name "typeahead" search (suggestions + exact-match redirect).
 //
-// This script ONLY runs if it finds the typeahead DOM elements:
-// - #pasta-search-form
-// - #pasta-q
-// - #pasta-search-status
-// - #pasta-search-suggestions
+// IMPORTANT
+// - This script is intentionally scoped to the dedicated search page.
+// - The homepage uses /src/js/scripts.js for table filtering.
+// - Guarding by pathname prevents two different search systems from
+//   competing for the same DOM on the homepage.
 //
-// IMPORTANT CONSTRAINTS
+// Runs only if:
+// - location.pathname starts with "/search"  (adjust if your route differs)
+// - AND required DOM elements exist.
+//
+// Styling constraint:
 // - Do NOT use inline styles here. All styling lives in /src/css/styles.css.
-//
-// HOW IT WORKS
-// - Loads /api/pasta-index.json (cached).
-// - Attempts an exact match (including synonyms / aliases).
-// - If no exact match, shows suggestions.
-// - If still none, falls back to fuzzy "did you mean" suggestions.
 // ============================================================================
 (function () {
+  // --------------------------------------------------------------------------
+  // HARD GUARD: only run on the dedicated search page
+  // --------------------------------------------------------------------------
+  const path = window.location.pathname || "/";
+  if (!path.startsWith("/search")) return;
+
   const form = document.getElementById("pasta-search-form");
   const input = document.getElementById("pasta-q");
   const status = document.getElementById("pasta-search-status");
   const list = document.getElementById("pasta-search-suggestions");
 
-  // If the page doesn't have these elements, this script does nothing.
+  // If the page doesn't have these elements, do nothing.
   if (!form || !input || !status || !list) return;
 
-  // Common Italian connector words that appear in menu names.
-  // Used only for a safe, secondary exact-match attempt (unique slug only).
+  // Common Italian connector words that appear in many pasta dish names.
   const STOPWORDS = new Set([
-    "a","ad","al","alla","alle","allo","ai","agli","all",
-    "da","de","dei","degli","della","delle","del","di",
-    "e","ed","in","con","per","su","lo","la","le","il",
-    "un","una","uno",
+    "alla",
+    "alle",
+    "allo",
+    "al",
+    "ai",
+    "con",
+    "di",
+    "del",
+    "della",
+    "delle",
+    "dei",
+    "da",
+    "in",
+    "e",
+    "ed",
+    "a",
+    "ad",
+    "la",
+    "le",
+    "lo",
+    "il",
+    "i",
+    "gli",
+    "un",
+    "una",
+    "uno",
   ]);
 
   // --------------------------------------------------------------------------
-  // Normalization helpers
+  // State & caches
+  // --------------------------------------------------------------------------
+  let indexCache = null;
+
+  // Lookup structures (built once after index loads)
+  let slugToEntry = null;
+  let aliasList = null;
+  let aliasKeys = null;
+  let aliasKeyToDisplay = null;
+  let stopKeyToSlugs = null;
+
+  // --------------------------------------------------------------------------
+  // Normalization helpers (keep consistent with scripts.js)
   // --------------------------------------------------------------------------
   function normalize(s) {
     return (s || "")
@@ -73,7 +110,7 @@
   }
 
   // --------------------------------------------------------------------------
-  // Small DOM helpers (no inline CSS)
+  // DOM helpers (no inline CSS)
   // --------------------------------------------------------------------------
   function clearSuggestions() {
     list.innerHTML = "";
@@ -84,24 +121,30 @@
   }
 
   function setMatchStatus(match) {
+    // Keeps markup minimal; styling via CSS.
     status.innerHTML = "";
     const span = document.createElement("span");
-    span.append("Match: ");
+    span.className = "search-match";
+    span.textContent = `Match: ${match.name}`;
+    status.appendChild(span);
+
     const a = document.createElement("a");
     a.href = match.url;
-    a.textContent = match.name;
-    span.appendChild(a);
-    status.appendChild(span);
+    a.className = "search-match-link";
+    a.textContent = "View";
+    status.appendChild(document.createTextNode(" "));
+    status.appendChild(a);
   }
 
-  function formatLabel(entryName, aliasDisplay) {
-    const n1 = normalize(entryName);
-    const n2 = normalize(aliasDisplay);
-    if (!aliasDisplay || !n2 || n1 === n2) return entryName;
-    return `${entryName} (commonly known as: ${aliasDisplay})`;
+  function formatLabel(name, aliasDisplay) {
+    // Example: "Spaghetti alla Chitarra (aka Chitarra)"
+    if (!aliasDisplay) return name;
+    const normName = normalize(name);
+    const normAlias = normalize(aliasDisplay);
+    if (!normAlias || normAlias === normName) return name;
+    return `${name} (aka ${aliasDisplay})`;
   }
 
-  // Renders suggestions using semantic markup + CSS classes only.
   function renderSuggestions(items) {
     clearSuggestions();
 
@@ -125,131 +168,58 @@
   }
 
   // --------------------------------------------------------------------------
-  // Levenshtein (bounded) for fuzzy "did you mean"
+  // Index loading + lookup structure builder
   // --------------------------------------------------------------------------
-  function levenshtein(a, b, maxDist) {
-    if (a === b) return 0;
-    if (!a || !b) return Math.max(a.length, b.length);
-
-    const al = a.length;
-    const bl = b.length;
-
-    // Early exit: too different in length.
-    if (Math.abs(al - bl) > maxDist) return maxDist + 1;
-
-    let prev = new Array(bl + 1);
-    let cur = new Array(bl + 1);
-
-    for (let j = 0; j <= bl; j++) prev[j] = j;
-
-    for (let i = 1; i <= al; i++) {
-      cur[0] = i;
-
-      let rowMin = cur[0];
-      const ai = a.charCodeAt(i - 1);
-
-      for (let j = 1; j <= bl; j++) {
-        const cost = ai === b.charCodeAt(j - 1) ? 0 : 1;
-        const val = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
-        cur[j] = val;
-        if (val < rowMin) rowMin = val;
-      }
-
-      if (rowMin > maxDist) return maxDist + 1;
-
-      const tmp = prev;
-      prev = cur;
-      cur = tmp;
-    }
-
-    return prev[bl];
-  }
-
-  function computeDidYouMean(queryKey, aliasKeys, limit = 5) {
-    if (!queryKey || queryKey.length < 3) return [];
-
-    // Bounded distance - scales gently with query length.
-    const maxDist = Math.min(4, Math.floor(queryKey.length / 6) + 1);
-
-    const scored = [];
-    for (const k of aliasKeys) {
-      const d = levenshtein(queryKey, k, maxDist);
-      if (d <= maxDist) scored.push({ k, d });
-    }
-
-    scored.sort((a, b) => a.d - b.d || a.k.length - b.k.length);
-    return scored.slice(0, limit).map((s) => s.k);
-  }
-
-  // --------------------------------------------------------------------------
-  // Index structures (built once)
-  // --------------------------------------------------------------------------
-  let indexCache = null;
-
-  // Built once per page-load
-  let slugToEntry = null;
-
-  // aliasList holds all aliases (including canonical names), normalized
-  // { key, slug, url, aliasDisplay }
-  let aliasList = null;
-  let aliasKeys = null;
-
-  // Map normalized alias -> human display string (best effort)
-  let aliasKeyToDisplay = null;
-
-  // Stopword-stripped alias key -> Set of slugs that match it
-  // Used only for safe secondary exact match (unique slug only).
-  let stopKeyToSlugs = null;
-
   function buildLookupStructures(idx) {
-    if (slugToEntry && aliasList && aliasKeys && aliasKeyToDisplay && stopKeyToSlugs) return;
-
     slugToEntry = new Map();
-    for (const e of idx.entries || []) slugToEntry.set(e.slug, e);
-
+    aliasList = [];
+    aliasKeys = [];
     aliasKeyToDisplay = new Map();
     stopKeyToSlugs = new Map();
 
-    // Seed display map with canonical names, synonyms, and searchAliases
-    for (const e of idx.entries || []) {
-      const nameKey = normalize(e.name);
-      if (nameKey && !aliasKeyToDisplay.has(nameKey)) aliasKeyToDisplay.set(nameKey, e.name);
+    // Expected shape of pasta-index.json:
+    // { items: [{ slug, name, url, description, aliases, searchAliases, synonyms, ... }], aliasToSlug: { "key": "slug" } }
+    const items = Array.isArray(idx.items) ? idx.items : [];
 
-      for (const syn of toArray(e.synonyms)) {
-        const synKey = normalize(syn);
-        if (synKey && !aliasKeyToDisplay.has(synKey)) aliasKeyToDisplay.set(synKey, syn);
-      }
+    for (const it of items) {
+      if (!it || !it.slug) continue;
 
-      for (const a of toArray(e.searchAliases || e.search_aliases || e.aliases)) {
-        const aKey = normalize(a);
-        if (aKey && !aliasKeyToDisplay.has(aKey)) aliasKeyToDisplay.set(aKey, a);
-      }
-    }
+      const entry = {
+        slug: it.slug,
+        name: it.name || it.slug,
+        url: it.url || `/pasta/${it.slug}/`,
+        description: it.description || "",
+      };
+      slugToEntry.set(it.slug, entry);
 
-    aliasList = [];
-    aliasKeys = [];
+      // Build alias candidates
+      const aliases = [
+        entry.name,
+        ...toArray(it.aliases),
+        ...toArray(it.searchAliases),
+        ...toArray(it.synonyms),
+      ];
 
-    const seen = new Set();
-    const aliasToSlug = idx.aliasToSlug || {};
+      for (const a of aliases) {
+        const key = normalize(a);
+        if (!key) continue;
 
-    for (const [aliasKey, slug] of Object.entries(aliasToSlug)) {
-      const entry = slugToEntry.get(slug);
-      const url = entry?.url || `/pasta/${slug}/`;
+        aliasList.push({
+          key,
+          aliasDisplay: a,
+          slug: it.slug,
+          url: entry.url,
+        });
 
-      const dedupeKey = `${aliasKey}::${slug}`;
-      if (seen.has(dedupeKey)) continue;
-      seen.add(dedupeKey);
+        aliasKeys.push(key);
+        if (!aliasKeyToDisplay.has(key)) aliasKeyToDisplay.set(key, a);
 
-      const aliasDisplay = aliasKeyToDisplay.get(aliasKey) || aliasKey;
-
-      aliasList.push({ key: aliasKey, slug, url, aliasDisplay });
-      aliasKeys.push(aliasKey);
-
-      // Stopword-stripped lookup
-      const stopKey = stripStopwords(aliasKey);
-      if (stopKey) {
-        if (!stopKeyToSlugs.has(stopKey)) stopKeyToSlugs.set(stopKey, new Set());
-        stopKeyToSlugs.get(stopKey).add(slug);
+        // Stopword-stripped mapping (safe fallback only when unique)
+        const stopKey = stripStopwords(key);
+        if (stopKey) {
+          if (!stopKeyToSlugs.has(stopKey)) stopKeyToSlugs.set(stopKey, new Set());
+          stopKeyToSlugs.get(stopKey).add(it.slug);
+        }
       }
     }
   }
@@ -271,6 +241,9 @@
     }
   }
 
+  // --------------------------------------------------------------------------
+  // Exact match + suggestions + fuzzy fallback
+  // --------------------------------------------------------------------------
   function findExactMatch(idx, query) {
     const key = normalize(query);
     if (!key) return null;
@@ -333,6 +306,59 @@
     return out;
   }
 
+  // Bounded Levenshtein distance
+  function levenshtein(a, b, maxDist) {
+    if (a === b) return 0;
+    if (!a || !b) return Math.max(a.length, b.length);
+
+    const al = a.length;
+    const bl = b.length;
+
+    if (Math.abs(al - bl) > maxDist) return maxDist + 1;
+
+    let prev = new Array(bl + 1);
+    let cur = new Array(bl + 1);
+
+    for (let j = 0; j <= bl; j++) prev[j] = j;
+
+    for (let i = 1; i <= al; i++) {
+      cur[0] = i;
+
+      let rowMin = cur[0];
+      const ai = a.charCodeAt(i - 1);
+
+      for (let j = 1; j <= bl; j++) {
+        const cost = ai === b.charCodeAt(j - 1) ? 0 : 1;
+        const val = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+        cur[j] = val;
+        if (val < rowMin) rowMin = val;
+      }
+
+      if (rowMin > maxDist) return maxDist + 1;
+
+      const tmp = prev;
+      prev = cur;
+      cur = tmp;
+    }
+
+    return prev[bl];
+  }
+
+  function computeDidYouMean(queryKey, keys, limit = 5) {
+    if (!queryKey || queryKey.length < 3) return [];
+
+    const maxDist = Math.min(4, Math.floor(queryKey.length / 6) + 1);
+
+    const scored = [];
+    for (const k of keys) {
+      const d = levenshtein(queryKey, k, maxDist);
+      if (d <= maxDist) scored.push({ k, d });
+    }
+
+    scored.sort((a, b) => a.d - b.d || a.k.localeCompare(b.k));
+    return scored.slice(0, limit).map((x) => x.k);
+  }
+
   function didYouMeanSuggestions(query, limit = 5) {
     const qKey = normalize(query);
     const keys = computeDidYouMean(qKey, aliasKeys || [], limit);
@@ -384,7 +410,7 @@
       return { match, suggestions: [], redirected: false };
     }
 
-    // 2) Suggestions (prefix/includes)
+    // 2) Suggestions (prefix first, then includes)
     const s1 = suggestFromAliases(raw, 10);
     if (s1.length) {
       setStatusText("No exact match. Suggestions:");
