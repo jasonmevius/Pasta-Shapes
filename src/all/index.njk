@@ -11,11 +11,11 @@ permalink: /all/
   - Browse all pasta shapes in a readable table.
   - Remove redundant "Detail" column (Name is already linked).
   - Add "Synonyms" column for alternate names.
+  - Keep sortable headers (Name + Category).
 
   IMPORTANT
-  - Avoids the Nunjucks "split" filter.
-  - Uses an inner horizontal scroll wrapper to keep layout stable.
-  - Table header (<thead>) removed per request to eliminate blank top row.
+  - Avoids Nunjucks "split" filter.
+  - Uses an inner horizontal scroll wrapper for stable layout.
 ============================================================================= #}
 
 {% set imagekitBase = "https://ik.imagekit.io/mevius" %}
@@ -61,9 +61,7 @@ permalink: /all/
 <section class="table-wrap" aria-label="All pasta shapes table">
   <div class="table-scroll" role="region" aria-label="Scrollable table (horizontal)">
     <table id="allPastaTable" class="data-table data-table--all">
-      <caption class="sr-only">
-        All pasta shapes. Columns include thumbnail, name, category, and synonyms.
-      </caption>
+      <caption class="sr-only">All pasta shapes with sortable columns</caption>
 
       <colgroup>
         <col class="col-thumb" />
@@ -71,6 +69,33 @@ permalink: /all/
         <col class="col-category" />
         <col class="col-synonyms" />
       </colgroup>
+
+      <thead>
+        <tr>
+          {# Keep structure; no visible "Thumb" label #}
+          <th scope="col" class="data-table__thumb">
+            <span class="sr-only">Thumbnail</span>
+          </th>
+
+          <th scope="col"
+              class="data-table__sortable data-table__left"
+              data-sort-key="name"
+              aria-sort="ascending">
+            Name <span class="sort-indicator" aria-hidden="true"></span>
+          </th>
+
+          <th scope="col"
+              class="data-table__sortable data-table__left"
+              data-sort-key="category"
+              aria-sort="none">
+            Category <span class="sort-indicator" aria-hidden="true"></span>
+          </th>
+
+          <th scope="col" class="data-table__left">
+            Synonyms <span class="sr-only">(also known as)</span>
+          </th>
+        </tr>
+      </thead>
 
       <tbody>
         {% for item in pasta %}
