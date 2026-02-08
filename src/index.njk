@@ -12,13 +12,15 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   - Search filters the results table as the user types.
   - Identify card links to /identify/.
 
+  STATUS LINES
+  - #pasta-search-status: owned by pasta-search.js (typeahead messaging)
+  - #pasta-search-count : owned by scripts.js (table filter counts)
+
   IMAGEKIT THUMBNAILS
-  - Thumbnails should resolve to:
+  - Thumbnails resolve to:
       https://ik.imagekit.io/mevius/pasta/thumbs/<ThumbnailImage>
-  - Your CSV provides the filename in the field:
+  - CSV field is:
       ThumbnailImage
-  - If that field is missing for a row, we fall back (legacy fields), then to
-    pending.png so the build never breaks.
 ============================================================================= #}
 
 {# Preferred ImageKit base from your Eleventy global paths object #}
@@ -169,16 +171,13 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
             <tr>
               <th scope="col" class="data-table__thumb"></th>
 
+              {# Sort headers - styled to look like normal header text via CSS #}
               <th scope="col" class="data-table__name" data-sort="name" aria-sort="ascending">
-                <button type="button" class="sort-btn js-sort" data-sort="name">
-                  Name
-                </button>
+                <button type="button" class="sort-link js-sort" data-sort="name">Name</button>
               </th>
 
               <th scope="col" class="cell-category" data-sort="category" aria-sort="none">
-                <button type="button" class="sort-btn js-sort" data-sort="category">
-                  Category
-                </button>
+                <button type="button" class="sort-link js-sort" data-sort="category">Category</button>
               </th>
 
               <th scope="col" class="cell-synonyms">
@@ -193,12 +192,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
               {% set alsoRaw = (item.Synonyms or item.SearchAliases or "") %}
               {% set categoryRaw = (item.Category or "") %}
 
-              {# -----------------------------------------------------------------
-                THUMBNAIL SOURCE LOGIC (FIXED)
-                - PRIMARY (your intended field): item.ThumbnailImage
-                - FALLBACKS (legacy): ThumbImage / ThumbFile / ImageFile
-                - FINAL fallback: pending.png
-              ------------------------------------------------------------------ #}
+              {# FIX: Use ThumbnailImage (your primary field) #}
               {% set thumbFile =
                 (item.ThumbnailImage
                   or item.ThumbImage
@@ -207,7 +201,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
                   or FALLBACK_THUMB)
               %}
 
-              {# Allow full URLs if ever present; otherwise build from thumbs base #}
               {% set thumbIsUrl = (thumbFile and (thumbFile | lower | slice(0, 4) == "http")) %}
               {% set thumbUrl = thumbFile if thumbIsUrl else (IK_THUMBS_BASE ~ thumbFile) %}
               {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
