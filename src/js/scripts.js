@@ -8,11 +8,10 @@
   //   - Homepage linked rotators (placeholder + icon)
   //   - Homepage search: prefix filtering + sort + paging
   //
-  // IMPORTANT
-  // - This homepage may also load /src/js/pasta-search.js (typeahead suggestions).
-  // - To avoid both scripts overwriting the same status line:
-  //     - pasta-search.js uses #pasta-search-status
-  //     - this file uses #pasta-search-count (fallback to status if missing)
+  // SEARCH TUNING (IMPORTANT)
+  // - For 1-character queries, match only pasta names (reduces noise).
+  // - For 2+ characters, allow synonym token prefix matches, but remove generic
+  //   tokens like "pasta" so phrases like "alphabet pasta" don't match "p".
   //
   // STYLE RULE
   // - All CSS must live in styles.css (no inline styles here).
@@ -70,7 +69,6 @@
       .map((s) => String(s || "").trim())
       .filter(Boolean);
 
-    // Keep arrays aligned by smallest length
     const n = Math.min(examples.length, srcs.length, names.length);
     if (n <= 0) return;
 
@@ -112,17 +110,25 @@
     const PAGE_N = 10;
     let visibleLimit = PAGE_N;
 
-    // Default sort state; also read from aria-sort on headers if present.
     let sortKey = "name";
     let sortDir = "ascending";
+
+    // Tokens we should not allow synonyms matching to trigger on.
+    // This prevents "alphabet pasta" from matching "p" via the word "pasta".
+    const STOP_TOKENS = new Set([
+      "pasta",
+      "noodle",
+      "noodles",
+      "shape",
+      "shapes",
+      "small",
+      "large",
+    ]);
 
     function setSearchingUI(isSearching) {
       document.body.classList.toggle("is-searching", isSearching);
       if (resultsPanel) resultsPanel.hidden = !isSearching;
-
-      // IMPORTANT:
-      // Do NOT hide the Identify card while searching.
-      // The Identify link must remain visible/clickable at all times.
+      // IMPORTANT: do NOT hide Identify card while searching.
     }
 
     function setControlVisible(el, isVisible) {
@@ -131,7 +137,6 @@
       el.setAttribute("aria-hidden", isVisible ? "false" : "true");
     }
 
-    // Normalization helpers
     function normalize(s) {
       return String(s || "")
         .toLowerCase()
@@ -144,20 +149,22 @@
         .trim();
     }
 
-    // Treat "p e n n e" like "penne"
     function maybeUnspaceLetters(q) {
       const t = String(q || "").trim();
       if (/^([a-z]\s+){2,}[a-z]$/i.test(t)) return t.replace(/\s+/g, "");
       return t;
     }
 
-    function tokenize(s) {
+    function tokenizeSearchText(s) {
       const n = normalize(s);
       if (!n) return [];
-      return n.split(" ").map((x) => x.trim()).filter(Boolean);
+      return n
+        .split(" ")
+        .map((x) => x.trim())
+        .filter(Boolean)
+        .filter((t) => !STOP_TOKENS.has(t));
     }
 
-    // Cache initial rows (DOM -> data objects)
     const rows = Array.from(tbody.querySelectorAll("tr.data-row")).map((tr) => {
       const name = tr.getAttribute("data-name") || "";
       const category = tr.getAttribute("data-category") || "";
@@ -169,7 +176,7 @@
         category,
         nameN: normalize(name),
         categoryN: normalize(category),
-        tokens: tokenize(search),
+        tokens: tokenizeSearchText(search),
       };
     });
 
@@ -191,8 +198,7 @@
       const ths = Array.from(table.querySelectorAll("th[data-sort]"));
       ths.forEach((th) => {
         const k = th.getAttribute("data-sort");
-        if (k === nextKey) th.setAttribute("aria-sort", nextDir);
-        else th.setAttribute("aria-sort", "none");
+        th.setAttribute("aria-sort", k === nextKey ? nextDir : "none");
       });
     }
 
@@ -205,7 +211,6 @@
         return a.nameN.localeCompare(b.nameN) * dir;
       }
 
-      // Default: name sort
       return a.nameN.localeCompare(b.nameN) * dir;
     }
 
@@ -239,9 +244,15 @@
         return;
       }
 
-      // Prefix match: name startsWith OR any token startsWith
+      // TUNING:
+      // - 1 character: match ONLY by name prefix.
+      // - 2+ characters: allow synonym token prefix matching (minus STOP_TOKENS).
+      const allowSynonyms = q.length >= 2;
+
       const matches = rows.filter((r) => {
         if (r.nameN.startsWith(q)) return true;
+        if (!allowSynonyms) return false;
+
         for (const t of r.tokens) {
           if (t.startsWith(q)) return true;
         }
@@ -252,7 +263,6 @@
       render(matches);
     }
 
-    // Paging
     if (nextBtn) {
       nextBtn.addEventListener("click", (e) => {
         e.preventDefault();
@@ -261,19 +271,17 @@
       });
     }
 
-    // Sorting - event delegation on header buttons/controls
+    // Sorting - click delegation on header controls
     table.addEventListener("click", (e) => {
       const btn = e.target.closest(".js-sort");
       if (!btn) return;
 
-      // Supports either data-sort on button or its parent th
       const key =
         btn.getAttribute("data-sort") ||
         btn.closest("th")?.getAttribute("data-sort") ||
         "";
       if (!key) return;
 
-      // Determine next direction
       const th = btn.closest("th");
       const current = th?.getAttribute("aria-sort") || "none";
       const nextDir = current === "ascending" ? "descending" : "ascending";
@@ -282,18 +290,15 @@
       sortDir = nextDir;
       setHeaderSortState(sortKey, sortDir);
 
-      // Reset paging on sort for a predictable UX
       visibleLimit = PAGE_N;
       filterAndRender();
     });
 
-    // Input filtering
     input.addEventListener("input", () => {
       visibleLimit = PAGE_N;
       filterAndRender();
     });
 
-    // Support /?q=... deep links
     (function handleQueryParamOnLoad() {
       const params = new URLSearchParams(window.location.search);
       const q = params.get("q");
@@ -306,7 +311,6 @@
       filterAndRender();
     })();
 
-    // Init
     readSortStateFromHeaders();
     filterAndRender();
   }
