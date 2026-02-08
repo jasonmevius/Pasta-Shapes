@@ -10,7 +10,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   PURPOSE
   - Homepage is the Search page.
   - Search filters the results table as the user types.
-  - Identify card links to /identify/.
+  - Identify card links to /identify/ (must remain visible while searching).
 
   STATUS LINES
   - #pasta-search-status: owned by pasta-search.js (typeahead messaging)
@@ -106,7 +106,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   </section>
 
   {# ===========================================================================
-    CARD 2 - IDENTIFY BY SHAPE
+    CARD 2 - IDENTIFY BY SHAPE (must stay visible)
   =========================================================================== #}
   <a
     id="home-identify-card"
@@ -171,13 +171,23 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
             <tr>
               <th scope="col" class="data-table__thumb"></th>
 
-              {# Sort headers - styled to look like normal header text via CSS #}
+              {# -----------------------------------------------------------------
+                Sort headers (match All Pastas look)
+                - Use your existing sortable affordance:
+                    .data-table__sortable + .sort-indicator
+                - Keep aria-sort on the <th> so CSS can render arrows.
+                - JS listens for clicks on ".js-sort".
+              ------------------------------------------------------------------ #}
               <th scope="col" class="data-table__name" data-sort="name" aria-sort="ascending">
-                <button type="button" class="sort-link js-sort" data-sort="name">Name</button>
+                <button type="button" class="data-table__sortable js-sort" data-sort="name">
+                  Name <span class="sort-indicator" aria-hidden="true"></span>
+                </button>
               </th>
 
               <th scope="col" class="cell-category" data-sort="category" aria-sort="none">
-                <button type="button" class="sort-link js-sort" data-sort="category">Category</button>
+                <button type="button" class="data-table__sortable js-sort" data-sort="category">
+                  Category <span class="sort-indicator" aria-hidden="true"></span>
+                </button>
               </th>
 
               <th scope="col" class="cell-synonyms">
