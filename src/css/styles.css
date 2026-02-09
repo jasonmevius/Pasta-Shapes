@@ -15,6 +15,7 @@
   - Home/Search experience:
       - Oversized, centered "hero" search input on the Home Search card
       - Suggestions + results table styling (standardized to match All Pastas)
+      - While searching, results panel replaces Identify card (more room; less clutter)
   - Identify page:
       - Card layout
       - Answer tiles (enum images + bool glyphs Y / N / ?)
@@ -31,9 +32,12 @@
   - Allow table header sort affordance to work on <button> controls by resetting
     native button styles for .data-table__sortable.
 
-  CHANGE NOTES (2026-02-07 - Identify tweaks)
-  - Identify cards: force title + description onto separate lines with spacing.
-  - Question 1 "Not Sure": display a centered "?" glyph styled like the others.
+  CHANGE NOTES (2026-02-09)
+  - Home search results REPLACE the Identify card while searching.
+  - Home results panel is not styled as a grey card.
+  - Fix header-corner radius clipping.
+  - Remove "extra" bottom border line on results table.
+  - Allow Category column to be hidden on very narrow screens (Home results only).
 ============================================================================= */
 
 /* =============================================================================
@@ -122,66 +126,69 @@ a:hover{ text-decoration: underline; }
 .container{
   max-width: var(--container);
   margin: 0 auto;
-  padding: 1.25rem var(--pad) 3rem;
-}
-
-/* Leave room for fixed bottom nav on mobile so content is not hidden behind it */
-@media (max-width: 719px){
-  .container{ padding-bottom: 5rem; }
+  padding: 0 var(--pad);
 }
 
 /* =============================================================================
-  4) Top navigation (sticky) + desktop/mobile gating
+  4) Topbar + nav
 ============================================================================= */
 
 .topbar{
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: 80;
   background: rgba(255,255,255,0.92);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border);
 }
 
 .topbar-inner{
-  max-width: var(--container);
-  margin: 0 auto;
-  padding: 0.75rem var(--pad);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--gap);
+  gap: 0.75rem;
+  padding: 0.75rem var(--pad);
+  max-width: var(--container);
+  margin: 0 auto;
 }
 
 .brand{
-  font-weight: 700;
-  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
   text-decoration: none;
+  font-weight: 750;
+  letter-spacing: -0.01em;
 }
+
 .brand:hover{ text-decoration: none; }
 
 .nav{
-  display: flex;
-  gap: 0.75rem;
-  align-items: center;
-  color: var(--muted);
-  font-size: 0.95rem;
+  display: none;
+  gap: 0.5rem;
 }
 
-.nav a{ text-decoration: none; }
+@media (min-width: 720px){
+  .nav{ display: inline-flex; }
+}
+
+.nav a{
+  text-decoration: none;
+  padding: 0.55rem 0.75rem;
+  border-radius: 999px;
+  color: var(--muted);
+  font-weight: 650;
+}
+
+.nav a:hover{
+  background: rgba(17,24,39,0.04);
+  color: var(--fg);
+  text-decoration: none;
+}
+
 .nav a[aria-current="page"]{
   color: var(--fg);
-  font-weight: 600;
-}
-
-/* Desktop-first: show inline nav, hide hamburger */
-.nav-desktop{ display: flex; }
-.nav-toggle{ display: none; }
-
-/* Mobile: hide inline nav, show hamburger */
-@media (max-width: 719px){
-  .nav-desktop{ display: none; }
-  .nav-toggle{ display: inline-flex; }
+  background: rgba(17,24,39,0.06);
 }
 
 /* =============================================================================
@@ -303,6 +310,16 @@ a:hover{ text-decoration: underline; }
   padding: 0.55rem 0.75rem;
   border-radius: 10px;
   font-size: 0.95rem;
+}
+
+/* Ghost variant used for "Next 10" link button */
+.btn--ghost{
+  background: #fff;
+  color: var(--fg);
+}
+.btn--ghost:hover{
+  background: rgba(17,24,39,0.03);
+  text-decoration: none;
 }
 
 /* =============================================================================
@@ -540,16 +557,28 @@ body.is-searching #home-search-card{
   }
 }
 
-/* Results panel on home (hidden by default via [hidden]) */
+/* Results panel on home (hidden by default via [hidden])
+   ---------------------------------------------------------------------------
+   CHANGE (2026-02-09)
+   - Home search results should REPLACE the Identify card while the user is typing.
+   - Results panel should feel like the All Pastas page: white page, table sits on white.
+   - So: results panel is NOT a grey "card" (index.njk no longer applies .card here).
+--------------------------------------------------------------------------- */
 .home-results{
+  /* Home results should lay out like a small page section, not a card. */
+  display: grid;
+  gap: var(--gap);
+
+  /* Allow the results area to scroll if needed (e.g., landscape phone). */
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
 
 /* When searching:
    - Show results panel
-   - Do NOT hide Identify card (Identify stays visible) */
+   - Hide Identify card (results take its place) */
 body.is-searching #home-results-panel{ display: grid; }
+body.is-searching #home-identify-card{ display: none; }
 
 /* =============================================================================
   12) Results tools row (count + paging button)
@@ -731,8 +760,17 @@ body.is-searching #home-results-panel{ display: grid; }
 .table-wrap--results{ margin-top: 0.25rem; }
 
 .table-scroll{
+  /* Horizontal scroll on very narrow screens (mobile-first) */
   overflow-x: auto;
-  overflow-y: visible;
+
+  /* IMPORTANT (2026-02-09):
+     - Hide vertical overflow so the thead background cannot "square off" the
+       rounded corners of the table wrap on Home Search results. */
+  overflow-y: hidden;
+
+  /* Clip table contents to the rounded corners of the parent wrapper. */
+  border-radius: inherit;
+
   -webkit-overflow-scrolling: touch;
 }
 
@@ -773,6 +811,12 @@ body.is-searching #home-results-panel{ display: grid; }
   border-bottom: 1px solid var(--border);
   padding: 0.85rem 0.9rem;
   vertical-align: middle;
+}
+
+/* Remove the "extra" border at the bottom of the table (Home Search results) */
+.data-table tbody tr:last-child td,
+.data-table tbody tr:last-child th{
+  border-bottom: 0;
 }
 
 .data-table tbody tr:hover{
@@ -878,6 +922,27 @@ th[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
 }
 
 /* =============================================================================
+  14b) Home Search - hide Category column on very narrow screens
+  ---------------------------------------------------------------------------
+  PURPOSE
+  - For the Home Search results table, space is tight on small phones.
+  - If needed, hide the Category column while keeping:
+      Thumb + Name + Synonyms
+  - This targets ONLY the results table, not the All Pastas table.
+  NOTE
+  - Column order in the results table is:
+      1) Thumb, 2) Name, 3) Category, 4) Synonyms
+============================================================================= */
+
+@media (max-width: 520px){
+  .data-table--results thead th:nth-child(3),
+  .data-table--results tbody td:nth-child(3),
+  .data-table--results colgroup col:nth-child(3){
+    display: none;
+  }
+}
+
+/* =============================================================================
   15) Footer (minimal)
 ============================================================================= */
 
@@ -962,7 +1027,3 @@ th[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
 }
 
 .bottom-nav-link[aria-current="page"]{ color: var(--fg); }
-
-@media (min-width: 720px){
-  .bottom-nav{ display: none; }
-}
