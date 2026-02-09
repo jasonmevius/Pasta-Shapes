@@ -7,17 +7,20 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 {# =============================================================================
   /src/index.njk
   ------------------------------------------------------------------------------
-  HOMEPAGE STRUCTURE
-  - Search card (always visible)
-  - Results panel (hidden until user starts searching)
-  - Identify card (hidden while searching - results take its place)
+  MOBILE-FIRST HOMEPAGE
 
-  ROTATOR SYNC
-  - Both the Search placeholder and the Identify icon use the SAME list/order.
-  - scripts.js uses data-rotator-group to tick both on the same interval.
+  CONTENT AREAS
+  - Search card (always visible)
+  - Results panel (hidden until searching)
+  - Identify card (hidden while searching; results replace it)
+
+  ROTATOR (SYNC)
+  - The placeholder text and identify icon rotation must stay in lockstep.
+  - We define one list (names + icons) and attach it to both elements via data
+    attributes. scripts.js ticks the group together.
 
   IMPORTANT
-  - If you change the list of shapes, update it ONLY in one place below.
+  - This file uses the MOST RECENT requested fallback rotator list you provided.
 
 ============================================================================= #}
 
@@ -27,11 +30,18 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 {% set FALLBACK_THUMB = "pending.png" %}
 
 {# -----------------------------------------------------------------------------
-  ROTATOR LIST (single source of truth)
-  - If site data provides homeRotatorNames and homeRotatorIconSrcs, we use those.
-  - Otherwise, we use a fallback list.
-  - One item was previously removed - fallback list is 7 items (no "pasta").
+  ROTATOR LIST (requested)
 ----------------------------------------------------------------------------- #}
+
+{% set fallbackRotatorIconSrcs = [
+  IK_CAROUSEL_BASE ~ "penne.png",
+  IK_CAROUSEL_BASE ~ "ravioli.png",
+  IK_CAROUSEL_BASE ~ "fusilli.png",
+  IK_CAROUSEL_BASE ~ "conchiglie.png",
+  IK_CAROUSEL_BASE ~ "farfalle.png",
+  IK_CAROUSEL_BASE ~ "gnocchi.png",
+  IK_CAROUSEL_BASE ~ "ridge-macaroni.png"
+] %}
 
 {% set fallbackRotatorNames = [
   "penne",
@@ -43,23 +53,13 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   "macaroni"
 ] %}
 
-{% set fallbackRotatorIconSrcs = [
-  IK_CAROUSEL_BASE ~ "penne.png",
-  IK_CAROUSEL_BASE ~ "ravioli.png",
-  IK_CAROUSEL_BASE ~ "fusilli.png",
-  IK_CAROUSEL_BASE ~ "conchiglie.png",
-  IK_CAROUSEL_BASE ~ "farfalle.png",
-  IK_CAROUSEL_BASE ~ "gnocchi.png",
-  IK_CAROUSEL_BASE ~ "macaroni.png"
-] %}
-
+{# Site-provided lists (if present) override fallback. Otherwise fallback is used. #}
 {% set rotatorNames = (homeRotatorNames | default([])) %}
 {% set rotatorIconSrcs = (homeRotatorIconSrcs | default([])) %}
 
 {% if rotatorNames | length == 0 %}
   {% set rotatorNames = fallbackRotatorNames %}
 {% endif %}
-
 {% if rotatorIconSrcs | length == 0 %}
   {% set rotatorIconSrcs = fallbackRotatorIconSrcs %}
 {% endif %}
@@ -90,11 +90,17 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         autocomplete="off"
         autocapitalize="none"
         spellcheck="false"
+
+        {# Placeholder is rotated by scripts.js as a group with the icon #}
         placeholder="Start typing - e.g., {{ rotatorNames[0] }}"
+
         data-rotator-group="homeHero"
         data-rotator-role="placeholder"
         data-rotator-names="{{ rotatorNamesCsv }}"
         data-rotate-interval="2500"
+
+        {# Requested explicit examples attribute (kept for compatibility) #}
+        data-placeholder-examples="penne,ravioli,fusilli,conchiglie,farfalle,gnocchi,macaroni"
       />
     </form>
 
@@ -103,23 +109,14 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   </section>
 
   {# ===========================================================================
-    RESULTS PANEL (not a grey card - table sits on white)
+    RESULTS PANEL (white background table; not inside a grey card)
   =========================================================================== #}
-  <section
-    id="home-results-panel"
-    class="home-results"
-    aria-label="Search results"
-    hidden
-  >
+  <section id="home-results-panel" class="home-results" aria-label="Search results" hidden>
     <ul id="pasta-search-suggestions" class="suggestions" aria-label="Suggestions"></ul>
 
     <div class="table-wrap table-wrap--results">
       <div class="table-scroll">
-        <table
-          id="pasta-results-table"
-          class="data-table data-table--results"
-          aria-label="Pasta results table"
-        >
+        <table id="pasta-results-table" class="data-table data-table--results" aria-label="Pasta results table">
           <colgroup>
             <col class="col-thumb" />
             <col class="col-name" />
@@ -200,7 +197,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 
   {# ===========================================================================
     CARD 2 - IDENTIFY BY SHAPE
-    - Hidden while searching (results panel replaces it)
+    Hidden while searching (results panel replaces it).
   =========================================================================== #}
   <a
     id="home-identify-card"
@@ -222,6 +219,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         decoding="async"
         width="96"
         height="96"
+
         data-rotator-group="homeHero"
         data-rotator-role="icon"
         data-rotator-names="{{ rotatorNamesCsv }}"
