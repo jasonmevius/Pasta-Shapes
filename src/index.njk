@@ -1,7 +1,7 @@
 ---
 title: Pasta Shapes
 layout: layout.njk
-description: "Search pasta shapes by name and aliases, or identify a shape by answering a few quick questions."
+description: "Search pasta shapes by name and aliases, or identify a shape by answering a few quick quick questions."
 ---
 
 {# =============================================================================
@@ -10,7 +10,8 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   PURPOSE
   - Homepage is the Search page.
   - Search filters the results table as the user types.
-  - Identify card links to /identify/ (must remain visible while searching).
+  - While searching, the Results panel REPLACES the Identify card (more room; less clutter).
+  - Identify card links to /identify/ (hidden while searching to give results more space).
 
   STATUS LINES
   - #pasta-search-status: owned by pasta-search.js (typeahead messaging)
@@ -106,44 +107,16 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   </section>
 
   {# ===========================================================================
-    CARD 2 - IDENTIFY BY SHAPE (must stay visible)
-  =========================================================================== #}
-  <a
-    id="home-identify-card"
-    class="home-card home-card-link card stack"
-    href="/identify/"
-    aria-label="Identify by Shape - go to Identify page"
-  >
-    <header class="home-card-head">
-      <h2 class="h2 home-card-title">Identify by Shape</h2>
-    </header>
-
-    <div class="identify-hero" aria-hidden="true">
-      <img
-        id="identify-icon-rotator"
-        class="identify-icon"
-        src="{{ firstRotatorIcon }}"
-        alt=""
-        loading="lazy"
-        decoding="async"
-        width="96"
-        height="96"
-        data-rotator-group="homeHero"
-        data-rotate="1"
-        data-rotate-srcs="{{ rotatorIconSrcs | join(',') }}"
-        data-rotate-names="{{ rotatorNames | join(',') }}"
-        data-rotate-interval="2500"
-        data-rotate-fade="240"
-      />
-    </div>
-  </a>
-
-  {# ===========================================================================
     RESULTS PANEL - hidden until user types
+    ---------------------------------------------------------------------------
+    CHANGE (2026-02-09)
+    - Results panel is placed BEFORE the Identify card in markup so it can visually
+      replace the Identify card when searching (same grid slot).
+    - Results panel is NOT a .card (no grey background). Table sits on white page.
   =========================================================================== #}
   <section
     id="home-results-panel"
-    class="home-results card stack"
+    class="home-results stack"
     aria-label="Search results"
     hidden
   >
@@ -260,5 +233,38 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       Next 10
     </a>
   </section>
+
+  {# ===========================================================================
+    CARD 2 - IDENTIFY BY SHAPE (hidden while searching)
+  =========================================================================== #}
+  <a
+    id="home-identify-card"
+    class="home-card home-card-link card stack"
+    href="/identify/"
+    aria-label="Identify by Shape - go to Identify page"
+  >
+    <header class="home-card-head">
+      <h2 class="h2 home-card-title">Identify by Shape</h2>
+    </header>
+
+    <div class="identify-hero" aria-hidden="true">
+      <img
+        id="identify-icon-rotator"
+        class="identify-icon"
+        src="{{ firstRotatorIcon }}"
+        alt=""
+        loading="lazy"
+        decoding="async"
+        width="96"
+        height="96"
+        data-rotator-group="homeHero"
+        data-rotate="1"
+        data-rotate-srcs="{{ rotatorIconSrcs | join(',') }}"
+        data-rotate-names="{{ rotatorNames | join(',') }}"
+        data-rotate-interval="2500"
+        data-rotate-fade="240"
+      />
+    </div>
+  </a>
 
 </section>
