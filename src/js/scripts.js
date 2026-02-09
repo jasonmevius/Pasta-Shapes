@@ -4,16 +4,16 @@
   Global JS for Pasta Shapes (mobile-first behaviors)
 
   UPDATE IN THIS REVISION
-  - Home Search results: show ALL matches (no "Next 10" pagination)
-  - Typing "r" shows every pasta that starts with "r"
-  - Hide/remove the paging control on the homepage search results
+  - Homepage search: STRICT prefix matching by pasta NAME only
+    - Typing "r" shows ONLY rows whose data-name starts with "r"
+    - No fallback includes() match against synonyms/aliases
+  - Show ALL matches (no paging; "Next 10" is always hidden)
 
-  Other behaviors preserved:
+  Preserved
   - Hamburger drawer toggle
   - Rotator sync + anti-flash (preload/decode, fade swap)
-  - Table-based filtering and count messaging
 
-  This file is intentionally heavily commented for future-proofing.
+  Heavily commented for future-proofing.
 ============================================================================= */
 
 (function () {
@@ -34,9 +34,13 @@
     return Math.max(min, Math.min(max, n));
   }
 
+  function normalize(s) {
+    return String(s || "").toLowerCase().trim();
+  }
+
   /**
    * Preload an image URL and attempt to decode it (where supported).
-   * Returns a Promise that resolves when the image is ready-ish to paint.
+   * Reduces flicker on mobile during src swaps.
    */
   function preloadAndDecode(url) {
     return new Promise((resolve) => {
@@ -69,9 +73,7 @@
     const drawer = (controlsId && document.getElementById(controlsId)) || $(".nav-drawer");
     if (!drawer) return;
 
-    if (!btn.hasAttribute("aria-expanded")) {
-      btn.setAttribute("aria-expanded", "false");
-    }
+    if (!btn.hasAttribute("aria-expanded")) btn.setAttribute("aria-expanded", "false");
 
     function isOpen() { return btn.getAttribute("aria-expanded") === "true"; }
 
@@ -139,9 +141,7 @@
       const fadeMs = clamp(parseInt(fadeRaw, 10) || 240, 0, 2000);
 
       const iconReady = new Map();
-      if (icons.length) {
-        icons.forEach((u) => iconReady.set(u, preloadAndDecode(u)));
-      }
+      if (icons.length) icons.forEach((u) => iconReady.set(u, preloadAndDecode(u)));
 
       let idx = 0;
       let isAnimating = false;
@@ -151,7 +151,7 @@
         const name = names[safeI];
         const iconSrc = (icons.length && iconEl) ? icons[safeI % icons.length] : null;
 
-        // No icon? Just update placeholder.
+        // No icon? Update placeholder only.
         if (!iconEl || !iconSrc) {
           if (placeholderEl && placeholderEl.tagName === "INPUT") {
             placeholderEl.placeholder = `Start typing - e.g., ${name}`;
@@ -170,7 +170,7 @@
           try { await readyPromise; } catch (_) { /* ignore */ }
         }
 
-        // Commit moment: swap icon + placeholder together
+        // Commit: swap icon + placeholder together
         iconEl.src = iconSrc;
         if (placeholderEl && placeholderEl.tagName === "INPUT") {
           placeholderEl.placeholder = `Start typing - e.g., ${name}`;
@@ -192,13 +192,12 @@
   }
 
   /* ---------------------------------------------------------------------------
-    Home search filtering (table-based)
+    Home search filtering (STRICT PREFIX BY NAME ONLY)
     ---------------------------------------------------------------------------
-    REQUIRED BEHAVIOR (per your request)
-    - Show ALL matches on the homepage
-    - No "Next 10" paging link at all
-    - Typing "r" should show every pasta whose NAME starts with "r"
-      (still allows secondary matches by contains - after prefix group)
+    Required behavior:
+    - Typing "r" shows ONLY pastas whose NAME begins with "r"
+    - Show ALL matches (no paging)
+    - Keep Identify hidden while searching, show results panel
   --------------------------------------------------------------------------- */
   function initHomeSearch() {
     const input = $("#pasta-q");
@@ -212,10 +211,9 @@
 
     const rows = $all("tr.data-row", tbody);
 
-    // Ensure the paging control never appears (even if present in HTML)
+    // Permanently disable paging control on homepage
     if (toggleBtn) {
       toggleBtn.hidden = true;
-      // Defensive: prevent default if something else unhides it
       toggleBtn.addEventListener("click", (e) => e.preventDefault());
     }
 
@@ -225,67 +223,40 @@
       if (identifyCard) identifyCard.hidden = on;
     }
 
-    function normalize(s) {
-      return String(s || "").toLowerCase().trim();
-    }
-
-    function matchRow(row, qNorm) {
-      // Prefix match by name is the primary behavior
-      const name = normalize(row.getAttribute("data-name") || "");
-      if (name.startsWith(qNorm)) return { ok: true, score: 0 };
-
-      // Secondary match: anywhere in name + aliases/synonyms
-      const hay = normalize(row.getAttribute("data-search") || "");
-      if (hay.includes(qNorm)) return { ok: true, score: 1 };
-
-      return { ok: false, score: 999 };
-    }
-
     function updateUI() {
       const q = normalize(input.value);
 
+      // No query: hide all rows and show Identify card again
       if (!q) {
         setSearching(false);
-
-        // Hide everything until typing
         rows.forEach(r => { r.hidden = true; });
-
         if (countEl) countEl.textContent = "Start typing to see matches.";
-        if (toggleBtn) toggleBtn.hidden = true;
         return;
       }
 
       setSearching(true);
 
+      // STRICT prefix match against the pasta NAME only
       const matches = [];
-      rows.forEach((row) => {
-        const res = matchRow(row, q);
-        if (res.ok) {
-          matches.push({
-            row,
-            score: res.score,
-            name: normalize(row.getAttribute("data-name"))
-          });
-        }
-      });
-
-      // Sort: prefix matches first, then alphabetical within score bucket
-      matches.sort((a, b) => {
-        if (a.score !== b.score) return a.score - b.score;
-        return a.name.localeCompare(b.name);
-      });
-
-      // Hide all then show ALL matches
-      rows.forEach(r => { r.hidden = true; });
-      matches.forEach(m => { m.row.hidden = false; });
-
-      // Count copy: no paging language anymore
-      if (countEl) {
-        if (matches.length === 0) countEl.textContent = "No matches.";
-        else countEl.textContent = `${matches.length} shown`;
+      for (const row of rows) {
+        const name = normalize(row.getAttribute("data-name") || "");
+        if (name.startsWith(q)) matches.push(row);
       }
 
-      if (toggleBtn) toggleBtn.hidden = true;
+      // Sort alphabetically by name (so "r" yields clean A-Z list)
+      matches.sort((ra, rb) => {
+        const a = normalize(ra.getAttribute("data-name"));
+        const b = normalize(rb.getAttribute("data-name"));
+        return a.localeCompare(b);
+      });
+
+      // Hide all then show all matches
+      rows.forEach(r => { r.hidden = true; });
+      matches.forEach(r => { r.hidden = false; });
+
+      if (countEl) {
+        countEl.textContent = matches.length ? `${matches.length} shown` : "No matches.";
+      }
     }
 
     // Hide all rows initially
@@ -293,7 +264,7 @@
 
     input.addEventListener("input", updateUI);
 
-    // Run once (supports prefilled query later if you add it)
+    // Run once (supports prefilled query later if added)
     updateUI();
   }
 
