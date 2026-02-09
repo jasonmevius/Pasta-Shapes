@@ -4,14 +4,16 @@
   Global JS for Pasta Shapes (mobile-first behaviors)
 
   UPDATE IN THIS REVISION
-  - Fix rotator "flash" / jarring swap:
-    - Preload + decode icons
-    - Fade out -> decode next -> swap -> fade in
-    - Update placeholder text at the same moment as the icon swap for better sync
+  - Home Search results: show ALL matches (no "Next 10" pagination)
+  - Typing "r" shows every pasta that starts with "r"
+  - Hide/remove the paging control on the homepage search results
 
-  Notes
-  - Hamburger + search behavior preserved.
-  - Heavily commented for future-proofing.
+  Other behaviors preserved:
+  - Hamburger drawer toggle
+  - Rotator sync + anti-flash (preload/decode, fade swap)
+  - Table-based filtering and count messaging
+
+  This file is intentionally heavily commented for future-proofing.
 ============================================================================= */
 
 (function () {
@@ -45,16 +47,13 @@
       img.loading = "eager";
 
       img.onload = async () => {
-        // decode() helps prevent "flash" / partially decoded frames on swap
-        // Some browsers (or cross-origin situations) may reject - safe to ignore.
         try {
           if (typeof img.decode === "function") await img.decode();
         } catch (_) { /* ignore */ }
         resolve();
       };
 
-      img.onerror = () => resolve(); // fail open
-
+      img.onerror = () => resolve();
       img.src = url;
     });
   }
@@ -106,17 +105,11 @@
   }
 
   /* ---------------------------------------------------------------------------
-    Rotator groups (synchronized placeholder + icon)
-    ---------------------------------------------------------------------------
-    Fixing the "flash" requires:
-    - preloading + decoding all icon URLs
-    - swapping src only after decode (while fully faded out)
-    - syncing placeholder update to the same commit moment as the icon swap
+    Rotator groups (synchronized placeholder + icon) with anti-flash swap
   --------------------------------------------------------------------------- */
   function initRotators() {
     const groups = new Map();
 
-    // Collect all rotator elements by group name
     $all("[data-rotator-group]").forEach((el) => {
       const groupName = el.getAttribute("data-rotator-group");
       if (!groupName) return;
@@ -128,17 +121,14 @@
       const placeholderEl = elements.find(el => el.getAttribute("data-rotator-role") === "placeholder");
       const iconEl = elements.find(el => el.getAttribute("data-rotator-role") === "icon");
 
-      // Determine list of names
       const names =
         toCsvList((placeholderEl && placeholderEl.getAttribute("data-rotator-names")) ||
                   (iconEl && iconEl.getAttribute("data-rotator-names")) || "");
 
       if (!names.length) return;
 
-      // Determine icons (optional)
       const icons = toCsvList(iconEl ? iconEl.getAttribute("data-rotator-icons") : "");
 
-      // Interval + fade
       const intervalMsRaw =
         (placeholderEl && placeholderEl.getAttribute("data-rotate-interval")) ||
         (iconEl && iconEl.getAttribute("data-rotate-interval")) ||
@@ -148,29 +138,20 @@
       const fadeRaw = iconEl ? iconEl.getAttribute("data-rotate-fade") : "240";
       const fadeMs = clamp(parseInt(fadeRaw, 10) || 240, 0, 2000);
 
-      // Preload/decode all icons up-front (best effort).
-      // This dramatically reduces flicker on mobile Safari.
       const iconReady = new Map();
       if (icons.length) {
-        icons.forEach((u) => {
-          iconReady.set(u, preloadAndDecode(u));
-        });
+        icons.forEach((u) => iconReady.set(u, preloadAndDecode(u)));
       }
 
       let idx = 0;
       let isAnimating = false;
 
-      /**
-       * Commit updates for a given index.
-       * - If we have icons: fade out -> wait decode -> swap -> fade in
-       * - Placeholder updates occur at the same commit moment as icon swap
-       */
       async function applyIndex(i) {
         const safeI = ((i % names.length) + names.length) % names.length;
         const name = names[safeI];
         const iconSrc = (icons.length && iconEl) ? icons[safeI % icons.length] : null;
 
-        // If no icon element, just update placeholder immediately
+        // No icon? Just update placeholder.
         if (!iconEl || !iconSrc) {
           if (placeholderEl && placeholderEl.tagName === "INPUT") {
             placeholderEl.placeholder = `Start typing - e.g., ${name}`;
@@ -178,42 +159,31 @@
           return;
         }
 
-        // Prevent overlapping animations if timers drift or tab resumes
         if (isAnimating) return;
         isAnimating = true;
 
-        // Start fade-out
         if (fadeMs > 0) iconEl.classList.add("is-fading");
+        if (fadeMs > 0) await new Promise(r => window.setTimeout(r, fadeMs));
 
-        // Wait until we're fully faded out (or immediately if fade disabled)
-        if (fadeMs > 0) {
-          await new Promise(r => window.setTimeout(r, fadeMs));
-        }
-
-        // Ensure next icon is decoded before swap (best effort)
         const readyPromise = iconReady.get(iconSrc);
         if (readyPromise) {
           try { await readyPromise; } catch (_) { /* ignore */ }
         }
 
-        // COMMIT MOMENT: swap icon + update placeholder together
+        // Commit moment: swap icon + placeholder together
         iconEl.src = iconSrc;
-
         if (placeholderEl && placeholderEl.tagName === "INPUT") {
           placeholderEl.placeholder = `Start typing - e.g., ${name}`;
         }
 
-        // Fade back in on the next frame to avoid a paint "flash"
         window.requestAnimationFrame(() => {
           iconEl.classList.remove("is-fading");
           isAnimating = false;
         });
       }
 
-      // Initialize immediately
       applyIndex(idx);
 
-      // One timer per group
       window.setInterval(() => {
         idx = (idx + 1) % names.length;
         applyIndex(idx);
@@ -223,6 +193,12 @@
 
   /* ---------------------------------------------------------------------------
     Home search filtering (table-based)
+    ---------------------------------------------------------------------------
+    REQUIRED BEHAVIOR (per your request)
+    - Show ALL matches on the homepage
+    - No "Next 10" paging link at all
+    - Typing "r" should show every pasta whose NAME starts with "r"
+      (still allows secondary matches by contains - after prefix group)
   --------------------------------------------------------------------------- */
   function initHomeSearch() {
     const input = $("#pasta-q");
@@ -235,8 +211,13 @@
     if (!input || !resultsPanel || !tbody) return;
 
     const rows = $all("tr.data-row", tbody);
-    const PAGE_SIZE = 10;
-    let page = 1;
+
+    // Ensure the paging control never appears (even if present in HTML)
+    if (toggleBtn) {
+      toggleBtn.hidden = true;
+      // Defensive: prevent default if something else unhides it
+      toggleBtn.addEventListener("click", (e) => e.preventDefault());
+    }
 
     function setSearching(on) {
       document.body.classList.toggle("is-searching", on);
@@ -249,9 +230,11 @@
     }
 
     function matchRow(row, qNorm) {
+      // Prefix match by name is the primary behavior
       const name = normalize(row.getAttribute("data-name") || "");
       if (name.startsWith(qNorm)) return { ok: true, score: 0 };
 
+      // Secondary match: anywhere in name + aliases/synonyms
       const hay = normalize(row.getAttribute("data-search") || "");
       if (hay.includes(qNorm)) return { ok: true, score: 1 };
 
@@ -263,10 +246,12 @@
 
       if (!q) {
         setSearching(false);
-        page = 1;
+
+        // Hide everything until typing
         rows.forEach(r => { r.hidden = true; });
-        if (toggleBtn) toggleBtn.hidden = true;
+
         if (countEl) countEl.textContent = "Start typing to see matches.";
+        if (toggleBtn) toggleBtn.hidden = true;
         return;
       }
 
@@ -276,50 +261,39 @@
       rows.forEach((row) => {
         const res = matchRow(row, q);
         if (res.ok) {
-          matches.push({ row, score: res.score, name: normalize(row.getAttribute("data-name")) });
+          matches.push({
+            row,
+            score: res.score,
+            name: normalize(row.getAttribute("data-name"))
+          });
         }
       });
 
+      // Sort: prefix matches first, then alphabetical within score bucket
       matches.sort((a, b) => {
         if (a.score !== b.score) return a.score - b.score;
         return a.name.localeCompare(b.name);
       });
 
-      const total = matches.length;
-      const visibleCount = Math.min(total, page * PAGE_SIZE);
-
+      // Hide all then show ALL matches
       rows.forEach(r => { r.hidden = true; });
-      matches.slice(0, visibleCount).forEach(m => { m.row.hidden = false; });
+      matches.forEach(m => { m.row.hidden = false; });
 
+      // Count copy: no paging language anymore
       if (countEl) {
-        const more = total - visibleCount;
-        if (total === 0) countEl.textContent = "No matches.";
-        else if (more > 0) countEl.textContent = `${visibleCount} shown - ${more} more`;
-        else countEl.textContent = `${total} shown`;
+        if (matches.length === 0) countEl.textContent = "No matches.";
+        else countEl.textContent = `${matches.length} shown`;
       }
 
-      if (toggleBtn) {
-        const more = total - visibleCount;
-        toggleBtn.hidden = !(more > 0);
-        toggleBtn.textContent = more > 0 ? `Next ${Math.min(PAGE_SIZE, more)}` : `Next ${PAGE_SIZE}`;
-      }
+      if (toggleBtn) toggleBtn.hidden = true;
     }
 
+    // Hide all rows initially
     rows.forEach(r => { r.hidden = true; });
 
-    input.addEventListener("input", () => {
-      page = 1;
-      updateUI();
-    });
+    input.addEventListener("input", updateUI);
 
-    if (toggleBtn) {
-      toggleBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        page += 1;
-        updateUI();
-      });
-    }
-
+    // Run once (supports prefilled query later if you add it)
     updateUI();
   }
 
