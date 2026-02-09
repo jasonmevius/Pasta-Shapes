@@ -3,45 +3,12 @@
   ------------------------------------------------------------------------------
   SINGLE GLOBAL STYLESHEET (complete file)
 
-  PURPOSE
-  - One stylesheet for the whole Pasta Shapes site.
-  - No inline CSS in templates.
-  - Mobile-first patterns with explicit desktop breakpoints.
-
-  MAJOR UI BEHAVIORS SUPPORTED
-  - Sticky top bar with:
-      - Desktop inline nav (>= 720px)
-      - Mobile hamburger button + drawer (< 720px)
-  - Home/Search experience:
-      - Oversized, centered "hero" search input on the Home Search card
-      - Suggestions + results table styling (standardized to match All Pastas)
-      - While searching, results panel replaces Identify card (more room; less clutter)
-  - Identify page:
-      - Card layout
-      - Answer tiles (enum images + bool glyphs Y / N / ?)
-      - Identify results still render as cards for now (will be standardized next)
-  - All Pastas page:
-      - Filter bar
-      - Table with synonyms column
-      - Sortable header affordance
-      - NON-sticky table header (per latest decision)
-      - On narrow screens, Synonyms column is hidden for usability
-
-  CHANGE NOTES (2026-02-07)
-  - Do NOT hide the Identify card while searching on Home.
-  - Allow table header sort affordance to work on <button> controls by resetting
-    native button styles for .data-table__sortable.
-
-  CHANGE NOTES (2026-02-09)
-  - Home search results REPLACE the Identify card while searching.
-  - Home results panel is not styled as a grey card.
-  - Fix header-corner radius clipping.
-  - Remove "extra" bottom border line on results table.
-  - Allow Category column to be hidden on very narrow screens (Home results only).
-============================================================================= */
-
-/* =============================================================================
-  1) Design tokens + base resets
+  CHANGE NOTES (2026-02-09 - follow-up)
+  - Fix #3: Ensure thead background does not square off rounded corners by clipping
+    table contents inside a rounded wrapper (overflow hidden).
+  - Fix #4: Remove the "extra" bottom border line by forcing the last row's cells
+    to have no bottom border (and avoiding double border lines).
+  - Fix #5: Hide Category column in HOME Search results on narrow screens.
 ============================================================================= */
 
 :root{
@@ -56,14 +23,11 @@
   --pad: 1rem;
   --gap: 0.75rem;
 
-  /* Approx sticky topbar height used for positioning the mobile drawer. */
   --topbar-h: 60px;
 }
 
 *{ box-sizing: border-box; }
 html, body{ height: 100%; }
-
-/* IMPORTANT: Make the HTML hidden attribute bulletproof site-wide */
 [hidden]{ display: none !important; }
 
 body{
@@ -80,10 +44,9 @@ a{ color: inherit; }
 a:hover{ text-decoration: underline; }
 
 /* =============================================================================
-  2) Accessibility helpers
+  Accessibility helpers
 ============================================================================= */
 
-/* Screen reader only (utility) */
 .sr-only{
   position: absolute !important;
   width: 1px !important;
@@ -96,7 +59,6 @@ a:hover{ text-decoration: underline; }
   border: 0 !important;
 }
 
-/* Skip-to-content link: hidden offscreen unless focused */
 .skip{
   position: absolute;
   left: -9999px;
@@ -120,7 +82,7 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  3) Global layout container
+  Global layout container
 ============================================================================= */
 
 .container{
@@ -130,7 +92,7 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  4) Topbar + nav
+  Topbar + nav
 ============================================================================= */
 
 .topbar{
@@ -192,7 +154,7 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  4a) Hamburger button (mobile)
+  Hamburger button (mobile)
 ============================================================================= */
 
 .nav-toggle{
@@ -222,13 +184,12 @@ a:hover{ text-decoration: underline; }
   border-radius: 999px;
 }
 
-/* Hide hamburger button on desktop regardless */
 @media (min-width: 720px){
   .nav-toggle{ display: none; }
 }
 
 /* =============================================================================
-  4b) Hamburger drawer (mobile)
+  Hamburger drawer (mobile)
 ============================================================================= */
 
 .nav-drawer{
@@ -244,7 +205,6 @@ a:hover{ text-decoration: underline; }
   backdrop-filter: blur(10px);
 }
 
-/* Drawer links - "button-like" */
 .nav-drawer a{
   text-decoration: none;
   padding: 0.85rem 0.85rem;
@@ -259,13 +219,12 @@ a:hover{ text-decoration: underline; }
   background: rgba(17,24,39,0.03);
 }
 
-/* Ensure drawer never renders on desktop */
 @media (min-width: 720px){
   .nav-drawer{ display: none !important; }
 }
 
 /* =============================================================================
-  5) Cards
+  Cards
 ============================================================================= */
 
 .card{
@@ -276,7 +235,7 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  6) Buttons
+  Buttons
 ============================================================================= */
 
 .btn{
@@ -295,7 +254,6 @@ a:hover{ text-decoration: underline; }
 }
 .btn:hover{ text-decoration: none; }
 
-/* Secondary variant supports both ".secondary" and ".btn--secondary" naming */
 .btn.secondary,
 .btn--secondary{
   background: #fff;
@@ -312,7 +270,6 @@ a:hover{ text-decoration: underline; }
   font-size: 0.95rem;
 }
 
-/* Ghost variant used for "Next 10" link button */
 .btn--ghost{
   background: #fff;
   color: var(--fg);
@@ -323,7 +280,7 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  7) Form fields (general)
+  Form fields
 ============================================================================= */
 
 .field{
@@ -361,7 +318,7 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  7a) Search bar styles (hero search restored)
+  Search bar styles
 ============================================================================= */
 
 .search{
@@ -386,7 +343,6 @@ a:hover{ text-decoration: underline; }
   outline-offset: 2px;
 }
 
-/* Home-only: intentionally oversized */
 #home-search-card .search-input,
 #home-search-card .search .field__input{
   font-size: 1.15rem;
@@ -404,7 +360,7 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  8) Page headers
+  Page headers
 ============================================================================= */
 
 .page-header{
@@ -424,7 +380,7 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  9) Shared thumbnail component
+  Thumbnail component
 ============================================================================= */
 
 .thumb{
@@ -447,7 +403,7 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  10) Suggestions list (still used on home)
+  Suggestions list
 ============================================================================= */
 
 .suggestions{
@@ -460,7 +416,7 @@ a:hover{ text-decoration: underline; }
 .suggestions:empty{ display: none; }
 
 /* =============================================================================
-  11) Home panels (Search / Identify cards)
+  Home panels
 ============================================================================= */
 
 .home-shell{ display: block; }
@@ -471,7 +427,6 @@ a:hover{ text-decoration: underline; }
   grid-template-columns: 1fr;
 }
 
-/* Landscape phones: allow a 2-up layout */
 @media (max-width: 719px) and (orientation: landscape){
   .home-panels{
     grid-template-columns: 1fr 1fr;
@@ -495,7 +450,6 @@ a:hover{ text-decoration: underline; }
   letter-spacing: -0.01em;
 }
 
-/* Search card expands by default and shrinks while typing */
 #home-search-card{
   min-height: 42svh;
   transition: min-height 180ms ease, padding 180ms ease;
@@ -511,7 +465,6 @@ body.is-searching #home-search-card{
   body.is-searching #home-search-card{ min-height: 0; }
 }
 
-/* Identify card is one big link */
 .home-card-link{
   text-decoration: none;
   cursor: pointer;
@@ -522,7 +475,6 @@ body.is-searching #home-search-card{
   background: rgba(17,24,39,0.02);
 }
 
-/* Identify hero (icon rotation area) */
 .identify-hero{
   width: 100%;
   border: none;
@@ -557,44 +509,20 @@ body.is-searching #home-search-card{
   }
 }
 
-/* Results panel on home (hidden by default via [hidden])
-   ---------------------------------------------------------------------------
-   CHANGE (2026-02-09)
-   - Home search results should REPLACE the Identify card while the user is typing.
-   - Results panel should feel like the All Pastas page: white page, table sits on white.
-   - So: results panel is NOT a grey "card" (index.njk no longer applies .card here).
---------------------------------------------------------------------------- */
+/* Results panel */
 .home-results{
-  /* Home results should lay out like a small page section, not a card. */
   display: grid;
   gap: var(--gap);
-
-  /* Allow the results area to scroll if needed (e.g., landscape phone). */
   overflow: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-/* When searching:
-   - Show results panel
-   - Hide Identify card (results take its place) */
+/* While searching: show results, hide Identify card */
 body.is-searching #home-results-panel{ display: grid; }
 body.is-searching #home-identify-card{ display: none; }
 
 /* =============================================================================
-  12) Results tools row (count + paging button)
-============================================================================= */
-
-.results-tools{
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-  margin-top: 0.75rem;
-  flex-wrap: wrap;
-}
-
-/* =============================================================================
-  13) Identify page UI (answer tiles + glyphs)
+  Identify UI (kept as-is)
 ============================================================================= */
 
 .identify{
@@ -670,31 +598,19 @@ body.is-searching #home-identify-card{ display: none; }
 .identify-answer-meta{ min-width: 0; }
 
 .identify-answer-title{
-  /* Ensure the title always sits on its own line above the description. */
   display: block;
   font-weight: 750;
   letter-spacing: -0.01em;
 }
 
 .identify-answer-desc{
-  /* Ensure the description always wraps to a new line with breathing room. */
   display: block;
   margin-top: 0.4rem;
   font-size: 0.92rem;
   color: var(--muted);
 }
 
-/* =============================================================================
-  Identify - Question 1 "Not Sure" tile (General type)
-  ---------------------------------------------------------------------------
-  PURPOSE
-  - Question 1 uses enum-style tiles that normally show an image.
-  - You requested the Not Sure option use a centered "?" glyph like the other
-    Not Sure tiles (Y / N / ?).
-  - This CSS overlays a "?" glyph and hides the (often-missing) image.
-============================================================================= */
-
-/* Common keys we’ve used for the first question across iterations. */
+/* Not sure glyph for first question */
 .identify-answers[data-key="type"] .identify-answer[data-value="not_sure"] img,
 .identify-answers[data-key="generalType"] .identify-answer[data-value="not_sure"] img,
 .identify-answers[data-key="general-type"] .identify-answer[data-value="not_sure"] img,
@@ -702,7 +618,6 @@ body.is-searching #home-identify-card{ display: none; }
   display: none;
 }
 
-/* Render the ? glyph in the left "thumb" slot of the tile */
 .identify-answers[data-key="type"] .identify-answer[data-value="not_sure"]::before,
 .identify-answers[data-key="generalType"] .identify-answer[data-value="not_sure"]::before,
 .identify-answers[data-key="general-type"] .identify-answer[data-value="not_sure"]::before,
@@ -744,7 +659,7 @@ body.is-searching #home-identify-card{ display: none; }
 }
 
 /* =============================================================================
-  14) Table styling (All Pastas + standardized Results tables)
+  Tables (All Pastas + Search results standardized)
 ============================================================================= */
 
 /* Table shell */
@@ -753,23 +668,25 @@ body.is-searching #home-identify-card{ display: none; }
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 2px);
   background: #fff;
-  overflow: visible;
+
+  /* FIX #3:
+     Clip the table content (including thead background) to rounded corners.
+     This is the key change if your header looked "square" in the corners. */
+  overflow: hidden;
 }
 
-/* Results panel: less top margin so it feels tight and intentional */
+/* Results panel: tighter spacing */
 .table-wrap--results{ margin-top: 0.25rem; }
 
 .table-scroll{
-  /* Horizontal scroll on very narrow screens (mobile-first) */
+  /* Horizontal scroll for small screens. */
   overflow-x: auto;
 
-  /* IMPORTANT (2026-02-09):
-     - Hide vertical overflow so the thead background cannot "square off" the
-       rounded corners of the table wrap on Home Search results. */
+  /* Keep vertical clipping - avoids “corner bleed” and stray visual lines. */
   overflow-y: hidden;
 
-  /* Clip table contents to the rounded corners of the parent wrapper. */
-  border-radius: inherit;
+  /* Background stability in scroll container (some browsers show a line if transparent). */
+  background: #fff;
 
   -webkit-overflow-scrolling: touch;
 }
@@ -780,7 +697,7 @@ body.is-searching #home-identify-card{ display: none; }
   table-layout: fixed;
 }
 
-/* Column sizing presets */
+/* Column sizing */
 .data-table--all .col-thumb,
 .data-table--results .col-thumb{ width: 84px; }
 
@@ -790,11 +707,8 @@ body.is-searching #home-identify-card{ display: none; }
 .data-table--all .col-category,
 .data-table--results .col-category{ width: 11rem; }
 
-/* Header row (NOT sticky) */
+/* Header row */
 .data-table thead th{
-  position: static;
-  top: auto;
-
   background: #fff;
   text-align: left;
   font-size: 0.9rem;
@@ -806,17 +720,15 @@ body.is-searching #home-identify-card{ display: none; }
   padding: 0.9rem 0.9rem;
 }
 
+/* Optional - makes the header corners look intentional even if you zoom in */
+.data-table thead th:first-child{ border-top-left-radius: calc(var(--radius) + 2px); }
+.data-table thead th:last-child{ border-top-right-radius: calc(var(--radius) + 2px); }
+
 .data-table tbody td,
 .data-table tbody th{
   border-bottom: 1px solid var(--border);
   padding: 0.85rem 0.9rem;
   vertical-align: middle;
-}
-
-/* Remove the "extra" border at the bottom of the table (Home Search results) */
-.data-table tbody tr:last-child td,
-.data-table tbody tr:last-child th{
-  border-bottom: 0;
 }
 
 .data-table tbody tr:hover{
@@ -847,11 +759,15 @@ body.is-searching #home-identify-card{ display: none; }
   word-break: break-word;
 }
 
-.synonyms--empty{
-  color: rgba(107,114,128,0.65);
+/* FIX #4:
+   Remove the bottom border on the last row cells - this prevents the "extra line"
+   above the wrapper border that can look like an unnecessary divider. */
+.data-table tbody tr:last-child > td,
+.data-table tbody tr:last-child > th{
+  border-bottom: 0 !important;
 }
 
-/* Sortable header affordance (matches your All Pastas look) */
+/* Sortable header affordance */
 .data-table__sortable{
   cursor: pointer;
   user-select: none;
@@ -863,8 +779,6 @@ body.is-searching #home-identify-card{ display: none; }
 
 .data-table__sortable:hover{ color: var(--fg); }
 
-/* IMPORTANT:
-   Allow .data-table__sortable to be a <button> without looking like a button */
 button.data-table__sortable{
   background: transparent;
   border: 0;
@@ -894,16 +808,11 @@ button.data-table__sortable:focus-visible{
 .data-table__sortable[aria-sort="ascending"] .sort-indicator::before{ content: "↑"; }
 .data-table__sortable[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
 
-/* Also support aria-sort being placed on the <th> (Home table does this) */
 th[aria-sort="none"] .sort-indicator::before{ content: "⇅"; }
 th[aria-sort="ascending"] .sort-indicator::before{ content: "↑"; }
 th[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
 
-/* =============================================================================
-  14a) Hide Synonyms column on narrow screens (All + Results)
-  - Assumes Synonyms is the 4th column
-============================================================================= */
-
+/* Hide Synonyms column on narrow screens (All + Results) */
 @media (max-width: 719px){
   .data-table--all thead th:nth-child(4),
   .data-table--results thead th:nth-child(4){
@@ -921,20 +830,11 @@ th[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
   }
 }
 
-/* =============================================================================
-  14b) Home Search - hide Category column on very narrow screens
-  ---------------------------------------------------------------------------
-  PURPOSE
-  - For the Home Search results table, space is tight on small phones.
-  - If needed, hide the Category column while keeping:
-      Thumb + Name + Synonyms
-  - This targets ONLY the results table, not the All Pastas table.
-  NOTE
-  - Column order in the results table is:
-      1) Thumb, 2) Name, 3) Category, 4) Synonyms
-============================================================================= */
-
-@media (max-width: 520px){
+/* FIX #5:
+   Home Search results - also hide Category column when space is tight.
+   Breakpoint chosen to be practical on common phones.
+   Column order: 1 Thumb, 2 Name, 3 Category, 4 Synonyms */
+@media (max-width: 640px){
   .data-table--results thead th:nth-child(3),
   .data-table--results tbody td:nth-child(3),
   .data-table--results colgroup col:nth-child(3){
@@ -943,7 +843,7 @@ th[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
 }
 
 /* =============================================================================
-  15) Footer (minimal)
+  Footer
 ============================================================================= */
 
 .site-footer{
@@ -958,7 +858,7 @@ th[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
 .footer-tagline{ margin: 0; }
 
 /* =============================================================================
-  16) Mobile bottom navigation (Search / Identify)
+  Mobile bottom navigation
 ============================================================================= */
 
 .bottom-nav{
