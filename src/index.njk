@@ -1,47 +1,37 @@
 ---
 title: Pasta Shapes
 layout: layout.njk
-description: "Search pasta shapes by name and aliases, or identify a shape by answering a few quick quick questions."
+description: "Search pasta shapes by name and aliases, or identify a shape by answering a few quick questions."
 ---
 
 {# =============================================================================
-  /src/index.njk (Homepage)
+  /src/index.njk
   ------------------------------------------------------------------------------
-  PURPOSE
-  - Homepage is the Search page.
-  - Search filters the results table as the user types.
-  - While searching, the Results panel REPLACES the Identify card (more room; less clutter).
-  - Identify card links to /identify/ (hidden while searching to give results more space).
+  HOMEPAGE STRUCTURE
+  - Search card (always visible)
+  - Results panel (hidden until user starts searching)
+  - Identify card (hidden while searching - results take its place)
 
-  STATUS LINES
-  - #pasta-search-status: owned by pasta-search.js (typeahead messaging)
-  - #pasta-search-count : owned by scripts.js (table filter counts)
+  ROTATOR SYNC
+  - Both the Search placeholder and the Identify icon use the SAME list/order.
+  - scripts.js uses data-rotator-group to tick both on the same interval.
 
-  IMAGEKIT THUMBNAILS
-  - Thumbnails resolve to:
-      https://ik.imagekit.io/mevius/pasta/thumbs/<ThumbnailImage>
-  - CSV field is:
-      ThumbnailImage
+  IMPORTANT
+  - If you change the list of shapes, update it ONLY in one place below.
+
 ============================================================================= #}
 
-{# Preferred ImageKit base from your Eleventy global paths object #}
 {% set IK_BASE = (paths.imagekitBase | default("https://ik.imagekit.io/mevius")) %}
 {% set IK_THUMBS_BASE = IK_BASE ~ "/pasta/thumbs/" %}
 {% set IK_CAROUSEL_BASE = IK_BASE ~ "/pasta/carousel/" %}
 {% set FALLBACK_THUMB = "pending.png" %}
 
 {# -----------------------------------------------------------------------------
-  Home rotator fallbacks (build-safe)
+  ROTATOR LIST (single source of truth)
+  - If site data provides homeRotatorNames and homeRotatorIconSrcs, we use those.
+  - Otherwise, we use a fallback list.
+  - One item was previously removed - fallback list is 7 items (no "pasta").
 ----------------------------------------------------------------------------- #}
-{% set fallbackRotatorIconSrcs = [
-  IK_CAROUSEL_BASE ~ "penne.png",
-  IK_CAROUSEL_BASE ~ "ravioli.png",
-  IK_CAROUSEL_BASE ~ "fusilli.png",
-  IK_CAROUSEL_BASE ~ "conchiglie.png",
-  IK_CAROUSEL_BASE ~ "farfalle.png",
-  IK_CAROUSEL_BASE ~ "gnocchi.png",
-  IK_CAROUSEL_BASE ~ "ridge-macaroni.png"
-] %}
 
 {% set fallbackRotatorNames = [
   "penne",
@@ -53,30 +43,44 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   "macaroni"
 ] %}
 
-{% set rotatorIconSrcs = (homeRotatorIconSrcs | default([])) %}
-{% set rotatorNames = (homeRotatorNames | default([])) %}
+{% set fallbackRotatorIconSrcs = [
+  IK_CAROUSEL_BASE ~ "penne.png",
+  IK_CAROUSEL_BASE ~ "ravioli.png",
+  IK_CAROUSEL_BASE ~ "fusilli.png",
+  IK_CAROUSEL_BASE ~ "conchiglie.png",
+  IK_CAROUSEL_BASE ~ "farfalle.png",
+  IK_CAROUSEL_BASE ~ "gnocchi.png",
+  IK_CAROUSEL_BASE ~ "macaroni.png"
+] %}
 
-{% if rotatorIconSrcs | length == 0 %}
-  {% set rotatorIconSrcs = fallbackRotatorIconSrcs %}
-{% endif %}
+{% set rotatorNames = (homeRotatorNames | default([])) %}
+{% set rotatorIconSrcs = (homeRotatorIconSrcs | default([])) %}
+
 {% if rotatorNames | length == 0 %}
   {% set rotatorNames = fallbackRotatorNames %}
 {% endif %}
 
-{% set firstRotatorIcon = rotatorIconSrcs[0] | default(fallbackRotatorIconSrcs[0]) %}
+{% if rotatorIconSrcs | length == 0 %}
+  {% set rotatorIconSrcs = fallbackRotatorIconSrcs %}
+{% endif %}
+
+{% set firstRotatorIcon = rotatorIconSrcs[0] %}
+{% set rotatorNamesCsv = rotatorNames | join(',') %}
+{% set rotatorIconsCsv = rotatorIconSrcs | join(',') %}
 
 <section class="home-panels">
 
   {# ===========================================================================
     CARD 1 - SEARCH BY NAME
   =========================================================================== #}
-  <section id="home-search-card" class="home-card card stack" aria-label="Search by name">
+  <section id="home-search-card" class="home-card card" aria-label="Search by name">
     <header class="home-card-head">
-      <h1 class="h2 home-card-title">Search by Name</h1>
+      <h1 class="home-card-title">Search by Name</h1>
     </header>
 
     <form id="pasta-search-form" class="search" action="/" method="get" novalidate>
       <label class="sr-only" for="pasta-q">Search by pasta name</label>
+
       <input
         id="pasta-q"
         name="q"
@@ -86,43 +90,28 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         autocomplete="off"
         autocapitalize="none"
         spellcheck="false"
-        placeholder="Start typing - e.g., penne"
+        placeholder="Start typing - e.g., {{ rotatorNames[0] }}"
         data-rotator-group="homeHero"
-        data-placeholder-rotate="1"
-        data-placeholder-template="Start typing - e.g., {example}"
-        data-placeholder-examples="penne,ravioli,fusilli,conchiglie,farfalle,gnocchi,macaroni"
+        data-rotator-role="placeholder"
+        data-rotator-names="{{ rotatorNamesCsv }}"
         data-rotate-interval="2500"
       />
     </form>
 
-    {# pasta-search.js writes typeahead messages here (optional) #}
-    <p id="pasta-search-status" class="muted home-search-status" aria-live="polite"></p>
-
-    {# scripts.js writes table-filter counts here #}
-    <p id="pasta-search-count" class="muted home-search-count" aria-live="polite">
-      Start typing to see matches.
-    </p>
+    <p id="pasta-search-status" class="muted" aria-live="polite"></p>
+    <p id="pasta-search-count" class="muted" aria-live="polite">Start typing to see matches.</p>
   </section>
 
   {# ===========================================================================
-    RESULTS PANEL - hidden until user types
-    ---------------------------------------------------------------------------
-    CHANGE (2026-02-09)
-    - Results panel is placed BEFORE the Identify card in markup so it can visually
-      replace the Identify card when searching (same grid slot).
-    - Results panel is NOT a .card (no grey background). Table sits on white page.
+    RESULTS PANEL (not a grey card - table sits on white)
   =========================================================================== #}
   <section
     id="home-results-panel"
-    class="home-results stack"
+    class="home-results"
     aria-label="Search results"
     hidden
   >
     <ul id="pasta-search-suggestions" class="suggestions" aria-label="Suggestions"></ul>
-
-    <p id="pasta-results-note" class="note" hidden>
-      Matches are prefix-based (e.g., “p” matches “penne”).
-    </p>
 
     <div class="table-wrap table-wrap--results">
       <div class="table-scroll">
@@ -141,29 +130,9 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
           <thead>
             <tr>
               <th scope="col" class="data-table__thumb"></th>
-
-              {# -----------------------------------------------------------------
-                Sort headers (match All Pastas look)
-                - Use your existing sortable affordance:
-                    .data-table__sortable + .sort-indicator
-                - Keep aria-sort on the <th> so CSS can render arrows.
-                - JS listens for clicks on ".js-sort".
-              ------------------------------------------------------------------ #}
-              <th scope="col" class="data-table__name" data-sort="name" aria-sort="ascending">
-                <button type="button" class="data-table__sortable js-sort" data-sort="name">
-                  Name <span class="sort-indicator" aria-hidden="true"></span>
-                </button>
-              </th>
-
-              <th scope="col" class="cell-category" data-sort="category" aria-sort="none">
-                <button type="button" class="data-table__sortable js-sort" data-sort="category">
-                  Category <span class="sort-indicator" aria-hidden="true"></span>
-                </button>
-              </th>
-
-              <th scope="col" class="cell-synonyms">
-                Synonyms
-              </th>
+              <th scope="col" class="data-table__name">Name</th>
+              <th scope="col" class="cell-category">Category</th>
+              <th scope="col" class="cell-synonyms">Synonyms</th>
             </tr>
           </thead>
 
@@ -173,7 +142,6 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
               {% set alsoRaw = (item.Synonyms or item.SearchAliases or "") %}
               {% set categoryRaw = (item.Category or "") %}
 
-              {# FIX: Use ThumbnailImage (your primary field) #}
               {% set thumbFile =
                 (item.ThumbnailImage
                   or item.ThumbImage
@@ -227,22 +195,21 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       </div>
     </div>
 
-    <a id="pasta-toggle-all" class="btn btn--ghost" href="#" hidden>
-      Next 10
-    </a>
+    <a id="pasta-toggle-all" class="btn btn--ghost" href="#" hidden>Next 10</a>
   </section>
 
   {# ===========================================================================
-    CARD 2 - IDENTIFY BY SHAPE (hidden while searching)
+    CARD 2 - IDENTIFY BY SHAPE
+    - Hidden while searching (results panel replaces it)
   =========================================================================== #}
   <a
     id="home-identify-card"
-    class="home-card home-card-link card stack"
+    class="home-card home-card-link card"
     href="/identify/"
     aria-label="Identify by Shape - go to Identify page"
   >
     <header class="home-card-head">
-      <h2 class="h2 home-card-title">Identify by Shape</h2>
+      <h2 class="home-card-title">Identify by Shape</h2>
     </header>
 
     <div class="identify-hero" aria-hidden="true">
@@ -256,9 +223,9 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
         width="96"
         height="96"
         data-rotator-group="homeHero"
-        data-rotate="1"
-        data-rotate-srcs="{{ rotatorIconSrcs | join(',') }}"
-        data-rotate-names="{{ rotatorNames | join(',') }}"
+        data-rotator-role="icon"
+        data-rotator-names="{{ rotatorNamesCsv }}"
+        data-rotator-icons="{{ rotatorIconsCsv }}"
         data-rotate-interval="2500"
         data-rotate-fade="240"
       />
