@@ -852,7 +852,7 @@ th[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
 }
 
 .site-footer-inner{
-  padding: 1.25rem var(--pad);
+  padding: 1.25rem var(--pad) 7.5rem;
 }
 
 .footer-tagline { 
