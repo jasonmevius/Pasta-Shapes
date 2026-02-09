@@ -453,6 +453,7 @@ a:hover{ text-decoration: underline; }
 #home-search-card{
   min-height: 42svh;
   transition: min-height 180ms ease, padding 180ms ease;
+  margin: 1rem 0 0;
 }
 
 body.is-searching #home-search-card{
@@ -847,7 +848,6 @@ th[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
 ============================================================================= */
 
 .site-footer{
-  border-top: 1px solid var(--border);
   background: #fff;
 }
 
@@ -855,7 +855,11 @@ th[aria-sort="descending"] .sort-indicator::before{ content: "↓"; }
   padding: 1.25rem var(--pad);
 }
 
-.footer-tagline{ margin: 0; }
+.footer-tagline { 
+  margin: 0;
+  font-size: 90%;
+  text-align: center;             
+}
 
 /* =============================================================================
   Mobile bottom navigation
