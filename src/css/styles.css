@@ -3,20 +3,20 @@
   ------------------------------------------------------------------------------
   GLOBAL STYLESHEET (mobile-first)
 
-  FIXES IN THIS REVISION (mobile width focus)
-  1) "Skip to content" should not be visible unless focused.
-  2) Even vertical spacing: same gap between Search/Identify, plus same gap above
-     Search and below Identify.
-  3) Remove border from .site-footer.
-  4) Restore styling for footer navigation (Search / Identify bottom nav).
-  5) No change to hamburger (already fixed), no change to search logic.
+  THIS REVISION - STYLE ONLY (NO FUNCTIONAL CHANGES)
+  1) Mobile: hide footer tagline text ("Built for fast, simple pasta lookup...")
+  2) Mobile: make Search + Identify cards fill the viewport between topbar and
+     bottom nav, with even space above and below
+  3) Mobile: remove the "double line" under the hamburger drawer
 
-  IMPORTANT PROJECT RULE
-  - All CSS stays here (no inline styles).
-  - Heavily commented for future-proofing.
-
+  Project rules:
+  - CSS lives here (no inline styles)
+  - Heavily commented for future-proofing
 ============================================================================= */
 
+/* -----------------------------------------------------------------------------
+  Tokens
+----------------------------------------------------------------------------- */
 :root{
   --bg: #ffffff;
   --fg: #111827;
@@ -28,11 +28,13 @@
   --radius: 14px;
   --container: 56rem;
 
-  /* Primary spacing token for the site */
   --pad: 1rem;
   --gap: 0.75rem;
 
-  /* Bottom nav sizing (mobile) */
+  /* IMPORTANT: used to compute available "home" height */
+  --topbar-h: 60px;
+
+  /* Mobile bottom nav visual + reserved space */
   --bottom-nav-h: 72px;
 }
 
@@ -52,7 +54,7 @@ body{
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* Mobile bottom nav is fixed - reserve space so content isn’t covered */
+  /* Reserve space so content isn't hidden behind the fixed bottom nav */
   padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom));
 }
 
@@ -60,10 +62,8 @@ a{ color: inherit; }
 a:hover{ text-decoration: underline; }
 
 /* -----------------------------------------------------------------------------
-  Accessibility utilities
+  Accessibility helpers
 ----------------------------------------------------------------------------- */
-
-/* Screen reader only helper */
 .sr-only{
   position: absolute !important;
   width: 1px !important;
@@ -77,18 +77,8 @@ a:hover{ text-decoration: underline; }
 }
 
 /* =============================================================================
-  FIX #1: Skip link should never be visibly “stuck” on the page.
-  ------------------------------------------------------------------------------
-  Your markup might use:
-  - class="skip"
-  - class="skip-link"
-  - a link whose text is "Skip to content"
-  - a link that targets #content
-
-  This block hides common variants offscreen until keyboard focus.
+  Skip link - hidden unless focused (prevents "Skip to content" showing)
 ============================================================================= */
-
-/* Hide offscreen by default */
 .skip,
 .skip-link,
 a.skip,
@@ -103,7 +93,6 @@ a[href="#content"]{
   white-space: nowrap !important;
 }
 
-/* Only show when focused (keyboard) */
 .skip:focus,
 .skip-link:focus,
 a.skip:focus,
@@ -114,17 +103,15 @@ a[href="#content"]:focus{
   width: auto !important;
   height: auto !important;
   padding: 0.5rem 0.75rem !important;
-
   background: var(--fg) !important;
   color: var(--bg) !important;
   border-radius: 10px !important;
   z-index: 1000 !important;
-
   text-decoration: none !important;
 }
 
 /* -----------------------------------------------------------------------------
-  Layout container
+  Container
 ----------------------------------------------------------------------------- */
 .container{
   max-width: var(--container);
@@ -133,7 +120,7 @@ a[href="#content"]:focus{
 }
 
 /* -----------------------------------------------------------------------------
-  Cards + buttons
+  Cards
 ----------------------------------------------------------------------------- */
 .card{
   border: 1px solid var(--border);
@@ -143,7 +130,7 @@ a[href="#content"]:focus{
 }
 
 /* -----------------------------------------------------------------------------
-  Topbar + nav (kept minimal here - hamburger already fixed)
+  Topbar + nav
 ----------------------------------------------------------------------------- */
 .topbar{
   position: sticky;
@@ -160,6 +147,7 @@ a[href="#content"]:focus{
   justify-content: space-between;
   gap: 0.75rem;
   padding: 0.75rem var(--pad);
+
   max-width: var(--container);
   margin: 0 auto;
 }
@@ -192,17 +180,22 @@ a[href="#content"]:focus{
   text-decoration: none;
 }
 
-/* Hamburger button (mobile) - centering already fixed, keep it here */
+/* -----------------------------------------------------------------------------
+  Hamburger button (mobile)
+----------------------------------------------------------------------------- */
 .nav-toggle{
   display: inline-flex;
   align-items: center;
   justify-content: center;
+
   width: 42px;
   height: 42px;
+
   border: 1px solid var(--border);
   border-radius: 12px;
   background: #fff;
   color: var(--fg);
+
   cursor: pointer;
   padding: 0;
   line-height: 1;
@@ -226,6 +219,9 @@ a[href="#content"]:focus{
   .nav-toggle{ display: none; }
 }
 
+/* -----------------------------------------------------------------------------
+  Mobile nav drawer
+----------------------------------------------------------------------------- */
 .nav-drawer{
   max-width: var(--container);
   margin: 0 auto;
@@ -234,9 +230,15 @@ a[href="#content"]:focus{
   display: grid;
   gap: 0.35rem;
 
-  border-bottom: 1px solid var(--border);
   background: rgba(255,255,255,0.92);
   backdrop-filter: blur(10px);
+
+  /* =============================================================================
+    FIX #3: remove the extra/double divider line
+    - previously: border-bottom: 1px solid var(--border);
+    - topbar already has a border-bottom, and this created a doubled look
+  ============================================================================= */
+  border-bottom: 0 !important;
 }
 
 .nav-drawer a{
@@ -249,6 +251,7 @@ a[href="#content"]:focus{
   font-weight: 650;
 }
 .nav-drawer a:hover{ background: rgba(17,24,39,0.03); }
+
 @media (min-width: 720px){
   .nav-drawer{ display: none !important; }
 }
@@ -276,36 +279,73 @@ a[href="#content"]:focus{
 }
 
 /* -----------------------------------------------------------------------------
-  Home panels (Search + Identify)
+  Home layout
 ----------------------------------------------------------------------------- */
 
-/* =============================================================================
-  FIX #2: Even vertical spacing
-  ------------------------------------------------------------------------------
-  We want:
-  - same gap above Search card
-  - same gap between Search and Identify cards
-  - same gap below Identify card
-
-  The cleanest approach: pad the .home-panels container with padding-block that
-  matches its internal gap.
-============================================================================= */
+/* Default: stacked cards with an even gap */
 .home-panels{
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--gap);
 
-  /* Even outer spacing */
+  /* Even spacing above and below the card stack */
   padding-top: var(--gap);
   padding-bottom: var(--gap);
 }
 
-/* Cards in the home grid */
+/* =============================================================================
+  FIX #2: Fill the available viewport height on mobile
+  ------------------------------------------------------------------------------
+  Goal:
+  - Topbar at top
+  - Bottom-nav fixed at bottom
+  - The area in-between should be "owned" by the two cards
+  - Even spacing above and below, plus even gap between cards
+
+  Approach:
+  - Give .home-panels a min-height based on viewport minus topbar and bottom nav
+  - Make the grid rows 1fr 1fr so each card grows evenly
+============================================================================= */
+@media (max-width: 719px){
+  .home-panels{
+    /* 100svh is more stable than 100vh on mobile browsers */
+    min-height: calc(
+      100svh
+      - var(--topbar-h)
+      - var(--bottom-nav-h)
+      - env(safe-area-inset-bottom)
+    );
+
+    /* Make the two cards fill the space evenly */
+    grid-template-rows: 1fr 1fr;
+    align-content: stretch;
+  }
+
+  /* While searching, Identify is hidden and results replace it.
+     In this state, Search should stay "natural height" and results fill the rest. */
+  body.is-searching .home-panels{
+    grid-template-rows: auto 1fr;
+  }
+
+  /* Place results panel in the second row so it truly replaces Identify */
+  #home-results-panel{
+    grid-row: 2;
+  }
+
+  /* Ensure Identify card doesn't reserve space when hidden */
+  #home-identify-card[hidden]{
+    display: none !important;
+  }
+}
+
+/* Cards inside home grid */
 .home-card{
   border-radius: calc(var(--radius) + 4px);
   padding: 1rem;
 
-  /* Mobile - keep layout stable */
+  /* Allow the card to expand to fill its grid row */
+  height: 100%;
+
   display: flex;
   flex-direction: column;
 }
@@ -322,11 +362,10 @@ a[href="#content"]:focus{
   letter-spacing: -0.01em;
 }
 
-/* Identify card is one big link */
+/* Identify card is a full-card link */
 .home-card-link{
   text-decoration: none;
   cursor: pointer;
-  position: relative;
 }
 .home-card-link:hover{
   text-decoration: none;
@@ -339,7 +378,6 @@ a[href="#content"]:focus{
   background: transparent;
   border: none;
 
-  /* Grow to fill remaining card height gracefully */
   flex: 1 1 auto;
 
   display: flex;
@@ -348,7 +386,7 @@ a[href="#content"]:focus{
   min-height: 10rem;
 }
 
-/* Rotator image */
+/* Rotator image - anti-flicker hardening */
 .identify-hero img{
   display: block;
   object-fit: contain;
@@ -356,14 +394,19 @@ a[href="#content"]:focus{
   height: 96px;
   opacity: 1;
   transition: opacity 240ms ease;
+
+  backface-visibility: hidden;
+  transform: translateZ(0);
+  will-change: opacity;
 }
+
 .identify-hero img.is-fading{ opacity: 0; }
 
 @media (prefers-reduced-motion: reduce){
   .identify-hero img{ transition: none; }
 }
 
-/* Home results panel (shown when searching) */
+/* Home results panel (shown while searching) */
 .home-results{
   display: grid;
   gap: var(--gap);
@@ -374,15 +417,16 @@ body.is-searching #home-results-panel{ display: grid; }
 body.is-searching #home-identify-card{ display: none; }
 
 /* -----------------------------------------------------------------------------
-  Tables (Search results + All Pastas style)
+  Tables (Search results)
 ----------------------------------------------------------------------------- */
 .table-wrap{
   margin-top: 1rem;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) + 2px);
   background: #fff;
-  overflow: hidden; /* needed for corner clipping */
+  overflow: hidden;
 }
+
 .table-wrap--results{ margin-top: 0.25rem; }
 
 .table-scroll{
@@ -438,9 +482,7 @@ body.is-searching #home-identify-card{ display: none; }
   word-break: break-word;
 }
 
-/* -----------------------------------------------------------------------------
-  Thumbnail
------------------------------------------------------------------------------ */
+/* Thumbnail */
 .thumb{
   width: 56px;
   height: 56px;
@@ -459,11 +501,27 @@ body.is-searching #home-identify-card{ display: none; }
   object-fit: cover;
 }
 
+/* Column hiding on narrow screens */
+@media (max-width: 719px){
+  .data-table--results thead th:nth-child(4),
+  .data-table--results tbody td:nth-child(4),
+  .data-table--results colgroup col:nth-child(4){
+    display: none;
+  }
+}
+@media (max-width: 640px){
+  .data-table--results thead th:nth-child(3),
+  .data-table--results tbody td:nth-child(3),
+  .data-table--results colgroup col:nth-child(3){
+    display: none;
+  }
+}
+
 /* -----------------------------------------------------------------------------
-  FIX #3: Remove border from .site-footer
+  Site footer
 ----------------------------------------------------------------------------- */
 .site-footer{
-  /* Remove any previously-set border */
+  /* Keep footer visually clean; no border */
   border: 0 !important;
   background: #fff;
 }
@@ -471,22 +529,20 @@ body.is-searching #home-identify-card{ display: none; }
 .site-footer-inner{
   padding: 1.25rem var(--pad);
 }
-.footer-tagline{ margin: 0; }
 
 /* =============================================================================
-  FIX #4: Footer navigation (Search / Identify) styling restored
-  ------------------------------------------------------------------------------
-  This assumes markup includes something like:
-    <nav class="bottom-nav" ...>
-      <div class="bottom-nav-inner">
-        <span class="bottom-nav-indicator"></span>
-        <a class="bottom-nav-link" ...>Search</a>
-        <a class="bottom-nav-link" ...>Identify</a>
-      </div>
-    </nav>
-
-  If your markup differs slightly but uses the same class names, this will work.
+  FIX #1: hide the footer tagline on mobile
+  - This removes "Built for fast, simple pasta lookup - mobile first."
 ============================================================================= */
+@media (max-width: 719px){
+  .footer-tagline{
+    display: none !important;
+  }
+}
+
+/* -----------------------------------------------------------------------------
+  Bottom nav (Search / Identify) - fixed pill bar
+----------------------------------------------------------------------------- */
 .bottom-nav{
   position: fixed;
   left: 0;
@@ -526,12 +582,11 @@ body.is-searching #home-identify-card{ display: none; }
 
   border-radius: 999px;
   background: rgba(17,24,39,0.06);
-
   transition: transform 160ms ease;
+
   pointer-events: none;
 }
 
-/* If nav sets data-active to "identify", slide the indicator */
 .bottom-nav[data-active="identify"] .bottom-nav-indicator{
   transform: translateX(100%);
 }
@@ -553,28 +608,6 @@ body.is-searching #home-identify-card{ display: none; }
   color: var(--muted);
 }
 
-/* Active state */
 .bottom-nav-link[aria-current="page"]{
   color: var(--fg);
-}
-
-/* -----------------------------------------------------------------------------
-  Column hiding (mobile usability)
------------------------------------------------------------------------------ */
-/* Hide Synonyms column on narrow screens (results tables) */
-@media (max-width: 719px){
-  .data-table--results thead th:nth-child(4),
-  .data-table--results tbody td:nth-child(4),
-  .data-table--results colgroup col:nth-child(4){
-    display: none;
-  }
-}
-
-/* If needed, also hide Category column on very narrow screens (results only) */
-@media (max-width: 640px){
-  .data-table--results thead th:nth-child(3),
-  .data-table--results tbody td:nth-child(3),
-  .data-table--results colgroup col:nth-child(3){
-    display: none;
-  }
 }
