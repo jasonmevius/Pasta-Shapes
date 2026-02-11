@@ -442,6 +442,12 @@ body.is-searching #home-identify-card{ display: none; }
   table-layout: fixed;
 }
 
+/* Shared column sizing */
+.data-table col.col-thumb{ width: 88px; }
+.data-table col.col-name{ width: 30%; }
+.data-table col.col-category{ width: 20%; }
+.data-table col.col-synonyms{ width: 42%; }
+
 .data-table thead th{
   background: #fff;
   text-align: left;
@@ -466,6 +472,14 @@ body.is-searching #home-identify-card{ display: none; }
 
 .data-table tbody tr:hover{
   background: rgba(17,24,39,0.02);
+}
+
+.data-table__name{
+  text-align: left;
+}
+
+.data-table tbody tr.data-row[data-slug]{
+  cursor: pointer;
 }
 
 .data-table__name a{

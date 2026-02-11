@@ -102,6 +102,7 @@ permalink: /all/
 
     <tr
       class="data-row"
+      data-slug="{{ slugVal }}"
       data-name="{{ (item.ShapeName or '') | lower | escape }}"
       data-category="{{ (item.Category or '') | lower | escape }}"
       data-synonyms="{{ synData | escape }}"

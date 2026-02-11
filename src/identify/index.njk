@@ -452,6 +452,20 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   }
 
   // Sort header wiring (local to Identify table)
+  if (els.resultsBody) {
+    els.resultsBody.addEventListener("click", (e) => {
+      const interactive = e.target.closest("a, button, input, select, textarea, label");
+      if (interactive) return;
+
+      const row = e.target.closest("tr.data-row[data-slug]");
+      if (!row || !els.resultsBody.contains(row)) return;
+
+      const slug = String(row.getAttribute("data-slug") || "").trim();
+      if (!slug) return;
+      window.location.href = `/pasta/${slug}/`;
+    });
+  }
+
   function initTableSorting() {
     if (!els.resultsTable) return;
 
