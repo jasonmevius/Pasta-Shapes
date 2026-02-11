@@ -180,6 +180,19 @@
     th.addEventListener("click", () => sortByHeader(th));
   });
 
+  // Make table rows clickable to open detail pages.
+  tbody.addEventListener("click", (e) => {
+    const interactive = e.target.closest("a, button, input, select, textarea, label");
+    if (interactive) return;
+
+    const row = e.target.closest("tr.data-row[data-slug]");
+    if (!row || !tbody.contains(row)) return;
+
+    const slug = normalize(row.dataset.slug);
+    if (!slug) return;
+    window.location.href = `/pasta/${slug}/`;
+  });
+
   populateCategoryDropdown();
   wireThumbFallbacks();
 
