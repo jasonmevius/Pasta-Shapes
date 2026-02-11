@@ -216,6 +216,19 @@
       toggleBtn.hidden = true;
       toggleBtn.addEventListener("click", (e) => e.preventDefault());
     }
+    // Make entire results row clickable (while preserving link behavior)
+    tbody.addEventListener("click", (e) => {
+      const interactive = e.target.closest("a, button, input, select, textarea, label");
+      if (interactive) return;
+
+      const row = e.target.closest("tr.data-row[data-slug]");
+      if (!row || !tbody.contains(row)) return;
+
+      const slug = (row.getAttribute("data-slug") || "").trim();
+      if (!slug) return;
+      window.location.href = `/pasta/${slug}/`;
+    });
+
 
     function setSearching(on) {
       document.body.classList.toggle("is-searching", on);

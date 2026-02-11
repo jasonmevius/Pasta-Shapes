@@ -442,6 +442,21 @@ body.is-searching #home-identify-card{ display: none; }
   table-layout: fixed;
 }
 
+/* Shared column sizing */
+.data-table col.col-thumb{ width: 88px; }
+.data-table col.col-name{ width: 28%; }
+.data-table col.col-category{ width: 18%; }
+.data-table col.col-synonyms{ width: 54%; }
+
+.data-table th.data-table__thumb,
+.data-table td.data-table__thumb{
+  width: 88px;
+  min-width: 88px;
+  max-width: 88px;
+  padding-left: 0.6rem;
+  padding-right: 0.6rem;
+}
+
 .data-table thead th{
   background: #fff;
   text-align: left;
@@ -468,11 +483,37 @@ body.is-searching #home-identify-card{ display: none; }
   background: rgba(17,24,39,0.02);
 }
 
-.data-table__name a{
-  text-decoration: none;
+.data-table__name{
+  text-align: left;
   font-weight: 700;
 }
-.data-table__name a:hover{ text-decoration: underline; }
+
+.data-table th.data-table__sortable{
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.14em;
+  text-decoration-thickness: 1.5px;
+}
+
+.data-table th.data-table__sortable .sort-indicator::before{
+  content: "↕";
+  margin-left: 0.32rem;
+  font-size: 0.82em;
+  opacity: 0.75;
+}
+
+.data-table th.data-table__sortable[aria-sort="ascending"] .sort-indicator::before{
+  content: "↑";
+}
+
+.data-table th.data-table__sortable[aria-sort="descending"] .sort-indicator::before{
+  content: "↓";
+}
+
+.data-table tbody tr.data-row[data-slug]{
+  cursor: pointer;
+}
+
 
 .cell-category{ color: var(--muted); }
 .cell-synonyms{
@@ -503,6 +544,8 @@ body.is-searching #home-identify-card{ display: none; }
 
 /* Column hiding on narrow screens */
 @media (max-width: 719px){
+  .data-table--results col.col-thumb{ width: 88px; }
+
   .data-table--results thead th:nth-child(4),
   .data-table--results tbody td:nth-child(4),
   .data-table--results colgroup col:nth-child(4){
@@ -510,6 +553,8 @@ body.is-searching #home-identify-card{ display: none; }
   }
 }
 @media (max-width: 640px){
+  .data-table--results col.col-thumb{ width: 88px; }
+
   .data-table--results thead th:nth-child(3),
   .data-table--results tbody td:nth-child(3),
   .data-table--results colgroup col:nth-child(3){

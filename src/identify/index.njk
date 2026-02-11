@@ -27,6 +27,8 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       - Synonyms (hidden on narrow screens via existing CSS rules)
 ============================================================================= #}
 
+{% from "partials/pasta-results-table.njk" import pastaResultsTable %}
+
 {# -----------------------------------------------------------------------------
   Build identifyData JSON in the template so JS has a compact dataset.
   NOTE: "category" is populated for the results table.
@@ -104,58 +106,20 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       <p class="muted" id="identify-results-count"></p>
     </div>
 
-    <div class="table-wrap table-wrap--results">
-      <div class="table-scroll">
-        <table
-          id="identify-results-table"
-          class="data-table data-table--results js-sortable-table"
-          aria-label="Identify matches table"
-        >
-          <colgroup>
-            <col class="col-thumb" />
-            <col class="col-name" />
-            <col class="col-category" />
-            <col class="col-synonyms" />
-          </colgroup>
-
-          <thead>
-            <tr>
-              <th scope="col" class="data-table__thumb">
-                <span class="sr-only">Thumb</span>
-              </th>
-
-              <th
-                scope="col"
-                class="data-table__sortable"
-                data-sort="name"
-                aria-sort="ascending"
-                tabindex="0"
-                role="button"
-              >
-                Name <span class="sort-indicator" aria-hidden="true"></span>
-              </th>
-
-              <th
-                scope="col"
-                class="data-table__sortable"
-                data-sort="category"
-                aria-sort="none"
-                tabindex="0"
-                role="button"
-              >
-                Category <span class="sort-indicator" aria-hidden="true"></span>
-              </th>
-
-              <th scope="col">Synonyms</th>
-            </tr>
-          </thead>
-
-          <tbody id="identify-results-body">
-            {# Rows rendered by JS #}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    {% call pastaResultsTable(
+      "identify",
+      "table-wrap table-wrap--results",
+      "Identify matches table",
+      "",
+      "",
+      "identify-results-table",
+      "data-table data-table--results js-sortable-table",
+      "Identify matches table",
+      "",
+      "identify-results-body"
+    ) %}
+      {# Rows rendered by JS #}
+    {% endcall %}
   </div>
 
   <div class="identify-bottom-bar" role="navigation" aria-label="Identify controls">
@@ -439,10 +403,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       thName.scope = "row";
       thName.className = "data-table__name";
 
-      const a = document.createElement("a");
-      a.href = `/pasta/${item.slug}/`;
-      a.textContent = item.name;
-      thName.appendChild(a);
+      thName.textContent = item.name;
 
       // Category
       const tdCat = document.createElement("td");
@@ -488,6 +449,20 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   }
 
   // Sort header wiring (local to Identify table)
+  if (els.resultsBody) {
+    els.resultsBody.addEventListener("click", (e) => {
+      const interactive = e.target.closest("a, button, input, select, textarea, label");
+      if (interactive) return;
+
+      const row = e.target.closest("tr.data-row[data-slug]");
+      if (!row || !els.resultsBody.contains(row)) return;
+
+      const slug = String(row.getAttribute("data-slug") || "").trim();
+      if (!slug) return;
+      window.location.href = `/pasta/${slug}/`;
+    });
+  }
+
   function initTableSorting() {
     if (!els.resultsTable) return;
 
