@@ -544,20 +544,7 @@ body.is-searching #home-identify-card{ display: none; }
 
 /* Column hiding on narrow screens */
 @media (max-width: 719px){
-  .data-table--results col.col-thumb,
-  .data-table--all col.col-thumb{ width: 88px; }
-
-  .data-table--results th.data-table__thumb,
-  .data-table--results td.data-table__thumb,
-  .data-table--all th.data-table__thumb,
-  .data-table--all td.data-table__thumb{
-    width: 88px;
-    min-width: 88px;
-    max-width: 88px;
-    padding-left: 0.6rem;
-    padding-right: 0.6rem;
-  }
-
+  /* Hide Synonyms on narrower screens */
   .data-table--results thead th:nth-child(4),
   .data-table--results tbody td:nth-child(4),
   .data-table--results colgroup col:nth-child(4),
@@ -566,10 +553,16 @@ body.is-searching #home-identify-card{ display: none; }
   .data-table--all colgroup col:nth-child(4){
     display: none;
   }
-}
-@media (max-width: 640px){
+
+  /* Re-balance the 3 visible columns explicitly. */
   .data-table--results col.col-thumb,
   .data-table--all col.col-thumb{ width: 88px; }
+
+  .data-table--results col.col-category,
+  .data-table--all col.col-category{ width: 26%; }
+
+  .data-table--results col.col-name,
+  .data-table--all col.col-name{ width: auto; }
 
   .data-table--results th.data-table__thumb,
   .data-table--results td.data-table__thumb,
@@ -581,7 +574,9 @@ body.is-searching #home-identify-card{ display: none; }
     padding-left: 0.6rem;
     padding-right: 0.6rem;
   }
-
+}
+@media (max-width: 640px){
+  /* Hide Category too on very small screens. */
   .data-table--results thead th:nth-child(3),
   .data-table--results tbody td:nth-child(3),
   .data-table--results colgroup col:nth-child(3),
@@ -589,6 +584,24 @@ body.is-searching #home-identify-card{ display: none; }
   .data-table--all tbody td:nth-child(3),
   .data-table--all colgroup col:nth-child(3){
     display: none;
+  }
+
+  /* Keep only thumb + name with explicit sizing. */
+  .data-table--results col.col-thumb,
+  .data-table--all col.col-thumb{ width: 88px; }
+
+  .data-table--results col.col-name,
+  .data-table--all col.col-name{ width: auto; }
+
+  .data-table--results th.data-table__thumb,
+  .data-table--results td.data-table__thumb,
+  .data-table--all th.data-table__thumb,
+  .data-table--all td.data-table__thumb{
+    width: 88px;
+    min-width: 88px;
+    max-width: 88px;
+    padding-left: 0.6rem;
+    padding-right: 0.6rem;
   }
 }
 
