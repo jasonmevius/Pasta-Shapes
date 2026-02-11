@@ -1,0 +1,108 @@
+{# =============================================================================
+  partials/pasta-results-table.njk
+  -----------------------------------------------------------------------------
+  Shared TABLE SHELL macro for pasta result views.
+
+  The caller provides <tbody> row content so page-specific row logic stays local
+  (home/all are server-rendered, identify is JS-rendered).
+============================================================================= #}
+
+{% macro pastaResultsTable(
+  mode="home",
+  wrapClass="table-wrap",
+  wrapAriaLabel="Pasta results table",
+  scrollRole="",
+  scrollAriaLabel="",
+  tableId="pasta-results-table",
+  tableClass="data-table data-table--results",
+  tableAriaLabel="Pasta results table",
+  tableCaption="",
+  tbodyId=""
+) %}
+<div class="{{ wrapClass }}" aria-label="{{ wrapAriaLabel }}">
+  <div class="table-scroll"{% if scrollRole %} role="{{ scrollRole }}"{% endif %}{% if scrollAriaLabel %} aria-label="{{ scrollAriaLabel }}"{% endif %}>
+    <table id="{{ tableId }}" class="{{ tableClass }}" aria-label="{{ tableAriaLabel }}">
+      {% if tableCaption %}
+        <caption class="sr-only">{{ tableCaption }}</caption>
+      {% endif %}
+
+      <colgroup>
+        <col class="col-thumb" />
+        <col class="col-name" />
+        <col class="col-category" />
+        <col class="col-synonyms" />
+      </colgroup>
+
+      <thead>
+        <tr>
+          {% if mode == "all" %}
+            <th scope="col" class="data-table__thumb">
+              <span class="sr-only">Thumbnail</span>
+            </th>
+          {% elif mode == "identify" %}
+            <th scope="col" class="data-table__thumb">
+              <span class="sr-only">Thumb</span>
+            </th>
+          {% else %}
+            <th scope="col" class="data-table__thumb"></th>
+          {% endif %}
+
+          {% if mode == "all" %}
+            <th scope="col"
+                class="data-table__sortable data-table__left"
+                data-sort-key="name"
+                aria-sort="ascending">
+              Name <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+          {% elif mode == "identify" %}
+            <th
+              scope="col"
+              class="data-table__sortable"
+              data-sort="name"
+              aria-sort="ascending"
+              tabindex="0"
+              role="button"
+            >
+              Name <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+          {% else %}
+            <th scope="col" class="data-table__name">Name</th>
+          {% endif %}
+
+          {% if mode == "all" %}
+            <th scope="col"
+                class="data-table__sortable data-table__left"
+                data-sort-key="category"
+                aria-sort="none">
+              Category <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+          {% elif mode == "identify" %}
+            <th
+              scope="col"
+              class="data-table__sortable"
+              data-sort="category"
+              aria-sort="none"
+              tabindex="0"
+              role="button"
+            >
+              Category <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
+          {% else %}
+            <th scope="col" class="cell-category">Category</th>
+          {% endif %}
+
+          {% if mode == "all" %}
+            <th scope="col" class="data-table__left">
+              Synonyms <span class="sr-only">(also known as)</span>
+            </th>
+          {% else %}
+            <th scope="col" class="cell-synonyms">Synonyms</th>
+          {% endif %}
+        </tr>
+      </thead>
+
+      <tbody{% if tbodyId %} id="{{ tbodyId }}"{% endif %}>{{ caller() }}</tbody>
+    </table>
+  </div>
+</div>
+{% endmacro %}
