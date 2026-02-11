@@ -79,7 +79,6 @@ permalink: /all/
       {% set slugVal = item.ShapeName | slug %}
     {% endif %}
 
-    {% set detailUrl = "/pasta/" ~ slugVal ~ "/" %}
 
     {% set thumbUrl = imagekitBase ~ "/pasta/thumbs/" ~ slugVal ~ ".png" %}
     {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
@@ -121,7 +120,7 @@ permalink: /all/
       </td>
 
       <th scope="row" class="data-table__name">
-        <a href="{{ detailUrl }}">{{ item.ShapeName }}</a>
+        {{ item.ShapeName }}
       </th>
 
       <td class="cell-category">{{ item.Category or "" }}</td>

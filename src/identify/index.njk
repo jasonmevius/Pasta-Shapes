@@ -403,10 +403,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       thName.scope = "row";
       thName.className = "data-table__name";
 
-      const a = document.createElement("a");
-      a.href = `/pasta/${item.slug}/`;
-      a.textContent = item.name;
-      thName.appendChild(a);
+      thName.textContent = item.name;
 
       // Category
       const tdCat = document.createElement("td");
