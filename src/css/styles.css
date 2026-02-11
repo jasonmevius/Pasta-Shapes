@@ -576,7 +576,55 @@ body.is-searching #home-identify-card{ display: none; }
   }
 }
 @media (max-width: 640px){
-  /* Hide Category too on very small screens. */
+  /* Keep Icon + Name + Category visible, but tighten sizing for small screens. */
+  .data-table--results col.col-thumb,
+  .data-table--all col.col-thumb{ width: 72px; }
+
+  .data-table--results col.col-category,
+  .data-table--all col.col-category{ width: 30%; }
+
+  .data-table--results col.col-name,
+  .data-table--all col.col-name{ width: auto; }
+
+  .data-table--results th.data-table__thumb,
+  .data-table--results td.data-table__thumb,
+  .data-table--all th.data-table__thumb,
+  .data-table--all td.data-table__thumb{
+    width: 72px;
+    min-width: 72px;
+    max-width: 72px;
+    padding-left: 0.45rem;
+    padding-right: 0.45rem;
+  }
+
+  .data-table thead th{
+    font-size: 0.82rem;
+    padding: 0.72rem 0.55rem;
+  }
+
+  .data-table tbody td,
+  .data-table tbody th{
+    padding: 0.68rem 0.55rem;
+  }
+
+  .thumb{
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+  }
+
+  .thumb img{
+    width: 48px;
+    height: 48px;
+  }
+
+  .cell-synonyms{
+    font-size: 0.88rem;
+  }
+}
+
+@media (max-width: 420px){
+  /* At very narrow widths, collapse Category and keep Icon + Name. */
   .data-table--results thead th:nth-child(3),
   .data-table--results tbody td:nth-child(3),
   .data-table--results colgroup col:nth-child(3),
@@ -586,22 +634,29 @@ body.is-searching #home-identify-card{ display: none; }
     display: none;
   }
 
-  /* Keep only thumb + name with explicit sizing. */
   .data-table--results col.col-thumb,
-  .data-table--all col.col-thumb{ width: 88px; }
-
-  .data-table--results col.col-name,
-  .data-table--all col.col-name{ width: auto; }
+  .data-table--all col.col-thumb{ width: 64px; }
 
   .data-table--results th.data-table__thumb,
   .data-table--results td.data-table__thumb,
   .data-table--all th.data-table__thumb,
   .data-table--all td.data-table__thumb{
-    width: 88px;
-    min-width: 88px;
-    max-width: 88px;
-    padding-left: 0.6rem;
-    padding-right: 0.6rem;
+    width: 64px;
+    min-width: 64px;
+    max-width: 64px;
+    padding-left: 0.4rem;
+    padding-right: 0.4rem;
+  }
+
+  .thumb{
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+  }
+
+  .thumb img{
+    width: 42px;
+    height: 42px;
   }
 }
 
