@@ -406,6 +406,109 @@ a[href="#content"]:focus{
   .identify-hero img{ transition: none; }
 }
 
+/* -----------------------------------------------------------------------------
+  Identify page (Option #2 layout)
+----------------------------------------------------------------------------- */
+.identify .identify-meta{
+  text-align: center;
+  padding-top: 0.6rem;
+  padding-bottom: 0.15rem;
+}
+
+#identify-count{ display: block; }
+
+.identify .identify-bottom-bar{
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 0 0.25rem;
+  flex-wrap: wrap;
+}
+
+.identify .identify-answers{
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.identify .identify-answer{
+  height: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  padding: 0.85rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.55rem;
+  cursor: pointer;
+}
+
+.identify .identify-answer:hover{
+  background: rgba(17,24,39,0.02);
+}
+
+.identify .identify-answer-meta{
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  text-align: center;
+}
+
+.identify .identify-answer > img,
+.identify .identify-answer-glyph{
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: #fff;
+  object-fit: contain;
+  display: block;
+}
+
+.identify .identify-answer > img{
+  padding: 6px;
+}
+
+.identify .identify-answer-glyph{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.6rem;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.identify .identify-answer-title{
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.identify .identify-answer-desc{
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.identify .identify-answers[data-kind="bool"] .identify-answer:last-child{
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 480px){
+  .identify .identify-answers{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (min-width: 768px){
+  .identify .identify-answers{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+
+.identify .identify-answers[data-kind="single"] .btn{
+  width: 100%;
+}
+
 /* Home results panel (shown while searching) */
 .home-results{
   display: grid;

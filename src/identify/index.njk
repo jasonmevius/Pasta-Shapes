@@ -597,8 +597,8 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       btn.type = "button";
       btn.className = "identify-answer";
 
-      // Bool questions use glyphs (Y / N / ?)
-      if (q.kind === "bool") {
+      // Bool questions (and enum Not sure) use glyphs (Y / N / ?)
+      if (q.kind === "bool" || value === "__ns__") {
         const glyph = document.createElement("span");
         glyph.className = "identify-answer-glyph";
         glyph.textContent = value === "yes" ? "Y" : value === "no" ? "N" : "?";
