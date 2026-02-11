@@ -210,6 +210,24 @@
     if (!input || !resultsPanel || !tbody) return;
 
     const rows = $all("tr.data-row", tbody);
+    const sortableHeaders = $all("th.data-table__sortable[data-sort]", tbody.closest("table") || document);
+
+    let sortKey = "name";
+    let sortDir = "ascending";
+
+    function compareRows(a, b, key, dir) {
+      const av = normalize(a.getAttribute(`data-${key}`) || "");
+      const bv = normalize(b.getAttribute(`data-${key}`) || "");
+      const cmp = av.localeCompare(bv, undefined, { sensitivity: "base" });
+      return dir === "ascending" ? cmp : -cmp;
+    }
+
+    function updateHeaderSortUi(activeKey, dir) {
+      sortableHeaders.forEach((th) => {
+        const key = th.getAttribute("data-sort");
+        th.setAttribute("aria-sort", key === activeKey ? dir : "none");
+      });
+    }
 
     // Permanently disable paging control on homepage
     if (toggleBtn) {
@@ -256,12 +274,8 @@
         if (name.startsWith(q)) matches.push(row);
       }
 
-      // Sort alphabetically by name (so "r" yields clean A-Z list)
-      matches.sort((ra, rb) => {
-        const a = normalize(ra.getAttribute("data-name"));
-        const b = normalize(rb.getAttribute("data-name"));
-        return a.localeCompare(b);
-      });
+      // Sort matches using current table sort key/dir
+      matches.sort((ra, rb) => compareRows(ra, rb, sortKey, sortDir));
 
       // Hide all then show all matches
       rows.forEach(r => { r.hidden = true; });
@@ -271,6 +285,31 @@
         countEl.textContent = matches.length ? `${matches.length} shown` : "No matches.";
       }
     }
+
+    sortableHeaders.forEach((th) => {
+      const toggle = () => {
+        const key = th.getAttribute("data-sort");
+        if (key !== "name" && key !== "category") return;
+        if (sortKey === key) {
+          sortDir = sortDir === "ascending" ? "descending" : "ascending";
+        } else {
+          sortKey = key;
+          sortDir = "ascending";
+        }
+        updateHeaderSortUi(sortKey, sortDir);
+        updateUI();
+      };
+
+      th.addEventListener("click", toggle);
+      th.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          toggle();
+        }
+      });
+    });
+
+    updateHeaderSortUi(sortKey, sortDir);
 
     // Hide all rows initially
     rows.forEach(r => { r.hidden = true; });

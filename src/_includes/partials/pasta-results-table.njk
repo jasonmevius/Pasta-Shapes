@@ -66,7 +66,16 @@
               Name <span class="sort-indicator" aria-hidden="true"></span>
             </th>
           {% else %}
-            <th scope="col" class="data-table__name">Name</th>
+            <th
+              scope="col"
+              class="data-table__sortable data-table__name"
+              data-sort="name"
+              aria-sort="ascending"
+              tabindex="0"
+              role="button"
+            >
+              Name <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
           {% endif %}
 
           {% if mode == "all" %}
@@ -88,7 +97,16 @@
               Category <span class="sort-indicator" aria-hidden="true"></span>
             </th>
           {% else %}
-            <th scope="col" class="cell-category">Category</th>
+            <th
+              scope="col"
+              class="data-table__sortable cell-category"
+              data-sort="category"
+              aria-sort="none"
+              tabindex="0"
+              role="button"
+            >
+              Category <span class="sort-indicator" aria-hidden="true"></span>
+            </th>
           {% endif %}
 
           {% if mode == "all" %}
