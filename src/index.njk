@@ -29,6 +29,9 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 {% set IK_CAROUSEL_BASE = IK_BASE ~ "/pasta/carousel/" %}
 {% set FALLBACK_THUMB = "pending.png" %}
 
+{% from "partials/pasta-results-table.njk" import pastaResultsTable %}
+
+
 {# -----------------------------------------------------------------------------
   ROTATOR LIST (requested)
 ----------------------------------------------------------------------------- #}
@@ -114,83 +117,72 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
   <section id="home-results-panel" class="home-results" aria-label="Search results" hidden>
     <ul id="pasta-search-suggestions" class="suggestions" aria-label="Suggestions"></ul>
 
-    <div class="table-wrap table-wrap--results">
-      <div class="table-scroll">
-        <table id="pasta-results-table" class="data-table data-table--results" aria-label="Pasta results table">
-          <colgroup>
-            <col class="col-thumb" />
-            <col class="col-name" />
-            <col class="col-category" />
-            <col class="col-synonyms" />
-          </colgroup>
+    {% call pastaResultsTable(
+      "home",
+      "table-wrap table-wrap--results",
+      "Pasta results table",
+      "",
+      "",
+      "pasta-results-table",
+      "data-table data-table--results",
+      "Pasta results table",
+      "",
+      "pasta-results-body"
+    ) %}
+      {% for item in pasta %}
 
-          <thead>
-            <tr>
-              <th scope="col" class="data-table__thumb"></th>
-              <th scope="col" class="data-table__name">Name</th>
-              <th scope="col" class="cell-category">Category</th>
-              <th scope="col" class="cell-synonyms">Synonyms</th>
-            </tr>
-          </thead>
+        {% set alsoRaw = (item.Synonyms or item.SearchAliases or "") %}
+        {% set categoryRaw = (item.Category or "") %}
 
-          <tbody id="pasta-results-body">
-            {% for item in pasta %}
+        {% set thumbFile =
+          (item.ThumbnailImage
+            or item.ThumbImage
+            or item.ThumbFile
+            or item.ImageFile
+            or FALLBACK_THUMB)
+        %}
 
-              {% set alsoRaw = (item.Synonyms or item.SearchAliases or "") %}
-              {% set categoryRaw = (item.Category or "") %}
+        {% set thumbIsUrl = (thumbFile and (thumbFile | lower | slice(0, 4) == "http")) %}
+        {% set thumbUrl = thumbFile if thumbIsUrl else (IK_THUMBS_BASE ~ thumbFile) %}
+        {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
 
-              {% set thumbFile =
-                (item.ThumbnailImage
-                  or item.ThumbImage
-                  or item.ThumbFile
-                  or item.ImageFile
-                  or FALLBACK_THUMB)
-              %}
+        <tr
+          class="data-row"
+          data-slug="{{ item.Slug }}"
+          data-name="{{ item.ShapeName }}"
+          data-category="{{ categoryRaw }}"
+          data-search="{{ item.ShapeName }} {{ alsoRaw }}"
+        >
+          <td class="data-table__thumb">
+            <span class="thumb" aria-hidden="true">
+              <img
+                src="{{ thumbUrlTransformed }}"
+                alt=""
+                loading="lazy"
+                decoding="async"
+                width="56"
+                height="56"
+              />
+            </span>
+          </td>
 
-              {% set thumbIsUrl = (thumbFile and (thumbFile | lower | slice(0, 4) == "http")) %}
-              {% set thumbUrl = thumbFile if thumbIsUrl else (IK_THUMBS_BASE ~ thumbFile) %}
-              {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
+          <th scope="row" class="data-table__name">
+            <a href="/pasta/{{ item.Slug }}/">{{ item.ShapeName }}</a>
+          </th>
 
-              <tr
-                class="data-row"
-                data-slug="{{ item.Slug }}"
-                data-name="{{ item.ShapeName }}"
-                data-category="{{ categoryRaw }}"
-                data-search="{{ item.ShapeName }} {{ alsoRaw }}"
-              >
-                <td class="data-table__thumb">
-                  <span class="thumb" aria-hidden="true">
-                    <img
-                      src="{{ thumbUrlTransformed }}"
-                      alt=""
-                      loading="lazy"
-                      decoding="async"
-                      width="56"
-                      height="56"
-                    />
-                  </span>
-                </td>
+          <td class="cell-category">{{ categoryRaw }}</td>
 
-                <th scope="row" class="data-table__name">
-                  <a href="/pasta/{{ item.Slug }}/">{{ item.ShapeName }}</a>
-                </th>
+          <td class="cell-synonyms">
+            {% if alsoRaw %}
+              {{ alsoRaw }}
+            {% else %}
+              <span class="muted">-</span>
+            {% endif %}
+          </td>
+        </tr>
 
-                <td class="cell-category">{{ categoryRaw }}</td>
-
-                <td class="cell-synonyms">
-                  {% if alsoRaw %}
-                    {{ alsoRaw }}
-                  {% else %}
-                    <span class="muted">-</span>
-                  {% endif %}
-                </td>
-              </tr>
-
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      {% endfor %}
+    {% endcall %}
 
     <a id="pasta-toggle-all" class="btn btn--ghost" href="#" hidden>Next 10</a>
   </section>
