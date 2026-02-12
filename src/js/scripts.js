@@ -277,9 +277,19 @@
       // Sort matches using current table sort key/dir
       matches.sort((ra, rb) => compareRows(ra, rb, sortKey, sortDir));
 
-      // Hide all then show all matches
-      rows.forEach(r => { r.hidden = true; });
-      matches.forEach(r => { r.hidden = false; });
+      // Reorder visible rows to match the active sort, then reveal only matches.
+      // (Toggling `hidden` alone does not change DOM order.)
+      const frag = document.createDocumentFragment();
+      const matchSet = new Set(matches);
+      matches.forEach((row) => {
+        row.hidden = false;
+        frag.appendChild(row);
+      });
+      tbody.appendChild(frag);
+
+      rows.forEach((row) => {
+        if (!matchSet.has(row)) row.hidden = true;
+      });
 
       if (countEl) {
         countEl.textContent = matches.length ? `${matches.length} shown` : "No matches.";
