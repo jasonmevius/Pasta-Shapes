@@ -882,7 +882,6 @@ body.is-searching #home-identify-card{ display: none; }
 }
 
 .detail-meta,
-.detail-actions,
 .detail-jump__links{
   display: flex;
   flex-wrap: wrap;
