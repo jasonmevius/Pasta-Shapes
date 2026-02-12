@@ -412,6 +412,10 @@ a[href="#content"]:focus{
   Home layout
 ----------------------------------------------------------------------------- */
 
+.home-intro{
+  display: none;
+}
+
 /* Default: stacked cards with an even gap */
 .home-panels{
   display: grid;
