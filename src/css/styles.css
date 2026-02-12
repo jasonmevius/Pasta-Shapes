@@ -129,6 +129,132 @@ a[href="#content"]:focus{
   padding: 0.9rem;
 }
 
+
+/* -----------------------------------------------------------------------------
+  Buttons (shared)
+----------------------------------------------------------------------------- */
+.btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btn:hover{ text-decoration: none; }
+
+.btn:disabled{
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btn.secondary,
+.btn--secondary,
+.btn--ghost{
+  background: #fff;
+  color: var(--fg);
+}
+
+.btn.secondary:hover,
+.btn--secondary:hover,
+.btn--ghost:hover{
+  background: rgba(17,24,39,0.03);
+}
+
+.btn-small{
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  font-size: 0.95rem;
+}
+
+/* -----------------------------------------------------------------------------
+  Shared form fields
+----------------------------------------------------------------------------- */
+.field{
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.field__label{
+  font-weight: 650;
+  font-size: 0.95rem;
+}
+
+.field__input,
+.field__select{
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.85rem 0.9rem;
+  font-size: 1rem;
+  background: #fff;
+  color: var(--fg);
+}
+
+.field__input:focus,
+.field__select:focus{
+  outline: 2px solid rgba(17,24,39,0.18);
+  outline-offset: 2px;
+}
+
+/* -----------------------------------------------------------------------------
+  Page header + table tools (All Pastas)
+----------------------------------------------------------------------------- */
+.page-header{
+  display: grid;
+  gap: 0.25rem;
+  margin-bottom: 1rem;
+}
+
+.page-header h1{
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.page-subtitle{
+  margin: 0;
+  color: var(--muted);
+}
+
+.table-tools{
+  margin: 1rem 0 0.75rem;
+}
+
+.table-tools__row{
+  display: grid;
+  gap: var(--gap);
+  align-items: end;
+}
+
+@media (max-width: 719px){
+  .table-tools__row{ grid-template-columns: 1fr; }
+}
+
+@media (min-width: 720px){
+  .table-tools__row{ grid-template-columns: 1.4fr 1fr auto; }
+}
+
+.table-meta{
+  display: grid;
+  gap: 0.5rem;
+  justify-items: end;
+  text-align: right;
+}
+
+.table-meta__count{
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
 /* -----------------------------------------------------------------------------
   Topbar + nav
 ----------------------------------------------------------------------------- */
@@ -426,6 +552,12 @@ a[href="#content"]:focus{
   flex-wrap: wrap;
 }
 
+.identify .identify-bottom-bar .btn{
+  min-width: 7.25rem;
+  font-weight: 650;
+  border-radius: 12px;
+}
+
 .identify .identify-answers{
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -493,9 +625,6 @@ a[href="#content"]:focus{
   color: var(--muted);
 }
 
-.identify .identify-answers[data-kind="bool"] .identify-answer:last-child{
-  grid-column: 1 / -1;
-}
 
 @media (min-width: 480px){
   .identify .identify-answers{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
