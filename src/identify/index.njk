@@ -520,10 +520,64 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     return history.some((h) => h.key === key);
   }
 
+  function getQuestionCounts(q) {
+    if (q.kind === "bool") {
+      return {
+        yes: getOptionCount(q.key, "yes"),
+        no: getOptionCount(q.key, "no"),
+        ns: getOptionCount(q.key, "__ns__"),
+      };
+    }
+
+    if (q.kind === "enum") {
+      const counts = {};
+      for (const v of q.values || []) counts[v] = getOptionCount(q.key, v);
+      counts.__ns__ = getOptionCount(q.key, "__ns__");
+      return counts;
+    }
+
+    return { __ns__: working.length };
+  }
+
+  function isQuestionInformative(q) {
+    const counts = getQuestionCounts(q);
+
+    if (q.kind === "bool") {
+      return counts.yes > 0 && counts.no > 0;
+    }
+
+    if (q.kind === "enum") {
+      const nonZero = (q.values || []).filter((v) => (counts[v] || 0) > 0).length;
+      return nonZero > 1;
+    }
+
+    return true;
+  }
+
   function nextQuestion() {
-    if (!questionAlreadyAnswered("type")) return QUESTION_DEFS.find((q) => q.key === "type");
-    for (const q of QUESTION_DEFS) if (!questionAlreadyAnswered(q.key)) return q;
+    if (!questionAlreadyAnswered("type")) {
+      const typeQ = QUESTION_DEFS.find((q) => q.key === "type");
+      if (typeQ && isQuestionInformative(typeQ)) return typeQ;
+    }
+
+    for (const q of QUESTION_DEFS) {
+      if (questionAlreadyAnswered(q.key)) continue;
+      if (isQuestionInformative(q)) return q;
+    }
+
     return null;
+  }
+
+  function getOptionCount(key, value) {
+    if (value === "__ns__") return working.length;
+
+    const normalizeBool = (v) => {
+      if (v === "__ns__") return "__ns__";
+      return String(v || "").toLowerCase();
+    };
+
+    const v = normalizeBool(value);
+    return working.filter((p) => normalizeBool(p[key]) === v).length;
   }
 
   function applyFilter(key, value) {
@@ -592,13 +646,13 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     els.answers.setAttribute("data-kind", q.kind);
     els.answers.setAttribute("data-key", q.key);
 
-    const makeAnswer = (value, label, desc, iconUrl) => {
+    const makeAnswer = (value, label, desc, iconUrl, count) => {
       const btn = document.createElement("button");
       btn.type = "button";
       btn.className = "identify-answer";
 
-      // Bool questions use glyphs (Y / N / ?)
-      if (q.kind === "bool") {
+      // Bool questions (and enum Not sure) use glyphs (Y / N / ?)
+      if (q.kind === "bool" || value === "__ns__") {
         const glyph = document.createElement("span");
         glyph.className = "identify-answer-glyph";
         glyph.textContent = value === "yes" ? "Y" : value === "no" ? "N" : "?";
@@ -619,7 +673,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
       const title = document.createElement("span");
       title.className = "identify-answer-title";
-      title.textContent = label;
+      title.textContent = `${label} (${count})`;
       meta.appendChild(title);
 
       if (desc) {
@@ -640,30 +694,43 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     };
 
     if (q.kind === "enum") {
+      const counts = getQuestionCounts(q);
       for (const v of q.values) {
+        const count = counts[v] || 0;
+        if (count <= 0) continue;
+
         els.answers.appendChild(
           makeAnswer(
             v,
             q.label ? q.label(v) : String(v),
             q.desc ? q.desc(v) : "",
-            q.icon ? q.icon(v) : ""
+            q.icon ? q.icon(v) : "",
+            count
           )
         );
       }
 
       els.answers.appendChild(
-        makeAnswer("__ns__", "Not sure", "Skip this question.", q.icon ? q.icon("__ns__") : "")
+        makeAnswer("__ns__", "Not sure", "Skip this question.", q.icon ? q.icon("__ns__") : "", counts.__ns__)
       );
     }
 
     if (q.kind === "bool") {
-      els.answers.appendChild(makeAnswer("yes", "Yes", q.descYes || "", answerIconFor(q.key, "yes")));
-      els.answers.appendChild(makeAnswer("no", "No", q.descNo || "", answerIconFor(q.key, "no")));
-      els.answers.appendChild(makeAnswer("__ns__", "Not sure", "Skip this question.", answerIconFor(q.key, "__ns__")));
+      const counts = getQuestionCounts(q);
+
+      if (counts.yes > 0) {
+        els.answers.appendChild(makeAnswer("yes", "Yes", q.descYes || "", answerIconFor(q.key, "yes"), counts.yes));
+      }
+
+      if (counts.no > 0) {
+        els.answers.appendChild(makeAnswer("no", "No", q.descNo || "", answerIconFor(q.key, "no"), counts.no));
+      }
+
+      els.answers.appendChild(makeAnswer("__ns__", "Not sure", "Skip this question.", answerIconFor(q.key, "__ns__"), counts.__ns__));
     }
 
     if (q.kind === "single") {
-      els.answers.appendChild(makeAnswer("__ns__", "Continue", "", ""));
+      els.answers.appendChild(makeAnswer("__ns__", "Continue", "", "", working.length));
     }
   }
 
