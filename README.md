@@ -44,3 +44,7 @@ Primary goals:
 ## Status
 
 This is an actively evolving personal project focused on learning, speed, and maintainability.
+
+## UX notes
+
+- Tablet/desktop homepage design proposals: `docs-responsive-proposals.md`
