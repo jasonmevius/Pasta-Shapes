@@ -394,9 +394,11 @@ a[href="#content"]:focus{
 .search-input{
   width: 100%;
   border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 0.85rem 0.9rem;
-  font-size: 1rem;
+  border-radius: 14px;
+  padding: 1.2rem 1.25rem;
+  min-height: 3.6rem;
+  font-size: 1.15rem;
+  font-weight: 600;
   background: #fff;
   text-align: center;
 }
@@ -487,6 +489,32 @@ a[href="#content"]:focus{
   margin: 0;
   font-size: 1.1rem;
   letter-spacing: -0.01em;
+}
+
+/* Search card tuning: center the input area and anchor helper text to bottom */
+#home-search-card .search{
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+}
+
+#home-search-card #pasta-search-status,
+#home-search-card #pasta-search-count{
+  margin: 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+#home-search-card #pasta-search-status{
+  min-height: 1.2em;
+  font-size: 0.85rem;
+  margin-top: 0.25rem;
+}
+
+#home-search-card #pasta-search-count{
+  margin-top: auto;
+  padding-bottom: 0.35rem;
+  font-size: 0.8rem;
 }
 
 /* Identify card is a full-card link */
