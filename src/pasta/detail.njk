@@ -11,262 +11,229 @@ eleventyComputed:
   description: "{% if item.Synonyms %}Aliases: {{ item.Synonyms | truncate(140) }}{% else %}What {{ item.ShapeName }} looks like, plus key shape attributes.{% endif %}"
 ---
 
-{# =============================================================================
-  pasta/detail.njk
-  ------------------------------------------------------------------------------
-  PURPOSE
-  - Mobile-first individual pasta page.
-  - Adds high-ROI sections:
-      1) Key tells
-      2) Commonly confused with (+ why)
-      3) Substitutes (ranked + why)
-      4) Pairings (+ why)
-      6) Also known as (synonyms)
-    Plus optional History + How it's made.
-
-  IMPORTANT COMPATIBILITY NOTE
-  - Your current Eleventy/Nunjucks setup does NOT have the `split` filter.
-  - This template intentionally avoids split/map/reject/concat and renders
-    semicolon-separated fields as clean text blocks for now.
-  - After this builds, we can add a tiny Eleventy filter to format lists into
-    bullets/chips (recommended), without changing your CSV.
-============================================================================= #}
-
 {% set heroUrl = item.ThumbnailImage | pastaHeroUrl(item.PhotoImage) %}
+
+{% set hasKeyTells = (item.KeyTells or "") | trim != "" %}
+{% set hasConfused = (item.OftenConfusedWith or "") | trim != "" %}
+{% set hasPairings = (item.ClassicSaucePairings or "") | trim != "" %}
+{% set hasSubs = ((item.SubstitutesClosest or "") | trim != "") or ((item.SubstitutesDecent or "") | trim != "") or ((item.SubstitutesEmergency or "") | trim != "") %}
+{% set hasAliases = (item.Synonyms or "") | trim != "" %}
+{% set hasHistory = (item.HistoryBlurb or "") | trim != "" %}
+{% set hasMadeMethod = (item.MadeMethod or "") | trim != "" %}
+{% set hasRegion = item.CityOrRegionMostAssociated and item.CityOrRegionMostAssociated != "Unknown" %}
+{% set hasFirstMention = item.EarliestAttestedMention and item.EarliestAttestedMention != "Unknown" %}
+
+{% set desc = "" %}
+{% if item.Description %}
+  {% set desc = item.Description %}
+{% elif item.KeyDiscriminators %}
+  {% set desc = item.KeyDiscriminators %}
+{% endif %}
 
 <a class="skip-link" href="#main">Skip to content</a>
 
-<!--
-<nav class="breadcrumbs">
-  <a href="/">← Back to search</a>
-</nav>
--->
+<main id="main" class="detail-page stack">
+  <section class="detail-hero card" aria-label="{{ item.ShapeName }} overview">
+    <div class="detail-hero__image-wrap">
+      <img
+        class="detail-hero__image"
+        src="{{ heroUrl }}"
+        alt="{{ item.ShapeName }}"
+        width="1200"
+        height="1200"
+        loading="eager"
+        decoding="async"
+      />
+    </div>
 
-<main id="main" class="stack">
-  {# ---------------------------------------------------------------------------
-    Header
-  --------------------------------------------------------------------------- #}
-  <header class="stack tight">
-    <h1 class="h1">{{ item.ShapeName }}</h1>
-    {% if item.Category %}
-      <p class="muted">{{ item.Category }}</p>
-    {% endif %}
-  </header>
+    <div class="detail-hero__content stack tight">
+      <p class="detail-kicker">Pasta detail</p>
+      <h1 class="h1 detail-title">{{ item.ShapeName }}</h1>
 
-  {# ---------------------------------------------------------------------------
-    Hero Image
-  --------------------------------------------------------------------------- #}
-  <figure class="card hero">
-    <img
-      src="{{ heroUrl }}"
-      alt="{{ item.ShapeName }}"
-      width="1200"
-      height="1200"
-      loading="eager"
-      decoding="async"
-    />
-  </figure>
-
-  {# ---------------------------------------------------------------------------
-    Jump to (only show if there is enough content to justify it)
-  --------------------------------------------------------------------------- #}
-  {% set hasKeyTells = (item.KeyTells or "") | trim != "" %}
-  {% set hasConfused = (item.OftenConfusedWith or "") | trim != "" %}
-  {% set hasPairings = (item.ClassicSaucePairings or "") | trim != "" %}
-  {% set hasSubs = ((item.SubstitutesClosest or "") | trim != "") or ((item.SubstitutesDecent or "") | trim != "") or ((item.SubstitutesEmergency or "") | trim != "") %}
-  {% set hasAliases = (item.Synonyms or "") | trim != "" %}
-  {% set hasHistory = (item.HistoryBlurb or "") | trim != "" %}
-  {% set showJump = (hasKeyTells and hasConfused) or (hasPairings and hasSubs) or (hasHistory and hasPairings) %}
-
-  {% if showJump %}
-    <section class="card stack tight" aria-label="Jump to sections">
-      <h2 class="h2">Jump to</h2>
-      <p class="muted">
-        {% if hasKeyTells %}<a href="#key-tells">Key tells</a>{% endif %}
-        {% if hasConfused %} · <a href="#confused-with">Confused with</a>{% endif %}
-        {% if hasPairings %} · <a href="#pairings">Pairings</a>{% endif %}
-        {% if hasSubs %} · <a href="#substitutes">Substitutes</a>{% endif %}
-        {% if hasAliases %} · <a href="#aliases">Aliases</a>{% endif %}
-        {% if hasHistory %} · <a href="#history">History</a>{% endif %}
-        · <a href="#attributes">Attributes</a>
-      </p>
-    </section>
-  {% endif %}
-
-  {# ---------------------------------------------------------------------------
-    What it is (short description)
-  --------------------------------------------------------------------------- #}
-  {% set desc = "" %}
-  {% if item.Description %}
-    {% set desc = item.Description %}
-  {% elif item.KeyDiscriminators %}
-    {% set desc = item.KeyDiscriminators %}
-  {% endif %}
-
-  {% if desc %}
-    <section class="card stack tight" aria-label="Description">
-      <h2 class="h2">What it is</h2>
-      <p class="muted">{{ desc }}</p>
-    </section>
-  {% endif %}
-
-  {# ---------------------------------------------------------------------------
-    Key tells (render as readable text for now; semicolons are OK)
-  --------------------------------------------------------------------------- #}
-  {% if hasKeyTells %}
-    <section id="key-tells" class="card stack tight" aria-label="Key tells">
-      <h2 class="h2">Key tells</h2>
-      <p class="muted">
-        {{ item.KeyTells }}
-      </p>
-      <p class="muted">
-        <small>Tip: these are separated by semicolons right now. We can render them as bullets once we add a small Eleventy filter.</small>
-      </p>
-    </section>
-  {% endif %}
-
-  {# ---------------------------------------------------------------------------
-    Commonly confused with (+ why)
-  --------------------------------------------------------------------------- #}
-  {% if hasConfused %}
-    <section id="confused-with" class="card stack tight" aria-label="Commonly confused with">
-      <h2 class="h2">Commonly confused with</h2>
-
-      <p class="muted">{{ item.OftenConfusedWith }}</p>
-
-      {% if (item.OftenConfusedWithWhy or "") | trim != "" %}
-        <p class="muted"><strong>How to tell them apart:</strong> {{ item.OftenConfusedWithWhy }}</p>
-      {% endif %}
-
-      <p class="muted">
-        Tip: If you’re not sure, try <a href="/identify/">Identify</a> and narrow it down by shape.
-      </p>
-    </section>
-  {% endif %}
-
-  {# ---------------------------------------------------------------------------
-    Pairings (+ why)
-  --------------------------------------------------------------------------- #}
-  {% if hasPairings %}
-    <section id="pairings" class="card stack tight" aria-label="Pairings">
-      <h2 class="h2">Pairings</h2>
-
-      <p class="muted">{{ item.ClassicSaucePairings }}</p>
-
-      {% if (item.ClassicSaucePairingsWhy or "") | trim != "" %}
-        <p class="muted"><strong>Why it works:</strong> {{ item.ClassicSaucePairingsWhy }}</p>
-      {% endif %}
-    </section>
-  {% endif %}
-
-  {# ---------------------------------------------------------------------------
-    Substitutes (ranked + why)
-  --------------------------------------------------------------------------- #}
-  {% if hasSubs %}
-    <section id="substitutes" class="card stack" aria-label="Substitutes">
-      <h2 class="h2">Substitutes</h2>
-
-      <div class="stack tight">
-        {% if (item.SubstitutesClosest or "") | trim != "" %}
-          <div class="stack tight">
-            <p><strong>Closest:</strong> {{ item.SubstitutesClosest }}</p>
-            {% if (item.SubstitutesClosestWhy or "") | trim != "" %}
-              <p class="muted">{{ item.SubstitutesClosestWhy }}</p>
-            {% endif %}
-          </div>
-        {% endif %}
-
-        {% if (item.SubstitutesDecent or "") | trim != "" %}
-          <div class="stack tight">
-            <p><strong>Decent:</strong> {{ item.SubstitutesDecent }}</p>
-            {% if (item.SubstitutesDecentWhy or "") | trim != "" %}
-              <p class="muted">{{ item.SubstitutesDecentWhy }}</p>
-            {% endif %}
-          </div>
-        {% endif %}
-
-        {% if (item.SubstitutesEmergency or "") | trim != "" %}
-          <div class="stack tight">
-            <p><strong>Emergency:</strong> {{ item.SubstitutesEmergency }}</p>
-            {% if (item.SubstitutesEmergencyWhy or "") | trim != "" %}
-              <p class="muted">{{ item.SubstitutesEmergencyWhy }}</p>
-            {% endif %}
-          </div>
-        {% endif %}
+      <div class="detail-meta" aria-label="Quick facts">
+        {% if item.Category %}<span class="detail-chip">{{ item.Category }}</span>{% endif %}
+        {% if item.Type %}<span class="detail-chip">{{ item.Type }}</span>{% endif %}
+        {% if item.PrimaryGeometry %}<span class="detail-chip">{{ item.PrimaryGeometry }}</span>{% endif %}
+        {% if item.SizeClass %}<span class="detail-chip">{{ item.SizeClass }}</span>{% endif %}
       </div>
-    </section>
-  {% endif %}
 
-  {# ---------------------------------------------------------------------------
-    How it's made (light)
-  --------------------------------------------------------------------------- #}
-  {% if (item.MadeMethod or "") | trim != "" %}
-    <section class="card stack tight" aria-label="How it's made">
-      <h2 class="h2">How it’s made</h2>
-      <p class="muted">{{ item.MadeMethod }}</p>
-    </section>
-  {% endif %}
+      {% if desc %}
+        <p class="muted detail-summary">{{ desc }}</p>
+      {% endif %}
 
-  {# ---------------------------------------------------------------------------
-    Aliases / synonyms
-  --------------------------------------------------------------------------- #}
-  {% if hasAliases %}
-    <section id="aliases" class="card stack tight" aria-label="Also known as">
-      <h2 class="h2">Also known as</h2>
-      <p class="muted">{{ item.Synonyms }}</p>
-    </section>
-  {% endif %}
-
-  {# ---------------------------------------------------------------------------
-    History
-  --------------------------------------------------------------------------- #}
-  {% if hasHistory %}
-    <section id="history" class="card stack tight" aria-label="History">
-      <h2 class="h2">History</h2>
-      <p class="muted">{{ item.HistoryBlurb }}</p>
-    </section>
-  {% endif %}
-
-  {# ---------------------------------------------------------------------------
-    Attributes (collapsible reference)
-  --------------------------------------------------------------------------- #}
-  <section id="attributes" class="card stack" aria-label="Shape attributes">
-    <h2 class="h2">Shape attributes</h2>
-
-    <details>
-      <summary class="muted">View full attribute list</summary>
-
-      <ul class="attr-list">
-        {% if item.Type %}<li><strong>Type:</strong> {{ item.Type }}</li>{% endif %}
-        {% if item.PrimaryGeometry %}<li><strong>Primary geometry:</strong> {{ item.PrimaryGeometry }}</li>{% endif %}
-        {% if item.SizeClass %}<li><strong>Size:</strong> {{ item.SizeClass }}</li>{% endif %}
-
-        {% if item.IsHollow %}<li><strong>Hollow:</strong> {{ item.IsHollow }}</li>{% endif %}
-        {% if item.IsRidged %}<li><strong>Ridged:</strong> {{ item.IsRidged }}</li>{% endif %}
-        {% if item.IsTwisted %}<li><strong>Twisted:</strong> {{ item.IsTwisted }}</li>{% endif %}
-        {% if item.IsCurved %}<li><strong>Curved:</strong> {{ item.IsCurved }}</li>{% endif %}
-        {% if item.IsStuffed %}<li><strong>Stuffed:</strong> {{ item.IsStuffed }}</li>{% endif %}
-
-        {% if item.CityOrRegionMostAssociated and item.CityOrRegionMostAssociated != "Unknown" %}
-          <li><strong>City/Region:</strong> {{ item.CityOrRegionMostAssociated }}</li>
-        {% endif %}
-
-        {% if item.EarliestAttestedMention and item.EarliestAttestedMention != "Unknown" %}
-          <li><strong>Earliest mention:</strong> {{ item.EarliestAttestedMention }}</li>
-        {% endif %}
-      </ul>
-    </details>
+      <div class="detail-actions" aria-label="Browse more shapes">
+        <a class="btn btn-small btn--ghost" href="/">Search</a>
+        <a class="btn btn-small btn--ghost" href="/identify/">Identify</a>
+        <a class="btn btn-small btn--ghost" href="/all/">All pastas</a>
+      </div>
+    </div>
   </section>
 
-  {# ---------------------------------------------------------------------------
-    Bottom actions
-  --------------------------------------------------------------------------- #}
-  <section class="card stack tight" aria-label="Next actions">
-    <h2 class="h2">Next</h2>
-    <p class="muted">
-      <a href="/">Search</a> ·
-      <a href="/identify/">Identify</a> ·
-      <a href="/all/">All pastas</a>
-    </p>
+  <section class="card detail-facts" aria-label="Quick reference">
+    <h2 class="h2">Quick reference</h2>
+    <dl class="detail-facts__grid">
+      {% if hasRegion %}
+        <div>
+          <dt>Most associated with</dt>
+          <dd>{{ item.CityOrRegionMostAssociated }}</dd>
+        </div>
+      {% endif %}
+
+      {% if hasFirstMention %}
+        <div>
+          <dt>Earliest mention</dt>
+          <dd>{{ item.EarliestAttestedMention }}</dd>
+        </div>
+      {% endif %}
+
+      {% if item.IsHollow %}
+        <div><dt>Hollow</dt><dd>{{ item.IsHollow }}</dd></div>
+      {% endif %}
+
+      {% if item.IsRidged %}
+        <div><dt>Ridged</dt><dd>{{ item.IsRidged }}</dd></div>
+      {% endif %}
+
+      {% if item.IsTwisted %}
+        <div><dt>Twisted</dt><dd>{{ item.IsTwisted }}</dd></div>
+      {% endif %}
+
+      {% if item.IsStuffed %}
+        <div><dt>Stuffed</dt><dd>{{ item.IsStuffed }}</dd></div>
+      {% endif %}
+    </dl>
+  </section>
+
+  <section class="card detail-jump" aria-label="Jump to sections">
+    <h2 class="h2">On this page</h2>
+    <div class="detail-jump__links">
+      {% if hasKeyTells %}<a href="#key-tells">Key tells</a>{% endif %}
+      {% if hasConfused %}<a href="#confused-with">Confused with</a>{% endif %}
+      {% if hasPairings %}<a href="#pairings">Pairings</a>{% endif %}
+      {% if hasSubs %}<a href="#substitutes">Substitutes</a>{% endif %}
+      {% if hasAliases %}<a href="#aliases">Aliases</a>{% endif %}
+      {% if hasMadeMethod %}<a href="#made-method">How it’s made</a>{% endif %}
+      {% if hasHistory %}<a href="#history">History</a>{% endif %}
+      <a href="#attributes">Attributes</a>
+    </div>
+  </section>
+
+  <section class="detail-grid">
+    <div class="stack detail-main-flow">
+      {% if hasKeyTells %}
+        <section id="key-tells" class="card stack tight" aria-label="Key tells">
+          <h2 class="h2">Key tells</h2>
+          <p class="muted">{{ item.KeyTells }}</p>
+        </section>
+      {% endif %}
+
+      {% if hasConfused %}
+        <section id="confused-with" class="card stack tight" aria-label="Commonly confused with">
+          <h2 class="h2">Commonly confused with</h2>
+          <p class="muted">{{ item.OftenConfusedWith }}</p>
+
+          {% if (item.OftenConfusedWithWhy or "") | trim != "" %}
+            <p class="muted"><strong>How to tell them apart:</strong> {{ item.OftenConfusedWithWhy }}</p>
+          {% endif %}
+        </section>
+      {% endif %}
+
+      {% if hasPairings %}
+        <section id="pairings" class="card stack tight" aria-label="Pairings">
+          <h2 class="h2">Classic pairings</h2>
+          <p class="muted">{{ item.ClassicSaucePairings }}</p>
+
+          {% if (item.ClassicSaucePairingsWhy or "") | trim != "" %}
+            <p class="muted"><strong>Why it works:</strong> {{ item.ClassicSaucePairingsWhy }}</p>
+          {% endif %}
+        </section>
+      {% endif %}
+
+      {% if hasSubs %}
+        <section id="substitutes" class="card stack" aria-label="Substitutes">
+          <h2 class="h2">Best substitutes</h2>
+
+          <div class="stack tight">
+            {% if (item.SubstitutesClosest or "") | trim != "" %}
+              <div class="detail-rank">
+                <p><strong>Closest match</strong></p>
+                <p>{{ item.SubstitutesClosest }}</p>
+                {% if (item.SubstitutesClosestWhy or "") | trim != "" %}
+                  <p class="muted">{{ item.SubstitutesClosestWhy }}</p>
+                {% endif %}
+              </div>
+            {% endif %}
+
+            {% if (item.SubstitutesDecent or "") | trim != "" %}
+              <div class="detail-rank">
+                <p><strong>Good backup</strong></p>
+                <p>{{ item.SubstitutesDecent }}</p>
+                {% if (item.SubstitutesDecentWhy or "") | trim != "" %}
+                  <p class="muted">{{ item.SubstitutesDecentWhy }}</p>
+                {% endif %}
+              </div>
+            {% endif %}
+
+            {% if (item.SubstitutesEmergency or "") | trim != "" %}
+              <div class="detail-rank">
+                <p><strong>Emergency option</strong></p>
+                <p>{{ item.SubstitutesEmergency }}</p>
+                {% if (item.SubstitutesEmergencyWhy or "") | trim != "" %}
+                  <p class="muted">{{ item.SubstitutesEmergencyWhy }}</p>
+                {% endif %}
+              </div>
+            {% endif %}
+          </div>
+        </section>
+      {% endif %}
+
+      {% if hasAliases %}
+        <section id="aliases" class="card stack tight" aria-label="Also known as">
+          <h2 class="h2">Also known as</h2>
+          <p class="muted">{{ item.Synonyms }}</p>
+        </section>
+      {% endif %}
+
+      {% if hasMadeMethod %}
+        <section id="made-method" class="card stack tight" aria-label="How it's made">
+          <h2 class="h2">How it’s made</h2>
+          <p class="muted">{{ item.MadeMethod }}</p>
+        </section>
+      {% endif %}
+
+      {% if hasHistory %}
+        <section id="history" class="card stack tight" aria-label="History">
+          <h2 class="h2">History</h2>
+          <p class="muted">{{ item.HistoryBlurb }}</p>
+        </section>
+      {% endif %}
+    </div>
+
+    <aside class="stack detail-side-flow">
+      <section id="attributes" class="card stack" aria-label="Shape attributes">
+        <h2 class="h2">Shape attributes</h2>
+        <ul class="attr-list">
+          {% if item.Type %}<li><strong>Type:</strong> {{ item.Type }}</li>{% endif %}
+          {% if item.PrimaryGeometry %}<li><strong>Primary geometry:</strong> {{ item.PrimaryGeometry }}</li>{% endif %}
+          {% if item.SizeClass %}<li><strong>Size:</strong> {{ item.SizeClass }}</li>{% endif %}
+          {% if item.IsHollow %}<li><strong>Hollow:</strong> {{ item.IsHollow }}</li>{% endif %}
+          {% if item.IsRidged %}<li><strong>Ridged:</strong> {{ item.IsRidged }}</li>{% endif %}
+          {% if item.IsTwisted %}<li><strong>Twisted:</strong> {{ item.IsTwisted }}</li>{% endif %}
+          {% if item.IsCurved %}<li><strong>Curved:</strong> {{ item.IsCurved }}</li>{% endif %}
+          {% if item.IsStuffed %}<li><strong>Stuffed:</strong> {{ item.IsStuffed }}</li>{% endif %}
+          {% if hasRegion %}<li><strong>City/Region:</strong> {{ item.CityOrRegionMostAssociated }}</li>{% endif %}
+          {% if hasFirstMention %}<li><strong>Earliest mention:</strong> {{ item.EarliestAttestedMention }}</li>{% endif %}
+        </ul>
+      </section>
+
+      <section class="card stack tight" aria-label="Next actions">
+        <h2 class="h2">Next</h2>
+        <p class="muted">
+          <a href="/">Search</a> ·
+          <a href="/identify/">Identify</a> ·
+          <a href="/all/">All pastas</a>
+        </p>
+      </section>
+    </aside>
   </section>
 </main>

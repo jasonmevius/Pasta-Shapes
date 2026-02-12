@@ -823,6 +823,147 @@ body.is-searching #home-identify-card{ display: none; }
   word-break: break-word;
 }
 
+/* -----------------------------------------------------------------------------
+  Detail page concept
+----------------------------------------------------------------------------- */
+.stack{
+  display: grid;
+  gap: var(--gap);
+}
+
+.stack.tight{ gap: 0.45rem; }
+
+.h1,
+.h2{
+  margin: 0;
+  letter-spacing: -0.02em;
+}
+
+.h1{ font-size: clamp(1.6rem, 5vw, 2.4rem); }
+.h2{ font-size: clamp(1.15rem, 3vw, 1.4rem); }
+
+.muted{
+  margin: 0;
+  color: var(--muted);
+}
+
+.detail-page{
+  margin-top: 0.8rem;
+  margin-bottom: 1rem;
+}
+
+.detail-hero{
+  display: grid;
+  gap: 0.9rem;
+  padding: 1rem;
+}
+
+.detail-hero__image-wrap{
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.detail-hero__image{
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+}
+
+.detail-kicker{
+  margin: 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.detail-meta,
+.detail-actions,
+.detail-jump__links{
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.detail-chip,
+.detail-jump__links a{
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.3rem 0.62rem;
+  font-size: 0.86rem;
+  text-decoration: none;
+  background: #fff;
+}
+
+.detail-jump__links a:hover{
+  background: rgba(17,24,39,0.03);
+  text-decoration: none;
+}
+
+.detail-facts__grid{
+  margin: 0;
+  display: grid;
+  gap: 0.6rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.detail-facts__grid dt{
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.detail-facts__grid dd{
+  margin: 0.1rem 0 0;
+  font-weight: 600;
+}
+
+.detail-grid{
+  display: grid;
+  gap: var(--gap);
+}
+
+.detail-rank{
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: #fff;
+  padding: 0.7rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.detail-rank p{ margin: 0; }
+
+.attr-list{
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+@media (min-width: 860px){
+  .detail-hero{
+    grid-template-columns: minmax(240px, 360px) 1fr;
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  .detail-grid{
+    grid-template-columns: minmax(0, 1.5fr) minmax(260px, 0.85fr);
+    align-items: start;
+  }
+
+  .detail-side-flow{
+    position: sticky;
+    top: calc(var(--topbar-h) + 0.8rem);
+  }
+}
+
 /* Thumbnail */
 .thumb{
   width: 56px;
