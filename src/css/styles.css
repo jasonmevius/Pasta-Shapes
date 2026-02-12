@@ -498,6 +498,7 @@ a[href="#content"]:focus{
 
   body.is-searching #home-search-card{
     height: auto;
+    min-height: auto;
   }
 
   #home-results-panel{
