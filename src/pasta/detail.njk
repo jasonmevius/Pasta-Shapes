@@ -36,9 +36,35 @@ eleventyComputed:
 
 <a class="skip-link" href="#main">Skip to content</a>
 
+<!--
 <nav class="breadcrumbs">
   <a href="/">← Back to search</a>
 </nav>
+-->
+
+{# =============================================================================
+  TEMP DEBUG - REMOVE AFTER FIXING
+  - Shows exactly what Eleventy sees for this pasta row.
+============================================================================= #}
+<section class="card stack tight" aria-label="Debug">
+  <h2 class="h2">Debug</h2>
+  <p class="muted"><strong>ShapeName:</strong> {{ item.ShapeName }}</p>
+  <p class="muted"><strong>Slug:</strong> {{ item.Slug }}</p>
+
+  <p class="muted"><strong>HistoryBlurb (raw):</strong> [{{ item.HistoryBlurb }}]</p>
+  <p class="muted"><strong>BestFor (raw):</strong> [{{ item.BestFor }}]</p>
+
+  <details>
+    <summary class="muted">Show keys that contain "History"</summary>
+    <ul class="attr-list">
+      {% for k, v in item %}
+        {% if "History" in k %}
+          <li><strong>{{ k }}:</strong> {{ v }}</li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+  </details>
+</section>
 
 <main id="main" class="stack">
   {# ---------------------------------------------------------------------------
