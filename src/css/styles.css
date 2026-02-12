@@ -502,7 +502,7 @@ a[href="#content"]:focus{
 
   #home-results-panel{
     grid-column: 1 / -1;
-    max-height: min(52vh, 34rem);
+    max-height: none;
   }
 }
 
@@ -710,8 +710,7 @@ a[href="#content"]:focus{
 .home-results{
   display: grid;
   gap: var(--gap);
-  overflow: auto;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
 }
 body.is-searching #home-results-panel{ display: grid; }
 body.is-searching #home-identify-card{ display: none; }
