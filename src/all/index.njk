@@ -74,7 +74,7 @@ permalink: /all/
 ) %}
   {% for item in pasta %}
 
-    {% set slugVal = item.slug %}
+    {% set slugVal = item.Slug %}
     {% if not slugVal %}
       {% set slugVal = item.ShapeName | slug %}
     {% endif %}
