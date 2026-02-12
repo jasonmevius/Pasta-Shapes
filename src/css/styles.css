@@ -26,7 +26,7 @@
   --border: #e5e7eb;
 
   --radius: 14px;
-  --container: 56rem;
+  --container: 72rem;
 
   --pad: 1rem;
   --gap: 0.75rem;
@@ -411,6 +411,10 @@ a[href="#content"]:focus{
   Home layout
 ----------------------------------------------------------------------------- */
 
+.home-intro{
+  display: none;
+}
+
 /* Default: stacked cards with an even gap */
 .home-panels{
   display: grid;
@@ -464,6 +468,76 @@ a[href="#content"]:focus{
   /* Ensure Identify card doesn't reserve space when hidden */
   #home-identify-card[hidden]{
     display: none !important;
+  }
+}
+
+@media (min-width: 768px){
+  .home-intro{
+    display: grid;
+    justify-items: center;
+    gap: 0.25rem;
+    text-align: center;
+    margin: 1rem auto 0.5rem;
+    max-width: 65ch;
+  }
+
+  .home-intro__kicker{
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .home-intro__text{
+    margin: 0;
+    font-size: 1rem;
+    letter-spacing: -0.01em;
+  }
+
+  .home-panels{
+    max-width: 60rem;
+    margin: 0 auto;
+    gap: 1rem;
+    padding-top: 0.5rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .home-card-title{
+    font-size: 1.2rem;
+  }
+}
+
+@media (min-width: 1024px){
+  .home-intro{
+    margin-top: 1.25rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .home-panels{
+    max-width: 70rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 1rem;
+  }
+
+  #home-search-card,
+  #home-identify-card{
+    min-height: 21rem;
+  }
+
+  body.is-searching .home-panels{
+    grid-template-columns: 1fr;
+  }
+
+  body.is-searching #home-search-card{
+    height: auto;
+  }
+
+  #home-results-panel{
+    grid-column: 1 / -1;
+    max-height: min(52vh, 34rem);
   }
 }
 
