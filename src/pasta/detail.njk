@@ -16,64 +16,88 @@ eleventyComputed:
   ------------------------------------------------------------------------------
   PURPOSE
   - Individual pasta detail page optimized for Mobile (fast scan + high ROI info).
-  - Adds value beyond “me-too” encyclopedia content by prioritizing:
-      1) Key tells (for identification)
-      2) Commonly confused with (disambiguation)
-      3) Substitutes (ranked, practical)
-      4) Sauce/dish pairings + why (geometry -> function)
-      6) Names/aliases (synonyms, misspellings)
-  - Keeps “Shape attributes” as a secondary / collapsible reference section.
+  - Sections included (per your prioritization):
+      1) Key tells
+      2) Commonly confused with (+ why)
+      3) Substitutes (ranked + why)
+      4) Pairings (+ why)
+      6) Aliases / synonyms
+    Plus: lightweight "How it's made" and "Attributes" reference (collapsed).
 
-  DATA EXPECTATIONS (CSV columns)
-  - ShapeName, Slug, Category, Type, PrimaryGeometry, SizeClass
-  - ThumbnailImage, PhotoImage (for hero image)
-  - Synonyms
-  - Description (or KeyDiscriminators as a fallback)
-  - KeyTells (semicolon-delimited list recommended)
-  - OftenConfusedWith (semicolon-delimited list)
-  - OftenConfusedWithWhy (semicolon-delimited list, aligned to OftenConfusedWith)
-  - ClassicSaucePairings (semicolon-delimited list)
-  - ClassicSaucePairingsWhy (semicolon-delimited list, aligned to ClassicSaucePairings)
-  - MadeMethod (e.g., extruded / rolled-cut / sheet formed / stuffed)
-  - HistoryBlurb (1–2 sentence micro-history)
-  - SubstitutesClosest / SubstitutesDecent / SubstitutesEmergency
-  - SubstitutesClosestWhy / SubstitutesDecentWhy / SubstitutesEmergencyWhy
+  COMPATIBILITY
+  - Avoids non-standard filters like `map` / `reject` that are not available in
+    your Eleventy/Nunjucks environment by default.
 
-  IMPORTANT: List fields are assumed to be semicolon-separated.
-  - Example: "Rigatoni; Ziti; Mostaccioli"
-  - Matching Why fields should follow the same order, also separated by semicolons.
+  LIST FIELD CONVENTION
+  - Semicolon-separated strings: "A; B; C"
+  - Matching Why lists should have the same order and count.
 
   LINKING BEHAVIOR
-  - This template attempts to link related pastas (confused-with / substitutes) by
-    searching for a matching ShapeName inside the full pasta dataset (data.pasta).
-  - If no match is found, it gracefully falls back to plain text.
-
-  ACCESSIBILITY
-  - Uses semantic sections, headings, and a skip link.
-  - The optional "Jump to" nav helps Mobile users move quickly.
-
-  STYLE NOTES
-  - This file leans on your existing CSS classes: card, stack, tight, muted, h1/h2.
-  - If you want “chip rows” and a more polished feel, we can add a small CSS block
-    later (recommended), but this works as-is.
+  - Attempts to link related pastas by matching `ShapeName` to an entry in `pasta`.
+  - Falls back to plain text if not found.
 ============================================================================= #}
 
 {% set heroUrl = item.ThumbnailImage | pastaHeroUrl(item.PhotoImage) %}
+{% set SEP = ";" %}
 
 {# -----------------------------------------------------------------------------
-  Helper: Parse semicolon-separated list into a trimmed array.
+  Build arrays using only built-in `split` and simple loops (no map/reject).
 ----------------------------------------------------------------------------- #}
-{% set _sep = ";" %}
 
-{% set keyTells = (item.KeyTells or "") | split(_sep) | map("trim") | reject("equalto", "") %}
-{% set confused = (item.OftenConfusedWith or "") | split(_sep) | map("trim") | reject("equalto", "") %}
-{% set confusedWhy = (item.OftenConfusedWithWhy or "") | split(_sep) | map("trim") | reject("equalto", "") %}
+{# Key tells array #}
+{% set keyTellsRaw = item.KeyTells or "" %}
+{% set keyTellsSplit = keyTellsRaw | split(SEP) %}
+{% set keyTells = [] %}
+{% for v in keyTellsSplit %}
+  {% set tPP = (v or "") | trim %}
+  {% if T != "" %}
+    {% set keyTells = keyTells.concat([T]) %}
+  {% endif %}
+{% endfor %}
 
-{% set pairings = (item.ClassicSaucePairings or "") | split(_sep) | map("trim") | reject("equalto", "") %}
-{% set pairingsWhy = (item.ClassicSaucePairingsWhy or "") | split(_sep) | map("trim") | reject("equalto", "") %}
+{# Confused-with arrays #}
+{% set confusedRaw = item.OftenConfusedWith or "" %}
+{% set confusedSplit = confusedRaw | split(SEP) %}
+{% set confused = [] %}
+{% for v in confusedSplit %}
+  {% set T = (v or "") | trim %}
+  {% if T != "" %}
+    {% set confused = confused.concat([T]) %}
+  {% endif %}
+{% endfor %}
 
-{# Substitutes are single fields (but may still be semicolon lists in the future).
-   For now, treat them as a single “headline” value. #}
+{% set confusedWhyRaw = item.OftenConfusedWithWhy or "" %}
+{% set confusedWhySplit = confusedWhyRaw | split(SEP) %}
+{% set confusedWhy = [] %}
+{% for v in confusedWhySplit %}
+  {% set T = (v or "") | trim %}
+  {% if T != "" %}
+    {% set confusedWhy = confusedWhy.concat([T]) %}
+  {% endif %}
+{% endfor %}
+
+{# Pairings arrays #}
+{% set pairingsRaw = item.ClassicSaucePairings or "" %}
+{% set pairingsSplit = pairingsRaw | split(SEP) %}
+{% set pairings = [] %}
+{% for v in pairingsSplit %}
+  {% set T = (v or "") | trim %}
+  {% if T != "" %}
+    {% set pairings = pairings.concat([T]) %}
+  {% endif %}
+{% endfor %}
+
+{% set pairingsWhyRaw = item.ClassicSaucePairingsWhy or "" %}
+{% set pairingsWhySplit = pairingsWhyRaw | split(SEP) %}
+{% set pairingsWhy = [] %}
+{% for v in pairingsWhySplit %}
+  {% set T = (v or "") | trim %}
+  {% if T != "" %}
+    {% set pairingsWhy = pairingsWhy.concat([T]) %}
+  {% endif %}
+{% endfor %}
+
+{# Substitutes (single values for v1) #}
 {% set subClosest = (item.SubstitutesClosest or "") | trim %}
 {% set subDecent = (item.SubstitutesDecent or "") | trim %}
 {% set subEmergency = (item.SubstitutesEmergency or "") | trim %}
@@ -82,11 +106,14 @@ eleventyComputed:
 {% set subDecentWhy = (item.SubstitutesDecentWhy or "") | trim %}
 {% set subEmergencyWhy = (item.SubstitutesEmergencyWhy or "") | trim %}
 
-{# -----------------------------------------------------------------------------
-  Helper: Find a pasta row by ShapeName for linking.
-  - Nunjucks doesn’t have a native function definition here, so we do a small
-    inline search when rendering each related item.
------------------------------------------------------------------------------ #}
+{# Section presence flags #}
+{% set hasKeyTells = (keyTells | length) > 0 %}
+{% set hasConfused = (confused | length) > 0 %}
+{% set hasPairings = (pairings | length) > 0 %}
+{% set hasSubs = (subClosest != "") or (subDecent != "") or (subEmergency != "") %}
+{% set hasHistory = (item.HistoryBlurb or "") | trim != "" %}
+
+{% set showJump = (hasKeyTells and hasConfused) or (hasPairings and hasSubs) or (hasHistory and hasPairings) %}
 
 <a class="skip-link" href="#main">Skip to content</a>
 
@@ -96,7 +123,7 @@ eleventyComputed:
 
 <main id="main" class="stack">
   {# ---------------------------------------------------------------------------
-    Header: Name + category + optional short descriptor line
+    Header
   --------------------------------------------------------------------------- #}
   <header class="stack tight">
     <h1 class="h1">{{ item.ShapeName }}</h1>
@@ -106,7 +133,7 @@ eleventyComputed:
   </header>
 
   {# ---------------------------------------------------------------------------
-    Hero image: large, clear, fast recognition
+    Hero image
   --------------------------------------------------------------------------- #}
   <figure class="card hero">
     <img
@@ -120,21 +147,13 @@ eleventyComputed:
   </figure>
 
   {# ---------------------------------------------------------------------------
-    Optional Jump Nav (Mobile-friendly)
-    - Only show if at least two of the key sections exist.
+    Jump nav (optional)
   --------------------------------------------------------------------------- #}
-  {% set hasKeyTells = keyTells | length > 0 %}
-  {% set hasConfused = confused | length > 0 %}
-  {% set hasPairings = pairings | length > 0 %}
-  {% set hasSubs = subClosest or subDecent or subEmergency %}
-  {% set hasHistory = item.HistoryBlurb %}
-  {% set showJump = (hasKeyTells and hasConfused) or (hasPairings and hasSubs) or (hasHistory and hasPairings) %}
-
   {% if showJump %}
     <section class="card stack tight" aria-label="Jump to sections">
       <h2 class="h2">Jump to</h2>
       <p class="muted">
-        <a href="#key-tells">Key tells</a>
+        {% if hasKeyTells %}<a href="#key-tells">Key tells</a>{% endif %}
         {% if hasConfused %} · <a href="#confused-with">Confused with</a>{% endif %}
         {% if hasPairings %} · <a href="#pairings">Pairings</a>{% endif %}
         {% if hasSubs %} · <a href="#substitutes">Substitutes</a>{% endif %}
@@ -146,7 +165,7 @@ eleventyComputed:
   {% endif %}
 
   {# ---------------------------------------------------------------------------
-    Description: short “what it is” (fallbacks allowed)
+    Description (short)
   --------------------------------------------------------------------------- #}
   {% set desc = "" %}
   {% if item.Description %}
@@ -163,7 +182,7 @@ eleventyComputed:
   {% endif %}
 
   {# ---------------------------------------------------------------------------
-    Key tells: the fastest “confirm you’ve got the right shape” bullets
+    Key tells
   --------------------------------------------------------------------------- #}
   {% if hasKeyTells %}
     <section id="key-tells" class="card stack" aria-label="Key tells">
@@ -177,9 +196,7 @@ eleventyComputed:
   {% endif %}
 
   {# ---------------------------------------------------------------------------
-    Commonly confused with: disambiguation (high ROI)
-    - Renders as a simple list of links where possible.
-    - If OftenConfusedWithWhy aligns, show a short differentiator under each.
+    Commonly confused with
   --------------------------------------------------------------------------- #}
   {% if hasConfused %}
     <section id="confused-with" class="card stack" aria-label="Commonly confused with">
@@ -195,7 +212,7 @@ eleventyComputed:
               <span>{{ name }}</span>
             {% endif %}
 
-            {# If a corresponding "why" exists for this index, show it. #}
+            {# Use the same index into confusedWhy when present #}
             {% if confusedWhy[loop.index0] %}
               <p class="muted">{{ confusedWhy[loop.index0] }}</p>
             {% endif %}
@@ -210,10 +227,10 @@ eleventyComputed:
   {% endif %}
 
   {# ---------------------------------------------------------------------------
-    Pairings + why: “geometry -> function” explanation (differentiator)
+    Pairings
   --------------------------------------------------------------------------- #}
   {% if hasPairings %}
-    <section id="pairings" class="card stack" aria-label="Best pairings">
+    <section id="pairings" class="card stack" aria-label="Pairings">
       <h2 class="h2">Pairings</h2>
 
       <ul class="stack tight">
@@ -230,14 +247,14 @@ eleventyComputed:
   {% endif %}
 
   {# ---------------------------------------------------------------------------
-    Substitutes: ranked practical swaps (closest / decent / emergency)
+    Substitutes
   --------------------------------------------------------------------------- #}
   {% if hasSubs %}
     <section id="substitutes" class="card stack" aria-label="Substitutes">
       <h2 class="h2">Substitutes</h2>
 
       <ul class="stack tight">
-        {% if subClosest %}
+        {% if subClosest != "" %}
           <li class="stack tight">
             <strong>Closest:</strong>
             {% set m1 = (pasta | selectattr("ShapeName", "equalto", subClosest) | first) %}
@@ -246,13 +263,13 @@ eleventyComputed:
             {% else %}
               <span>{{ subClosest }}</span>
             {% endif %}
-            {% if subClosestWhy %}
+            {% if subClosestWhy != "" %}
               <p class="muted">{{ subClosestWhy }}</p>
             {% endif %}
           </li>
         {% endif %}
 
-        {% if subDecent %}
+        {% if subDecent != "" %}
           <li class="stack tight">
             <strong>Decent:</strong>
             {% set m2 = (pasta | selectattr("ShapeName", "equalto", subDecent) | first) %}
@@ -261,13 +278,13 @@ eleventyComputed:
             {% else %}
               <span>{{ subDecent }}</span>
             {% endif %}
-            {% if subDecentWhy %}
+            {% if subDecentWhy != "" %}
               <p class="muted">{{ subDecentWhy }}</p>
             {% endif %}
           </li>
         {% endif %}
 
-        {% if subEmergency %}
+        {% if subEmergency != "" %}
           <li class="stack tight">
             <strong>Emergency:</strong>
             {% set m3 = (pasta | selectattr("ShapeName", "equalto", subEmergency) | first) %}
@@ -276,7 +293,7 @@ eleventyComputed:
             {% else %}
               <span>{{ subEmergency }}</span>
             {% endif %}
-            {% if subEmergencyWhy %}
+            {% if subEmergencyWhy != "" %}
               <p class="muted">{{ subEmergencyWhy }}</p>
             {% endif %}
           </li>
@@ -286,7 +303,7 @@ eleventyComputed:
   {% endif %}
 
   {# ---------------------------------------------------------------------------
-    How it's made: keep it lightweight (single line if available)
+    How it's made (lightweight)
   --------------------------------------------------------------------------- #}
   {% if item.MadeMethod %}
     <section class="card stack tight" aria-label="How it's made">
@@ -296,7 +313,7 @@ eleventyComputed:
   {% endif %}
 
   {# ---------------------------------------------------------------------------
-    Aliases / synonyms: structured, easy to scan
+    Aliases
   --------------------------------------------------------------------------- #}
   {% if item.Synonyms %}
     <section id="aliases" class="card stack tight" aria-label="Also known as">
@@ -306,7 +323,7 @@ eleventyComputed:
   {% endif %}
 
   {# ---------------------------------------------------------------------------
-    History: 1–2 sentence micro-blurb
+    History
   --------------------------------------------------------------------------- #}
   {% if item.HistoryBlurb %}
     <section id="history" class="card stack tight" aria-label="History">
@@ -316,7 +333,7 @@ eleventyComputed:
   {% endif %}
 
   {# ---------------------------------------------------------------------------
-    Attributes: keep as a reference section (collapsible to reduce scroll fatigue)
+    Attributes (collapsible)
   --------------------------------------------------------------------------- #}
   <section id="attributes" class="card stack" aria-label="Shape attributes">
     <h2 class="h2">Shape attributes</h2>
@@ -354,7 +371,7 @@ eleventyComputed:
   </section>
 
   {# ---------------------------------------------------------------------------
-    Bottom actions: keep the user moving (Mobile-friendly)
+    Bottom actions
   --------------------------------------------------------------------------- #}
   <section class="card stack tight" aria-label="Next actions">
     <h2 class="h2">Next</h2>
