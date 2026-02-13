@@ -66,27 +66,12 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     type: item.Type or "",
     size: item.SizeClass or "",
 
-{# ------------------------------------------------------------------------- #}
-{# Core boolean discriminators used by Identify questions. #}
-{# IMPORTANT: These may be 1/0, true/false, yes/no depending on CSV history. #}
-{# The embedded Identify script normalizes all of these safely. #}
-{# ------------------------------------------------------------------------- #}
     hollow: item.IsHollow or "",
     ridged: item.IsRidged or "",
     twisted: item.IsTwisted or "",
     curved: item.IsCurved or "",
     stuffed: item.IsStuffed or "",
 
-{# ------------------------------------------------------------------------- #}
-{# Optional "unlock more questions" fields #}
-{# - Safe even if your CSV doesn't have them yet (they'll just be blank). #}
-{# - Recommended columns to add over time: #}
-{# CrossSection: round | flat | other #}
-{# CutStyle: straight | diagonal | pinched | folded #}
-{# IsConcave: 1/0 (or true/false)  -> cups / shells / ear shapes #}
-{# HasRuffles: 1/0                 -> ruffled edges / frills #}
-{# IsPastina: 1/0                  -> spoonable tiny pasta (soup pastina) #}
-{# ------------------------------------------------------------------------- #}
     crossSection: item.CrossSection or item.CrossSectionShape or "",
     cutStyle: item.CutStyle or "",
     concave: item.IsConcave or "",
