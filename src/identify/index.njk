@@ -65,11 +65,34 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     category: categoryRaw,
     type: item.Type or "",
     size: item.SizeClass or "",
+
+    // -------------------------------------------------------------------------
+    // Core boolean discriminators used by Identify questions.
+    // IMPORTANT: These may be 1/0, true/false, yes/no depending on CSV history.
+    // The embedded Identify script normalizes all of these safely.
+    // -------------------------------------------------------------------------
     hollow: item.IsHollow or "",
     ridged: item.IsRidged or "",
     twisted: item.IsTwisted or "",
     curved: item.IsCurved or "",
     stuffed: item.IsStuffed or "",
+
+    // -------------------------------------------------------------------------
+    // Optional "unlock more questions" fields
+    // - Safe even if your CSV doesn't have them yet (they'll just be blank).
+    // - Recommended columns to add over time:
+    //   CrossSection: round | flat | other
+    //   CutStyle: straight | diagonal | pinched | folded
+    //   IsConcave: 1/0 (or true/false)  -> cups / shells / ear shapes
+    //   HasRuffles: 1/0                 -> ruffled edges / frills
+    //   IsPastina: 1/0                  -> spoonable tiny pasta (soup pastina)
+    // -------------------------------------------------------------------------
+    crossSection: item.CrossSection or item.CrossSectionShape or "",
+    cutStyle: item.CutStyle or "",
+    concave: item.IsConcave or "",
+    ruffles: item.HasRuffles or item.IsRuffled or "",
+    pastina: item.IsPastina or "",
+
     also: alsoRaw,
     thumb: thumbRaw
   }) %}
@@ -176,7 +199,8 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   const FALLBACK_THUMB = "pending.png";
 
   // UX tuning
-  const AUTO_SHOW_RESULTS_THRESHOLD = 10;
+  const AUTO_SHOW_RESULTS_THRESHOLD = Infinity; // show results after every question
+
 
   // Results sizing
   const DEFAULT_RESULTS_LIMIT = 60;
@@ -247,6 +271,28 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
   const normalize = (v) => String(v || "").trim().toLowerCase();
 
+  // ---------------------------------------------------------------------------
+  // Boolean normalization
+  // ---------------------------------------------------------------------------
+  // Your CSV has evolved over time, so boolean-like fields may appear as:
+  // - 1 / 0
+  // - true / false
+  // - yes / no
+  // - y / n
+  // - (blank)
+  //
+  // Identify questions store answers as "yes" or "no" (plus "__ns__" for Not sure).
+  // This helper coerces any of the above into: "yes" | "no" | "".
+  // ---------------------------------------------------------------------------
+  const coerceYesNo = (raw) => {
+    const v = String(raw ?? "").trim().toLowerCase();
+    if (!v) return "";
+    if (v === "yes" || v === "y" || v === "true" || v === "1") return "yes";
+    if (v === "no" || v === "n" || v === "false" || v === "0") return "no";
+    return v; // allow future explicit tokens without breaking
+  };
+
+
   // Canonical dataset (what Identify filters against)
   const initial = raw.map((r) => ({
     slug: r.slug,
@@ -316,12 +362,69 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       label: (v) => v,
       icon: (v) => identifyIconUrlFor(`size-${v}.png`),
     },
-  ];
+  
+    // -------------------------------------------------------------------------
+    // Optional "unlock more questions" fields (safe if empty in CSV).
+    // -------------------------------------------------------------------------
+    {
+      key: "crossSection",
+      title: "Is it round or flat?",
+      help: "This helps split spaghetti-like strands from ribbon-like noodles (and some short shapes).",
+      kind: "enum",
+      values: ["round", "flat", "other"],
+      label: (v) => ({ round: "Round", flat: "Flat", other: "Other / not sure" }[v] || v),
+      desc: (v) => ({
+        round: "Looks like a round strand or cylinder.",
+        flat: "Looks like a flat ribbon or sheet.",
+        other: "Not clearly round or flat, or you’re not sure.",
+      }[v] || ""),
+      icon: (v) => identifyIconUrlFor(`cross-${v}.png`),
+    },
+    {
+      key: "cutStyle",
+      title: "How is it cut?",
+      help: "Cut style is a strong discriminator for short shapes (straight, diagonal, pinched, folded).",
+      kind: "enum",
+      values: ["straight", "diagonal", "pinched", "folded"],
+      label: (v) => ({ straight: "Straight", diagonal: "Diagonal", pinched: "Pinched", folded: "Folded" }[v] || v),
+      desc: (v) => ({
+        straight: "Ends look straight across.",
+        diagonal: "Ends look angled (like penne).",
+        pinched: "Looks pinched or pressed (creates a crease).",
+        folded: "Looks folded into a pocket/shape.",
+      }[v] || ""),
+      icon: (v) => identifyIconUrlFor(`cut-${v}.png`),
+    },
+    {
+      key: "concave",
+      title: "Is it concave - like a cup or little ear?",
+      help: "Concave shapes scoop sauce (shells, cups, 'ears').",
+      kind: "bool",
+      descYes: "It forms a cup / scoop.",
+      descNo: "It’s flat or tubular without a scooping cup.",
+    },
+    {
+      key: "ruffles",
+      title: "Does it have ruffled edges?",
+      help: "Ruffles/frills often identify 'ruffled ribbon' or 'flower/bell' shapes.",
+      kind: "bool",
+      descYes: "Edges look wavy, frilly, or ruffled.",
+      descNo: "Edges are smooth/clean.",
+    },
+    {
+      key: "pastina",
+      title: "Is it tiny - meant for soup (pastina)?",
+      help: "Pastina are spoonable tiny shapes used in broths and soups.",
+      kind: "bool",
+      descYes: "Very small, spoonable pieces.",
+      descNo: "Not tiny - more like a standard pasta portion.",
+    },
+];
 
   // Working state
   let working = initial.slice();
   let history = []; // [{ key, value, prevWorking }]
-  let resultsPanelPreference = "auto"; // auto | show | hide
+  let resultsPanelPreference = "show"; // auto | show | hide (default: show for "always see matches")
   let resultsLimit = DEFAULT_RESULTS_LIMIT;
 
   const setText = (el, txt) => { if (el) el.textContent = txt; };
@@ -555,44 +658,83 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   }
 
   function nextQuestion() {
+    // Always force "type" first (it frames everything else).
     if (!questionAlreadyAnswered("type")) {
       const typeQ = QUESTION_DEFS.find((q) => q.key === "type");
       if (typeQ && isQuestionInformative(typeQ)) return typeQ;
     }
 
+    // After type, pick the unanswered question that best splits the remaining set.
+    // This avoids the "it only asks type, then size" problem when booleans are sparse.
+    let best = null;
+    let bestScore = -1;
+
     for (const q of QUESTION_DEFS) {
       if (questionAlreadyAnswered(q.key)) continue;
-      if (isQuestionInformative(q)) return q;
+      if (!isQuestionInformative(q)) continue;
+
+      const counts = getQuestionCounts(q);
+
+      // Score heuristic:
+      // - bool: bigger of min(yes,no) means a better split.
+      // - enum: prefer questions with more non-zero buckets AND larger second-best bucket.
+      let score = 0;
+
+      if (q.kind === "bool") {
+        score = Math.min(counts.yes || 0, counts.no || 0);
+      } else if (q.kind === "enum") {
+        const buckets = (q.values || []).map((v) => counts[v] || 0).filter((n) => n > 0).sort((a, b) => b - a);
+        const nonZero = buckets.length;
+        const second = buckets[1] || 0;
+        score = nonZero * 1000 + second; // weight "multiple options" heavily
+      } else {
+        score = 1;
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = q;
+      }
     }
 
-    return null;
+    return best;
   }
 
   function getOptionCount(key, value) {
     if (value === "__ns__") return working.length;
 
-    const normalizeBool = (v) => {
-      if (v === "__ns__") return "__ns__";
-      return String(v || "").toLowerCase();
-    };
+    // For bool questions, value will be "yes" or "no".
+    // For enum questions, value will be one of the enum tokens.
+    const desired = String(value).toLowerCase();
 
-    const v = normalizeBool(value);
-    return working.filter((p) => normalizeBool(p[key]) === v).length;
+    return working.filter((p) => {
+      const pvRaw = p[key];
+
+      // If this key is one of our boolean-like fields, compare using yes/no coercion.
+      if (key === "hollow" || key === "ridged" || key === "twisted" || key === "curved" || key === "stuffed" || key === "concave" || key === "ruffles" || key === "pastina") {
+        return coerceYesNo(pvRaw) === desired;
+      }
+
+      return String(pvRaw || "").trim().toLowerCase() === desired;
+    }).length;
   }
 
   function applyFilter(key, value) {
     const prev = working.slice();
 
-    const normalizeBool = (v) => {
-      if (v === "__ns__") return "__ns__";
-      return String(v || "").toLowerCase();
-    };
+    const desired = String(value).toLowerCase();
 
     working = working.filter((p) => {
       if (value === "__ns__") return true;
-      const v = normalizeBool(value);
-      const pv = normalizeBool(p[key]);
-      return pv === v;
+
+      const pvRaw = p[key];
+
+      // If this key is one of our boolean-like fields, compare using yes/no coercion.
+      if (key === "hollow" || key === "ridged" || key === "twisted" || key === "curved" || key === "stuffed" || key === "concave" || key === "ruffles" || key === "pastina") {
+        return coerceYesNo(pvRaw) === desired;
+      }
+
+      return String(pvRaw || "").trim().toLowerCase() === desired;
     });
 
     history.push({ key, value, prevWorking: prev });
