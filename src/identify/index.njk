@@ -280,16 +280,54 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 
 {# Canonical dataset (what Identify filters against) #}
   const initial = raw.map((r) => ({
+    // -----------------------------------------------------------------------
+    // Base identity fields
+    // -----------------------------------------------------------------------
     slug: r.slug,
     name: r.name,
     category: String(r.category || r.type || "").trim(),
+
+    // -----------------------------------------------------------------------
+    // Core Identify fields (existing)
+    // NOTE: normalize() converts lots of truthy/falsey values to:
+    //   - "yes" / "no" for booleans
+    //   - "tiny/small/medium/large" etc. for enums when already normalized
+    //   - "" (empty string) when unknown/not provided
+    // -----------------------------------------------------------------------
     type: normalize(r.type),
     size: normalize(r.size),
+
     hollow: normalize(r.hollow),
     ridged: normalize(r.ridged),
     twisted: normalize(r.twisted),
     curved: normalize(r.curved),
     stuffed: normalize(r.stuffed),
+
+    // -----------------------------------------------------------------------
+    // Unlock fields (NEW) - we support multiple possible key spellings since
+    // the upstream CSV / pasta.js mapping can vary (CrossSection vs crossSection).
+    // -----------------------------------------------------------------------
+    crossSection: normalize(
+      r.crossSection ?? r.CrossSection ?? r.crosssection ?? r.cross_section ?? r.Cross_Section
+    ),
+    cutStyle: normalize(
+      r.cutStyle ?? r.CutStyle ?? r.cutstyle ?? r.cut_style ?? r.Cut_Style
+    ),
+
+    // These are intended to be 1/0 or yes/no. We keep them as yes/no.
+    concave: normalize(
+      r.isConcave ?? r.IsConcave ?? r.isconcave ?? r.concave ?? r.IsConcave
+    ),
+    ruffles: normalize(
+      r.hasRuffles ?? r.HasRuffles ?? r.hasruffles ?? r.ruffles ?? r.HasRuffles
+    ),
+    pastina: normalize(
+      r.isPastina ?? r.IsPastina ?? r.ispastina ?? r.pastina ?? r.IsPastina
+    ),
+
+    // -----------------------------------------------------------------------
+    // Display helpers
+    // -----------------------------------------------------------------------
     also: String(r.also || ""),
     thumb: String(r.thumb || ""),
   }));
@@ -306,6 +344,79 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       desc: (v) => TYPE_DESCS[v] || "",
       icon: (v) => identifyIconUrlFor(`${v}.png`),
     },
+
+    // -----------------------------------------------------------------------
+    // High-signal unlock questions (show only when they split the remaining set)
+    // -----------------------------------------------------------------------
+    {
+      key: "pastina",
+      title: "Is it a tiny soup pasta (pastina)?",
+      help: "If you’re holding a spoon-sized pasta, this helps a lot.",
+      kind: "bool",
+      descYes: "Small spoon-sized pieces (often cooked in broth).",
+      descNo: "Not a tiny soup pasta.",
+    },
+    {
+      key: "crossSection",
+      title: "What’s the cross-section?",
+      help: "Round strands/tubes vs flat ribbons/sheets vs other shapes.",
+      kind: "enum",
+      values: ["round", "flat", "other"],
+      label: (v) => ({ round: "Round", flat: "Flat", other: "Other" }[v] || v),
+      desc: (v) =>
+        ({
+          round: "Round strand or tube.",
+          flat: "Flat ribbon or sheet.",
+          other: "Not clearly round or flat.",
+        }[v] || ""),
+      // Uses your new ImageKit assets:
+      //   crossSection-round.png, crossSection-flat.png, crossSection-other.png
+      icon: (v) => identifyIconUrlFor(`crossSection-${v}.png`),
+    },
+    {
+      key: "cutStyle",
+      title: "How is it cut or formed?",
+      help: "Straight vs diagonal cuts, pinched shapes, or folded stuffed pastas.",
+      kind: "enum",
+      values: ["straight", "diagonal", "pinched", "folded"],
+      label: (v) =>
+        ({
+          straight: "Straight",
+          diagonal: "Diagonal",
+          pinched: "Pinched",
+          folded: "Folded",
+        }[v] || v),
+      desc: (v) =>
+        ({
+          straight: "A clean straight cut.",
+          diagonal: "Cut at an angle.",
+          pinched: "Pinched/compressed (like a bow-tie).",
+          folded: "Folded into a pocket or dumpling shape.",
+        }[v] || ""),
+      // Uses your new ImageKit assets:
+      //   cutStyle-straight.png, cutStyle-diagonal.png, cutStyle-pinched.png, cutStyle-folded.png
+      icon: (v) => identifyIconUrlFor(`cutStyle-${v}.png`),
+    },
+    {
+      key: "concave",
+      title: "Is it concave (cup-like)?",
+      help: "Some shapes scoop sauce (like little cups or shells).",
+      kind: "bool",
+      descYes: "Has a cup/scoop shape (concave).",
+      descNo: "Not cup-like.",
+    },
+    {
+      key: "ruffles",
+      title: "Does it have ruffles?",
+      help: "Wavy or ruffled edges (often great sauce grippers).",
+      kind: "bool",
+      descYes: "Has ruffled/wavy edges.",
+      descNo: "Edges are mostly straight/smooth.",
+    },
+
+    // -----------------------------------------------------------------------
+    // Existing geometry questions
+    // -----------------------------------------------------------------------
     {
       key: "hollow",
       title: "Is it hollow?",
@@ -339,6 +450,18 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       descNo: "Straight rather than bent.",
     },
     {
+      key: "stuffed",
+      title: "Is it stuffed?",
+      help: "Stuffed pasta has a filling (cheese, meat, veg).",
+      kind: "bool",
+      descYes: "Contains a filling.",
+      descNo: "No filling inside.",
+    },
+
+    // -----------------------------------------------------------------------
+    // Keep size available, but later in the flow (lowest signal / most subjective)
+    // -----------------------------------------------------------------------
+    {
       key: "size",
       title: "What size is it?",
       help: "If you’re unsure, pick “Not sure” - size is often the least reliable.",
@@ -347,64 +470,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       label: (v) => v,
       icon: (v) => identifyIconUrlFor(`size-${v}.png`),
     },
-  
-{# ------------------------------------------------------------------------- #}
-{# Optional "unlock more questions" fields (safe if empty in CSV). #}
-{# ------------------------------------------------------------------------- #}
-    {
-      key: "crossSection",
-      title: "Is it round or flat?",
-      help: "This helps split spaghetti-like strands from ribbon-like noodles (and some short shapes).",
-      kind: "enum",
-      values: ["round", "flat", "other"],
-      label: (v) => ({ round: "Round", flat: "Flat", other: "Other / not sure" }[v] || v),
-      desc: (v) => ({
-        round: "Looks like a round strand or cylinder.",
-        flat: "Looks like a flat ribbon or sheet.",
-        other: "Not clearly round or flat, or you’re not sure.",
-      }[v] || ""),
-      icon: (v) => identifyIconUrlFor(`crossSection-${v}.png`),
-    },
-    {
-      key: "cutStyle",
-      title: "How is it cut?",
-      help: "Cut style is a strong discriminator for short shapes (straight, diagonal, pinched, folded).",
-      kind: "enum",
-      values: ["straight", "diagonal", "pinched", "folded"],
-      label: (v) => ({ straight: "Straight", diagonal: "Diagonal", pinched: "Pinched", folded: "Folded" }[v] || v),
-      desc: (v) => ({
-        straight: "Ends look straight across.",
-        diagonal: "Ends look angled (like penne).",
-        pinched: "Looks pinched or pressed (creates a crease).",
-        folded: "Looks folded into a pocket/shape.",
-      }[v] || ""),
-      icon: (v) => identifyIconUrlFor(`cutStyle-${v}.png`),
-    },
-    {
-      key: "concave",
-      title: "Is it concave - like a cup or little ear?",
-      help: "Concave shapes scoop sauce (shells, cups, 'ears').",
-      kind: "bool",
-      descYes: "It forms a cup / scoop.",
-      descNo: "It’s flat or tubular without a scooping cup.",
-    },
-    {
-      key: "ruffles",
-      title: "Does it have ruffled edges?",
-      help: "Ruffles/frills often identify 'ruffled ribbon' or 'flower/bell' shapes.",
-      kind: "bool",
-      descYes: "Edges look wavy, frilly, or ruffled.",
-      descNo: "Edges are smooth/clean.",
-    },
-    {
-      key: "pastina",
-      title: "Is it tiny - meant for soup (pastina)?",
-      help: "Pastina are spoonable tiny shapes used in broths and soups.",
-      kind: "bool",
-      descYes: "Very small, spoonable pieces.",
-      descNo: "Not tiny - more like a standard pasta portion.",
-    },
-];
+  ];
 
 {# Working state #}
   let working = initial.slice();
