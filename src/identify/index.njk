@@ -140,3 +140,767 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
 <script type="application/json" id="identify-data">
 {{ identifyData | dump | safe }}
 </script>
+
+<script>
+(function () {
+  // ============================================================================
+  // Identify logic (embedded)
+  // ----------------------------------------------------------------------------
+  // NOTE
+  // - This script is intentionally embedded to keep Identify self-contained.
+  // - It renders matches into an All-Pastas-style table with sortable headers.
+  // - It normalizes CSV booleans (1/0, true/false, yes/no) so filtering is stable.
+  // - It only asks questions that can actually reduce the remaining matches.
+  // ============================================================================
+  if (window.__pastaIdentifyInit) return;
+  window.__pastaIdentifyInit = true;
+
+  const $ = (sel, root = document) => root.querySelector(sel);
+
+  const els = {
+    app: $("#identify-app"),
+    title: $("#identify-title"),
+    kicker: $("#identify-kicker"),
+    help: $("#identify-help"),
+    answers: $("#identify-answers"),
+    count: $("#identify-count"),
+
+    resultsCard: $("#identify-results"),
+    resultsCount: $("#identify-results-count"),
+
+    resultsTable: $("#identify-results-table"),
+    resultsBody: $("#identify-results-body"),
+
+    btnBack: $("#identify-back"),
+    btnReset: $("#identify-reset"),
+    btnToggleResults: $("#identify-toggle-results"),
+
+    dataScript: $("#identify-data"),
+  };
+
+  // ImageKit bases
+  const IK_THUMBS_BASE = "https://ik.imagekit.io/mevius/pasta/thumbs/";
+  const IK_IDENTIFY_BASE = "https://ik.imagekit.io/mevius/pasta/identify/";
+  const FALLBACK_THUMB = "pending.png";
+
+  // UX tuning
+  // Show results after every question (you said you like always seeing the list)
+  const AUTO_SHOW_RESULTS_THRESHOLD = Infinity;
+
+  // Results sizing
+  const DEFAULT_RESULTS_LIMIT = 60;
+  const SHOW_MORE_STEP = 60;
+
+  // Sorting state for the results table
+  let sortKey = "name";
+  let sortDir = "ascending";
+
+  const isUrl = (s) => /^https?:\/\//i.test(String(s || "").trim());
+
+  const fileNameOnly = (s) => {
+    const str = String(s || "").trim();
+    if (!str) return "";
+    const clean = str.split("#")[0].split("?")[0];
+    const parts = clean.split("/");
+    return parts[parts.length - 1] || "";
+  };
+
+  const thumbUrlFor = (thumbRaw) => {
+    if (isUrl(thumbRaw)) return String(thumbRaw).trim();
+    const fn = fileNameOnly(thumbRaw);
+    return IK_THUMBS_BASE + (fn || FALLBACK_THUMB);
+  };
+
+  const identifyIconUrlFor = (file) => IK_IDENTIFY_BASE + file;
+
+  const answerIconFor = (questionKey, value) => {
+    // We only have yes/no/not-sure icons for the legacy bool questions.
+    // For newly added bool questions, fall back to the same naming convention.
+    if (value === "__ns__") return identifyIconUrlFor(`${questionKey}-notsure.png`);
+    return identifyIconUrlFor(`${questionKey}-${value}.png`);
+  };
+
+  // ---------------------------------------------------------------------------
+  // Data load + normalization
+  // ---------------------------------------------------------------------------
+  let raw = [];
+  try {
+    raw = JSON.parse(els.dataScript ? els.dataScript.textContent : "[]");
+  } catch (e) {
+    raw = [];
+  }
+
+  if (!Array.isArray(raw) || raw.length === 0) {
+    if (els.title) els.title.textContent = "Identify is unavailable";
+    if (els.help) els.help.textContent = "Could not parse pasta data on this page.";
+    return;
+  }
+
+  // Normalization helpers
+  const normalize = (v) => String(v || "").trim().toLowerCase();
+
+  const toYN = (v) => {
+    const s = normalize(v);
+    if (!s) return "";
+    if (s === "1" || s === "true" || s === "yes" || s === "y") return "yes";
+    if (s === "0" || s === "false" || s === "no" || s === "n") return "no";
+    // If the source already uses yes/no (or something custom), keep it.
+    return s;
+  };
+
+  const toEnum = (v) => normalize(v);
+
+  const deriveType = (row) => {
+    // Goal: always return one of the keys in TYPE_LABELS (or empty string).
+    // We prioritize explicit signals over inferred ones.
+    const cat = String(row.category || "").trim();
+    const catN = cat.toLowerCase();
+
+    const stuffed = toYN(row.stuffed);
+    const pastina = toYN(row.pastina);
+
+    // Stuffed / soup are special because they matter early in Identify.
+    if (stuffed === "yes" || catN.includes("stuffed")) return "stuffed";
+    if (pastina === "yes" || catN.includes("soup") || catN.includes("pastina")) return "soup";
+
+    const typeN = normalize(row.type);
+    if (TYPE_LABELS[typeN]) return typeN;
+
+    // Fallback heuristics based on category text (helps if CSV Type is blank)
+    if (catN.includes("strand")) return "strand";
+    if (catN.includes("tube")) return "tube";
+    if (catN.includes("ribbon")) return "ribbon";
+    if (catN.includes("sheet")) return "sheet";
+    if (catN.includes("ring")) return "ring";
+    if (catN.includes("dumpling")) return "dumpling";
+    if (catN.includes("short")) return "short";
+
+    return typeN || "";
+  };
+
+  const TYPE_LABELS = {
+    strand: "Strand",
+    tube: "Tube",
+    ribbon: "Ribbon",
+    sheet: "Sheet",
+    short: "Short cut",
+    stuffed: "Stuffed",
+    soup: "Soup (Pastina)",
+    ring: "Ring",
+    dumpling: "Dumpling",
+  };
+
+  const TYPE_DESCS = {
+    strand: "Long, thin noodles (round or slightly flattened).",
+    tube: "Hollow pasta designed to hold sauce inside.",
+    ribbon: "Long, flat strips like fettuccine-style cuts.",
+    sheet: "Sheets used for layering or cutting (lasagna-style).",
+    short: "Short shapes that scoop, trap, or cling to sauce.",
+    stuffed: "Filled pasta (pockets, pillows, or sealed edges).",
+    soup: "Tiny pasta made for spoons and brothy soups.",
+    ring: "Rings that catch sauce in openings.",
+    dumpling: "Pasta-like dumplings (often irregular or rustic).",
+  };
+
+  // Canonical dataset (what Identify filters against)
+  const initial = raw.map((r) => ({
+    slug: r.slug,
+    name: r.name,
+    category: String(r.category || r.type || "").trim(),
+
+    // Core facets used by Identify
+    type: deriveType(r),
+    size: toEnum(r.size),
+
+    hollow: toYN(r.hollow),
+    ridged: toYN(r.ridged),
+    twisted: toYN(r.twisted),
+    curved: toYN(r.curved),
+    stuffed: toYN(r.stuffed),
+
+    // Newly unlocked fields (from your CSV work)
+    crossSection: toEnum(r.crossSection),
+    cutStyle: toEnum(r.cutStyle),
+    concave: toYN(r.concave),
+    ruffles: toYN(r.ruffles),
+    pastina: toYN(r.pastina),
+
+    also: String(r.also || ""),
+    thumb: String(r.thumb || ""),
+  }));
+
+  // ---------------------------------------------------------------------------
+  // Question definitions
+  // ---------------------------------------------------------------------------
+  const QUESTION_DEFS = [
+    {
+      key: "type",
+      title: "What general type is it?",
+      help: "Start broad - this narrows the list quickly.",
+      kind: "enum",
+      values: Object.keys(TYPE_LABELS),
+      label: (v) => TYPE_LABELS[v] || v,
+      desc: (v) => TYPE_DESCS[v] || "",
+      // Keep legacy icons for the original type set (if they exist)
+      icon: (v) => identifyIconUrlFor(`${v}.png`),
+    },
+
+    // New boolean: pastina
+    {
+      key: "pastina",
+      title: "Is it very small - like soup pasta?",
+      help: "Pastina is tiny pasta eaten with a spoon (often in broth).",
+      kind: "bool",
+      descYes: "Tiny pieces meant for soups and brothy dishes.",
+      descNo: "Not tiny soup pasta.",
+    },
+
+    // New enum: cross section
+    {
+      key: "crossSection",
+      title: "What is the cross-section?",
+      help: "Think about the noodle profile - is it round, flat, or something else?",
+      kind: "enum",
+      values: ["round", "flat", "other"],
+      label: (v) => (v === "other" ? "Other / irregular" : v),
+      // No icons for these yet - we render the label as the big glyph.
+    },
+
+    // New enum: cut style
+    {
+      key: "cutStyle",
+      title: "How are the ends/edges formed?",
+      help: "Straight, diagonal, pinched, or folded edges often narrow things fast.",
+      kind: "enum",
+      values: ["straight", "diagonal", "pinched", "folded"],
+      label: (v) => v,
+    },
+
+    // New boolean: concave
+    {
+      key: "concave",
+      title: "Is it concave - like a cup or scoop?",
+      help: "Concave shapes catch small ingredients (peas, sausage bits, pesto).",
+      kind: "bool",
+      descYes: "It has a noticeable cup/scoop shape.",
+      descNo: "Not cup-like (more flat, tubular, or solid).",
+    },
+
+    // New boolean: ruffles
+    {
+      key: "ruffles",
+      title: "Does it have ruffles or wavy edges?",
+      help: "Ruffles help grip sauce and can be very distinctive.",
+      kind: "bool",
+      descYes: "Wavy/ruffled edges are visible.",
+      descNo: "Edges look straight or smooth.",
+    },
+
+    // Legacy booleans (still very useful)
+    {
+      key: "hollow",
+      title: "Is it hollow?",
+      help: "Hollow pasta has a visible tube or cavity.",
+      kind: "bool",
+      descYes: "You can see a tube or opening through the shape.",
+      descNo: "Solid pasta - no tube or cavity.",
+    },
+    {
+      key: "ridged",
+      title: "Does it have ridges?",
+      help: "Ridges (rigate) help grip sauce.",
+      kind: "bool",
+      descYes: "Noticeable grooves or ridges on the surface.",
+      descNo: "Mostly smooth surface.",
+    },
+    {
+      key: "twisted",
+      title: "Is it twisted?",
+      help: "Twisted shapes include spirals and corkscrews.",
+      kind: "bool",
+      descYes: "Spiraled or corkscrew-like geometry.",
+      descNo: "Not spiraled or twisted.",
+    },
+    {
+      key: "curved",
+      title: "Is it curved?",
+      help: "Curved shapes include elbows, crescents, and arcs.",
+      kind: "bool",
+      descYes: "Bent or arced rather than straight.",
+      descNo: "Straight rather than bent.",
+    },
+
+    // Keep size late - it’s helpful but often subjective
+    {
+      key: "size",
+      title: "What size is it?",
+      help: "If you’re unsure, pick “Not sure” - size is often the least reliable.",
+      kind: "enum",
+      values: ["tiny", "small", "medium", "large"],
+      label: (v) => v,
+      icon: (v) => identifyIconUrlFor(`size-${v}.png`),
+    },
+  ];
+
+  // ---------------------------------------------------------------------------
+  // Working state
+  // ---------------------------------------------------------------------------
+  let working = initial.slice();
+  let history = []; // [{ key, value, prevWorking }]
+  let resultsPanelPreference = "auto"; // auto | show | hide
+  let resultsLimit = DEFAULT_RESULTS_LIMIT;
+
+  const setText = (el, txt) => { if (el) el.textContent = txt; };
+
+  // Sorting
+  function compare(a, b) {
+    const aKey = (sortKey === "category" ? a.category : a.name) || "";
+    const bKey = (sortKey === "category" ? b.category : b.name) || "";
+    const cmp = String(aKey).localeCompare(String(bKey), "en", { sensitivity: "base" });
+    return sortDir === "descending" ? -cmp : cmp;
+  }
+
+  function sortWorking() {
+    working.sort(compare);
+  }
+
+  // Match count label
+  function renderMatchesCount() {
+    setText(els.count, `Matching: ${working.length}`);
+  }
+
+  // Show/hide results panel
+  function showResultsPanel(show) {
+    if (!els.resultsCard || !els.btnToggleResults) return;
+    els.resultsCard.hidden = !show;
+    els.btnToggleResults.hidden = false;
+
+    if (!show) {
+      els.btnToggleResults.textContent = "Show all";
+    } else {
+      els.btnToggleResults.textContent =
+        resultsLimit >= working.length ? "Hide list" : "Show all";
+    }
+  }
+
+  function shouldShowResultsPanel() {
+    if (resultsPanelPreference === "show") return true;
+    if (resultsPanelPreference === "hide") return false;
+    return working.length <= AUTO_SHOW_RESULTS_THRESHOLD;
+  }
+
+  // Render results into the table body
+  function renderResultsTable() {
+    if (!els.resultsBody) return;
+
+    els.resultsBody.innerHTML = "";
+
+    const n = Math.min(working.length, resultsLimit);
+    const slice = working.slice(0, n);
+
+    for (const item of slice) {
+      const tr = document.createElement("tr");
+      tr.className = "data-row";
+      tr.setAttribute("data-slug", item.slug);
+      tr.setAttribute("data-name", item.name);
+      tr.setAttribute("data-category", item.category || "");
+
+      // Thumb cell
+      const tdThumb = document.createElement("td");
+      tdThumb.className = "data-table__thumb";
+
+      const spanThumb = document.createElement("span");
+      spanThumb.className = "thumb";
+      spanThumb.setAttribute("aria-hidden", "true");
+
+      const img = document.createElement("img");
+      img.width = 56;
+      img.height = 56;
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.alt = "";
+      img.src = thumbUrlFor(item.thumb) + "?tr=w-56,h-56,f-auto,q-50";
+
+      spanThumb.appendChild(img);
+      tdThumb.appendChild(spanThumb);
+
+      // Name (row header cell)
+      const thName = document.createElement("th");
+      thName.scope = "row";
+      thName.className = "data-table__name";
+      thName.textContent = item.name;
+
+      // Category
+      const tdCat = document.createElement("td");
+      tdCat.className = "cell-category";
+      tdCat.textContent = item.category || "";
+
+      // Synonyms
+      const tdSyn = document.createElement("td");
+      tdSyn.className = "cell-synonyms";
+      tdSyn.textContent = item.also || "";
+
+      tr.appendChild(tdThumb);
+      tr.appendChild(thName);
+      tr.appendChild(tdCat);
+      tr.appendChild(tdSyn);
+
+      els.resultsBody.appendChild(tr);
+    }
+
+    setText(els.resultsCount, `${working.length} match${working.length === 1 ? "" : "es"}`);
+
+    // Show-more row (spans all columns)
+    if (!els.resultsCard.hidden && resultsLimit < working.length) {
+      const trMore = document.createElement("tr");
+
+      const tdMore = document.createElement("td");
+      tdMore.colSpan = 4;
+
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "btn secondary";
+      btn.textContent = `Show more (${Math.min(working.length - resultsLimit, SHOW_MORE_STEP)})`;
+      btn.addEventListener("click", () => {
+        resultsLimit = Math.min(working.length, resultsLimit + SHOW_MORE_STEP);
+        renderResultsTable();
+        syncToggleLabel();
+      });
+
+      tdMore.appendChild(btn);
+      trMore.appendChild(tdMore);
+      els.resultsBody.appendChild(trMore);
+    }
+  }
+
+  // Row click -> detail page
+  if (els.resultsBody) {
+    els.resultsBody.addEventListener("click", (e) => {
+      const interactive = e.target.closest("a, button, input, select, textarea, label");
+      if (interactive) return;
+
+      const row = e.target.closest("tr.data-row[data-slug]");
+      if (!row || !els.resultsBody.contains(row)) return;
+
+      const slug = String(row.getAttribute("data-slug") || "").trim();
+      if (!slug) return;
+      window.location.href = `/pasta/${slug}/`;
+    });
+  }
+
+  // Sort header wiring (local to Identify table)
+  function initTableSorting() {
+    if (!els.resultsTable) return;
+
+    const headers = Array.from(els.resultsTable.querySelectorAll("thead th[data-sort]"));
+    if (!headers.length) return;
+
+    function setSortState(activeKey, dir) {
+      for (const th of headers) {
+        const key = th.getAttribute("data-sort");
+        th.setAttribute("aria-sort", key === activeKey ? dir : "none");
+      }
+      sortKey = activeKey;
+      sortDir = dir;
+    }
+
+    function toggle(th) {
+      const key = th.getAttribute("data-sort");
+      const cur = th.getAttribute("aria-sort") || "none";
+
+      let next = "ascending";
+      if (cur === "ascending") next = "descending";
+      if (cur === "descending") next = "ascending";
+
+      setSortState(key, next);
+      sortWorking();
+      renderResultsTable();
+    }
+
+    for (const th of headers) {
+      th.addEventListener("click", () => toggle(th));
+      th.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          toggle(th);
+        }
+      });
+    }
+
+    // Ensure initial state
+    setSortState("name", "ascending");
+  }
+
+  function syncToggleLabel() {
+    if (!els.btnToggleResults || !els.resultsCard) return;
+    if (els.resultsCard.hidden) {
+      els.btnToggleResults.textContent = "Show all";
+      return;
+    }
+    els.btnToggleResults.textContent =
+      resultsLimit >= working.length ? "Hide list" : "Show all";
+  }
+
+  // ---------------------------------------------------------------------------
+  // Identify filtering helpers
+  // ---------------------------------------------------------------------------
+  function questionAlreadyAnswered(key) {
+    return history.some((h) => h.key === key);
+  }
+
+  function getOptionCount(key, value) {
+    if (value === "__ns__") return working.length;
+    const want = normalize(value);
+    return working.filter((p) => normalize(p[key]) === want).length;
+  }
+
+  function getQuestionCounts(q) {
+    if (q.kind === "bool") {
+      return {
+        yes: getOptionCount(q.key, "yes"),
+        no: getOptionCount(q.key, "no"),
+        ns: getOptionCount(q.key, "__ns__"),
+      };
+    }
+
+    if (q.kind === "enum") {
+      const counts = {};
+      for (const v of q.values || []) counts[v] = getOptionCount(q.key, v);
+      counts.__ns__ = getOptionCount(q.key, "__ns__");
+      return counts;
+    }
+
+    return { __ns__: working.length };
+  }
+
+  function isQuestionInformative(q) {
+    const counts = getQuestionCounts(q);
+
+    if (q.kind === "bool") {
+      // Only ask if both answers exist among remaining candidates
+      return counts.yes > 0 && counts.no > 0;
+    }
+
+    if (q.kind === "enum") {
+      // Only ask if there are at least two viable options remaining
+      const nonZero = (q.values || []).filter((v) => (counts[v] || 0) > 0).length;
+      return nonZero > 1;
+    }
+
+    return true;
+  }
+
+  function nextQuestion() {
+    // Always start with type if it can reduce the set
+    if (!questionAlreadyAnswered("type")) {
+      const typeQ = QUESTION_DEFS.find((q) => q.key === "type");
+      if (typeQ && isQuestionInformative(typeQ)) return typeQ;
+    }
+
+    for (const q of QUESTION_DEFS) {
+      if (questionAlreadyAnswered(q.key)) continue;
+      if (isQuestionInformative(q)) return q;
+    }
+
+    return null;
+  }
+
+  function applyFilter(key, value) {
+    const prev = working.slice();
+
+    working = working.filter((p) => {
+      if (value === "__ns__") return true;
+      return normalize(p[key]) === normalize(value);
+    });
+
+    history.push({ key, value, prevWorking: prev });
+    sortWorking();
+  }
+
+  function goBack() {
+    const last = history.pop();
+    if (!last) return;
+    working = last.prevWorking.slice();
+    sortWorking();
+  }
+
+  function resetAll() {
+    history = [];
+    working = initial.slice();
+    resultsLimit = DEFAULT_RESULTS_LIMIT;
+    resultsPanelPreference = "auto";
+    sortWorking();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Render loop
+  // ---------------------------------------------------------------------------
+  function renderQuestion() {
+    const q = nextQuestion();
+
+    renderMatchesCount();
+
+    if (!q) {
+      setText(els.title, "Done");
+      setText(els.kicker, "Here are your matches.");
+      setText(els.help, "Use Back to change your last answer, or Reset to start over.");
+      if (els.answers) els.answers.innerHTML = "";
+      showResultsPanel(true);
+      renderResultsTable();
+      syncToggleLabel();
+      return;
+    }
+
+    setText(els.title, q.title);
+    setText(els.kicker, `Step ${history.length + 1}`);
+    setText(els.help, q.help || "");
+
+    if (els.btnBack) els.btnBack.disabled = history.length === 0;
+    if (els.btnReset) els.btnReset.hidden = history.length === 0;
+
+    showResultsPanel(shouldShowResultsPanel());
+    renderResultsTable();
+    syncToggleLabel();
+
+    if (!els.answers) return;
+    els.answers.innerHTML = "";
+    els.answers.setAttribute("data-kind", q.kind);
+    els.answers.setAttribute("data-key", q.key);
+
+    const makeAnswer = (value, label, desc, iconUrl, count) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "identify-answer";
+
+      // Render a big "glyph" for:
+      // - bool questions (Y / N / ?)
+      // - "Not sure" ( ? )
+      // - enum questions without an icon (we show the label)
+      const useGlyph = q.kind === "bool" || value === "__ns__" || !iconUrl;
+
+      if (useGlyph) {
+        const glyph = document.createElement("span");
+        glyph.className = "identify-answer-glyph";
+
+        if (q.kind === "bool" || value === "__ns__") {
+          glyph.textContent = value === "yes" ? "Y" : value === "no" ? "N" : "?";
+        } else {
+          // Enum without icons: show the label itself (keeps UI consistent)
+          glyph.textContent = String(label || "").toUpperCase();
+        }
+
+        btn.appendChild(glyph);
+      } else {
+        const img = document.createElement("img");
+        img.alt = "";
+        img.loading = "lazy";
+        img.decoding = "async";
+        img.width = 56;
+        img.height = 56;
+        img.src = iconUrl || "";
+        btn.appendChild(img);
+      }
+
+      const meta = document.createElement("span");
+      meta.className = "identify-answer-meta";
+
+      const title = document.createElement("span");
+      title.className = "identify-answer-title";
+      title.textContent = `${label} (${count})`;
+      meta.appendChild(title);
+
+      if (desc) {
+        const d = document.createElement("span");
+        d.className = "identify-answer-desc";
+        d.textContent = desc;
+        meta.appendChild(d);
+      }
+
+      btn.appendChild(meta);
+
+      btn.addEventListener("click", () => {
+        applyFilter(q.key, value);
+        renderQuestion();
+      });
+
+      return btn;
+    };
+
+    if (q.kind === "enum") {
+      const counts = getQuestionCounts(q);
+      for (const v of q.values) {
+        const count = counts[v] || 0;
+        if (count <= 0) continue;
+
+        els.answers.appendChild(
+          makeAnswer(
+            v,
+            q.label ? q.label(v) : String(v),
+            q.desc ? q.desc(v) : "",
+            q.icon ? q.icon(v) : "",
+            count
+          )
+        );
+      }
+
+      els.answers.appendChild(
+        makeAnswer("__ns__", "Not sure", "Skip this question.", q.icon ? q.icon("__ns__") : "", counts.__ns__)
+      );
+    }
+
+    if (q.kind === "bool") {
+      const counts = getQuestionCounts(q);
+
+      if (counts.yes > 0) {
+        els.answers.appendChild(makeAnswer("yes", "Yes", q.descYes || "", answerIconFor(q.key, "yes"), counts.yes));
+      }
+
+      if (counts.no > 0) {
+        els.answers.appendChild(makeAnswer("no", "No", q.descNo || "", answerIconFor(q.key, "no"), counts.no));
+      }
+
+      els.answers.appendChild(makeAnswer("__ns__", "Not sure", "Skip this question.", answerIconFor(q.key, "__ns__"), counts.__ns__));
+    }
+  }
+
+  // Controls
+  if (els.btnBack) {
+    els.btnBack.addEventListener("click", () => {
+      goBack();
+      renderQuestion();
+    });
+  }
+
+  if (els.btnReset) {
+    els.btnReset.addEventListener("click", () => {
+      resetAll();
+      renderQuestion();
+    });
+  }
+
+  if (els.btnToggleResults) {
+    els.btnToggleResults.addEventListener("click", () => {
+      const currentlyHidden = Boolean(els.resultsCard && els.resultsCard.hidden);
+
+      if (currentlyHidden) {
+        resultsPanelPreference = "show";
+        if (els.resultsCard) els.resultsCard.hidden = false;
+
+        // When user explicitly requests the list, show everything.
+        resultsLimit = working.length;
+        renderResultsTable();
+        syncToggleLabel();
+      } else {
+        resultsPanelPreference = "hide";
+        if (els.resultsCard) els.resultsCard.hidden = true;
+        syncToggleLabel();
+      }
+    });
+  }
+
+  // Init
+  sortWorking();
+  initTableSorting();
+  renderQuestion();
+})();
+</script>
