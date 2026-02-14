@@ -459,17 +459,6 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     },
 
     // -----------------------------------------------------------------------
-    // Keep size available, but later in the flow (lowest signal / most subjective)
-    // -----------------------------------------------------------------------
-    {
-      key: "size",
-      title: "What size is it?",
-      help: "If you’re unsure, pick “Not sure” - size is often the least reliable.",
-      kind: "enum",
-      values: ["tiny", "small", "medium", "large"],
-      label: (v) => v,
-      icon: (v) => identifyIconUrlFor(`size-${v}.png`),
-    },
   ];
 
 {# Working state #}
