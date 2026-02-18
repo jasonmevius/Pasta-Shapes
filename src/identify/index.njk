@@ -24,7 +24,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       - Thumb (not sortable)
       - Name (sortable)
       - Category (sortable)
-      - Synonyms (hidden on narrow screens via existing CSS rules)
+      - Description (hidden on narrow screens via existing CSS rules)
 ============================================================================= #}
 
 {% from "partials/pasta-results-table.njk" import pastaResultsTable %}
@@ -39,12 +39,9 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
   {% set thumbCandidate = (item.ThumbnailImage or "") | replace("<ImageKitPath>", "") | trim %}
   {% set thumbRaw = thumbCandidate if thumbCandidate else (item.Slug ~ ".png") %}
 
-  {% set alsoRaw =
-    item.SearchAliases
-    or item.Aliases
-    or item.Synonyms
-    or item.Also
-    or item.Misspellings
+  {% set descriptionRaw =
+    item.DescriptionShort
+    or item.Description
     or ""
   %}
 
@@ -78,7 +75,7 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
     ruffles: item.HasRuffles or item.IsRuffled or "",
     pastina: item.IsPastina or "",
 
-    also: alsoRaw,
+    description: descriptionRaw,
     thumb: thumbRaw
   }) %}
 {% endfor %}
@@ -553,15 +550,15 @@ description: "Identify a pasta shape by answering a few quick questions. Mobile-
       tdCat.className = "cell-category";
       tdCat.textContent = item.category || "";
 
-{# Synonyms #}
-      const tdSyn = document.createElement("td");
-      tdSyn.className = "cell-synonyms";
-      tdSyn.textContent = item.also || "";
+{# Description #}
+      const tdDesc = document.createElement("td");
+      tdDesc.className = "cell-description";
+      tdDesc.textContent = item.description || "";
 
       tr.appendChild(tdThumb);
       tr.appendChild(thName);
       tr.appendChild(tdCat);
-      tr.appendChild(tdSyn);
+      tr.appendChild(tdDesc);
 
       els.resultsBody.appendChild(tr);
     }
