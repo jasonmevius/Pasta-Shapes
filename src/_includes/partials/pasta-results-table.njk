@@ -5,6 +5,9 @@
 
   The caller provides <tbody> row content so page-specific row logic stays local
   (home/all are server-rendered, identify is JS-rendered).
+
+  v2 update:
+  - Replaces the Synonyms column with Description.
 ============================================================================= #}
 
 {% macro pastaResultsTable(
@@ -30,7 +33,7 @@
         <col class="col-thumb" />
         <col class="col-name" />
         <col class="col-category" />
-        <col class="col-synonyms" />
+        <col class="col-description" />
       </colgroup>
 
       <thead>
@@ -111,10 +114,10 @@
 
           {% if mode == "all" %}
             <th scope="col" class="data-table__left">
-              Synonyms <span class="sr-only">(also known as)</span>
+              Description <span class="sr-only">(quick summary)</span>
             </th>
           {% else %}
-            <th scope="col" class="cell-synonyms">Synonyms</th>
+            <th scope="col" class="cell-description">Description</th>
           {% endif %}
         </tr>
       </thead>
