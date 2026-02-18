@@ -15,6 +15,7 @@
 // Styling constraint:
 // - Do NOT use inline styles here. All styling lives in /src/css/styles.css.
 // ============================================================================
+
 (function () {
   // --------------------------------------------------------------------------
   // HARD GUARD: only run on the dedicated search page
@@ -31,6 +32,8 @@
   if (!form || !input || !status || !list) return;
 
   // Common Italian connector words that appear in many pasta dish names.
+  // We only use these for a "safe fallback" exact-match - when the stripped key
+  // maps uniquely to ONE slug.
   const STOPWORDS = new Set([
     "alla",
     "alle",
@@ -66,11 +69,11 @@
   let indexCache = null;
 
   // Lookup structures (built once after index loads)
-  let slugToEntry = null;
-  let aliasList = null;
-  let aliasKeys = null;
-  let aliasKeyToDisplay = null;
-  let stopKeyToSlugs = null;
+  let slugToEntry = null; // Map(slug -> {slug,name,url,description})
+  let aliasList = null; // Array of {key, aliasDisplay, slug, url}
+  let aliasKeys = null; // Array of normalized alias keys (for fuzzy)
+  let aliasKeyToDisplay = null; // Map(normalizedKey -> preferred display alias)
+  let stopKeyToSlugs = null; // Map(stopwordStrippedKey -> Set(slug))
 
   // --------------------------------------------------------------------------
   // Normalization helpers (keep consistent with scripts.js)
@@ -98,6 +101,7 @@
   }
 
   function toArray(v) {
+    // Accept arrays, semicolon-delimited strings, or empty.
     if (!v) return [];
     if (Array.isArray(v)) return v;
     if (typeof v === "string") {
@@ -107,6 +111,22 @@
         .filter(Boolean);
     }
     return [];
+  }
+
+  // --------------------------------------------------------------------------
+  // Description helper
+  // --------------------------------------------------------------------------
+  function bestDescription(it) {
+    // Prefer a short description if available (keeps suggestion list compact).
+    // Falls back gracefully across legacy/new index keys.
+    return (
+      it?.descriptionShort ||
+      it?.description_short ||
+      it?.DescriptionShort ||
+      it?.description ||
+      it?.Description ||
+      ""
+    );
   }
 
   // --------------------------------------------------------------------------
@@ -123,6 +143,7 @@
   function setMatchStatus(match) {
     // Keeps markup minimal; styling via CSS.
     status.innerHTML = "";
+
     const span = document.createElement("span");
     span.className = "search-match";
     span.textContent = `Match: ${match.name}`;
@@ -178,48 +199,91 @@
     stopKeyToSlugs = new Map();
 
     // Expected shape of pasta-index.json:
-    // { items: [{ slug, name, url, description, aliases, searchAliases, synonyms, ... }], aliasToSlug: { "key": "slug" } }
-    const items = Array.isArray(idx.items) ? idx.items : [];
+    // {
+    //   items: [{ slug, name, url, description, descriptionShort, aliases, searchAliases, synonyms, ... }],
+    //   aliasToSlug: { "normalized alias": "slug" },
+    //   aliasToDisplay: { "normalized alias": "Preferred Label" }   // optional
+    // }
+    const items = Array.isArray(idx?.items) ? idx.items : [];
+
+    // Prevent repeated key/slug pairs from flooding aliasKeys for fuzzy matching.
+    const seenKeySlug = new Set();
 
     for (const it of items) {
-      if (!it || !it.slug) continue;
+      if (!it) continue;
+
+      const slug = it.slug || it.Slug;
+      if (!slug) continue;
 
       const entry = {
-        slug: it.slug,
-        name: it.name || it.slug,
-        url: it.url || `/pasta/${it.slug}/`,
-        description: it.description || "",
+        slug,
+        name: it.name || it.ShapeName || slug,
+        url: it.url || `/pasta/${slug}/`,
+        description: bestDescription(it),
       };
-      slugToEntry.set(it.slug, entry);
+      slugToEntry.set(slug, entry);
 
-      // Build alias candidates
+      // Build alias candidates from legacy + new (optional) fields.
+      // NOTE: We do NOT include Synonyms_Display here on purpose - it often contains
+      // region/context text that is great for display but noisy for matching.
       const aliases = [
+        // Canonical
         entry.name,
+
+        // Legacy index fields
         ...toArray(it.aliases),
         ...toArray(it.searchAliases),
         ...toArray(it.synonyms),
+
+        // Newer / optional index fields (safe no-ops if missing)
+        ...toArray(it.search_aliases),
+        ...toArray(it.SearchAliases),
+
+        ...toArray(it.synonymsSearch || it.synonyms_search || it.Synonyms_Search),
+
+        ...toArray(it.synonymsTranslations || it.synonyms_translations || it.Synonyms_Translations),
+        ...toArray(it.synonymsVariantTerms || it.synonyms_variant_terms || it.Synonyms_VariantTerms),
+
+        ...toArray(it.translations || it.Translations),
+        ...toArray(it.variantTerms || it.VariantTerms),
       ];
 
       for (const a of aliases) {
         const key = normalize(a);
         if (!key) continue;
 
+        const keySlug = `${key}::${slug}`;
+        if (seenKeySlug.has(keySlug)) continue;
+        seenKeySlug.add(keySlug);
+
         aliasList.push({
           key,
           aliasDisplay: a,
-          slug: it.slug,
+          slug,
           url: entry.url,
         });
 
         aliasKeys.push(key);
+
+        // First seen wins, but can be overridden later by idx.aliasToDisplay.
         if (!aliasKeyToDisplay.has(key)) aliasKeyToDisplay.set(key, a);
 
         // Stopword-stripped mapping (safe fallback only when unique)
         const stopKey = stripStopwords(key);
         if (stopKey) {
           if (!stopKeyToSlugs.has(stopKey)) stopKeyToSlugs.set(stopKey, new Set());
-          stopKeyToSlugs.get(stopKey).add(it.slug);
+          stopKeyToSlugs.get(stopKey).add(slug);
         }
+      }
+    }
+
+    // If the index provides a preferred display label per normalized alias key,
+    // use it (e.g., a human-friendly alias label).
+    if (idx && idx.aliasToDisplay && typeof idx.aliasToDisplay === "object") {
+      for (const [k, v] of Object.entries(idx.aliasToDisplay)) {
+        if (!k || !v) continue;
+        // Keys are expected to already be normalized in the index builder.
+        aliasKeyToDisplay.set(k, v);
       }
     }
   }
@@ -249,7 +313,7 @@
     if (!key) return null;
 
     // 1) Exact match against aliasToSlug (canonical, synonyms, searchAliases)
-    let slug = idx.aliasToSlug?.[key];
+    let slug = idx?.aliasToSlug?.[key];
     if (slug) {
       const entry = slugToEntry?.get(slug);
       return entry || { slug, url: `/pasta/${slug}/`, name: slug };
@@ -306,7 +370,7 @@
     return out;
   }
 
-  // Bounded Levenshtein distance
+  // Bounded Levenshtein distance (small + fast; good enough for "did you mean")
   function levenshtein(a, b, maxDist) {
     if (a === b) return 0;
     if (!a || !b) return Math.max(a.length, b.length);
@@ -375,6 +439,7 @@
       const url = entry?.url || `/pasta/${slug}/`;
       const name = entry?.name || slug;
 
+      // Prefer a "pretty" label if the index provides one.
       const aliasDisplay = aliasKeyToDisplay?.get(k) || k;
 
       suggestions.push({
@@ -437,7 +502,7 @@
     runSearch(input.value, { redirectIfFound: false });
   });
 
-  // Submit behavior
+  // Submit behavior (redirect if exact match)
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
 
@@ -445,45 +510,9 @@
     if (result.redirected) return;
 
     const count = (result.suggestions || []).length;
+    if (!count) return;
 
-    if (count === 1) {
-      window.location.href = result.suggestions[0].url;
-      return;
-    }
-
-    if (count > 1) {
-      setStatusText("Multiple matches - please choose one:");
-      const firstLink = list.querySelector("a");
-      if (firstLink) firstLink.focus();
-      return;
-    }
-
-    setStatusText("No match found.");
+    // If there are suggestions but no exact match, put focus on the list for accessibility.
+    list.focus?.();
   });
-
-  // Handle /?q=... shared links
-  (function handleQueryParamOnLoad() {
-    const params = new URLSearchParams(window.location.search);
-    const q = params.get("q");
-    if (!q) return;
-
-    input.value = q;
-    window.history.replaceState({}, "", window.location.pathname);
-
-    (async () => {
-      const result = await runSearch(q, { redirectIfFound: true });
-      if (result.redirected) return;
-
-      const count = (result.suggestions || []).length;
-      if (count === 1) {
-        window.location.href = result.suggestions[0].url;
-        return;
-      }
-      if (count > 1) {
-        setStatusText("Multiple matches - please choose one:");
-        const firstLink = list.querySelector("a");
-        if (firstLink) firstLink.focus();
-      }
-    })();
-  })();
 })();
