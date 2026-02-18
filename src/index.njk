@@ -137,6 +137,7 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
       {% for item in pasta %}
 
         {% set alsoRaw = (item.Synonyms or item.SearchAliases or "") %}
+        {% set descriptionRaw = (item.DescriptionShort or item.Description or "") %}
         {% set categoryRaw = (item.Category or "") %}
 
         {% set thumbFile =
@@ -177,9 +178,9 @@ description: "Search pasta shapes by name and aliases, or identify a shape by an
 
           <td class="cell-category">{{ categoryRaw }}</td>
 
-          <td class="cell-synonyms">
-            {% if alsoRaw %}
-              {{ alsoRaw }}
+          <td class="cell-description">
+            {% if descriptionRaw %}
+              {{ descriptionRaw }}
             {% else %}
               <span class="muted">-</span>
             {% endif %}

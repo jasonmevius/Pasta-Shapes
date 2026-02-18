@@ -746,7 +746,7 @@ body.is-searching #home-identify-card{ display: none; }
 .data-table col.col-thumb{ width: 88px; }
 .data-table col.col-name{ width: 28%; }
 .data-table col.col-category{ width: 18%; }
-.data-table col.col-synonyms{ width: 54%; }
+.data-table col.col-description{ width: 54%; }
 
 .data-table th.data-table__thumb,
 .data-table td.data-table__thumb{
@@ -816,7 +816,7 @@ body.is-searching #home-identify-card{ display: none; }
 
 
 .cell-category{ color: var(--muted); }
-.cell-synonyms{
+.cell-description{
   color: var(--muted);
   font-size: 0.92rem;
   overflow-wrap: anywhere;
@@ -1058,7 +1058,7 @@ body.is-searching #home-identify-card{ display: none; }
     height: 48px;
   }
 
-  .cell-synonyms{
+  .cell-description{
     font-size: 0.88rem;
   }
 }

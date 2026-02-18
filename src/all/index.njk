@@ -10,7 +10,7 @@ permalink: /all/
   PURPOSE
   - Browse all pasta shapes in a readable table.
   - Remove redundant "Detail" column (Name is already linked).
-  - Add "Synonyms" column for alternate names.
+  - Add "Description" column for quick summaries.
   - Keep sortable headers (Name + Category).
 
   IMPORTANT
@@ -83,28 +83,25 @@ permalink: /all/
     {% set thumbUrl = imagekitBase ~ "/pasta/thumbs/" ~ slugVal ~ ".png" %}
     {% set thumbUrlTransformed = thumbUrl ~ "?tr=w-56,h-56,f-auto,q-50" %}
 
-    {% set synRaw =
-      item.Synonyms
-      or item.Aliases
-      or item.SearchAliases
-      or item.AlsoKnownAs
-      or item.Also_Known_As
+    {% set descriptionRaw =
+      item.DescriptionShort
+      or item.Description
       or ""
     %}
 
-    {% set synDisplay = (synRaw | string)
+    {% set descriptionDisplay = (descriptionRaw | string)
       | replace(";", ", ")
       | replace("|", ", ")
     %}
 
-    {% set synData = (synDisplay | lower) %}
+    {% set descriptionData = (descriptionDisplay | lower) %}
 
     <tr
       class="data-row"
       data-slug="{{ slugVal }}"
       data-name="{{ (item.ShapeName or '') | lower | escape }}"
       data-category="{{ (item.Category or '') | lower | escape }}"
-      data-synonyms="{{ synData | escape }}"
+      data-description="{{ descriptionData | escape }}"
     >
       <td class="data-table__thumb">
         <span class="thumb" aria-hidden="true">
@@ -125,13 +122,13 @@ permalink: /all/
 
       <td class="cell-category">{{ item.Category or "" }}</td>
 
-      <td class="cell-synonyms">
-        {% if synDisplay and synDisplay | trim %}
-          <span class="synonyms" title="{{ synDisplay | escape }}">
-            {{ synDisplay }}
+      <td class="cell-description">
+        {% if descriptionDisplay and descriptionDisplay | trim %}
+          <span class="description" title="{{ descriptionDisplay | escape }}">
+            {{ descriptionDisplay }}
           </span>
         {% else %}
-          <span class="synonyms synonyms--empty" aria-label="No synonyms available">-</span>
+          <span class="description description--empty" aria-label="No description available">-</span>
         {% endif %}
       </td>
     </tr>
