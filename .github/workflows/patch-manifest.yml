@@ -1,0 +1,32 @@
+name: Patch Manifest From Suggestions
+
+on:
+  workflow_dispatch:
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Patch manifest.csv into manifest.patched.csv
+        working-directory: tools/pasta-images-downloader
+        run: |
+          node ./patch_manifest_from_suggestions.js
+
+      - name: Upload patched manifest artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: manifest-patched
+          path: tools/pasta-images-downloader/manifest.patched.csv
+          if-no-files-found: error
+          retention-days: 7
