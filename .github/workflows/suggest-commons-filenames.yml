@@ -1,0 +1,32 @@
+name: Suggest Commons Filenames
+
+on:
+  workflow_dispatch:
+
+jobs:
+  suggest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+
+      - name: Generate suggestions.csv
+        working-directory: tools/pasta-images-downloader
+        run: |
+          node ./suggest_commons_filenames.js
+
+      - name: Upload suggestions.csv artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: commons-suggestions
+          path: tools/pasta-images-downloader/suggestions.csv
+          if-no-files-found: error
+          retention-days: 7
