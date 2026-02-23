@@ -1,61 +1,56 @@
 # .github/workflows/download-pasta-images.yml
 # -----------------------------------------------------------------------------
 # PURPOSE
-# - Runs the pasta image downloader on a GitHub-hosted runner (no local installs)
-# - Downloads all images referenced in tools/pasta-images-downloader/manifest.csv
-# - Writes them to:
-#     tools/pasta-images-downloader/uncooked/<slug>.<ext>
-#     tools/pasta-images-downloader/cooked/<slug>.<ext>
-# - Creates:
-#     tools/pasta-images-downloader/pasta-images.zip
-# - Uploads pasta-images.zip as a downloadable Actions Artifact
-#
-# HOW TO USE
-# - Go to the repo - Actions tab - "Download Pasta Images" - Run workflow
-# - When the run completes, download the artifact from the run summary page
+# - Downloads images from tools/pasta-images-downloader/manifest.csv
+# - Saves them under uncooked/ and cooked/
+# - Creates pasta-images.zip
+# - ALWAYS uploads:
+#     1) pasta-images.zip (even if some downloads fail)
+#     2) download-log.txt (so you can see which URLs failed)
 # -----------------------------------------------------------------------------
 
 name: Download Pasta Images
 
 on:
-  # Manual trigger - you run it when you want a fresh zip.
   workflow_dispatch:
 
 jobs:
   download-images:
     runs-on: ubuntu-latest
-
-    # Least privilege - this job only needs to read the repo contents.
     permissions:
       contents: read
 
     steps:
-      # Pull the repo contents into the runner workspace.
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Install Node on the runner so we can run download_images.js.
-      # setup-node v6 is current and supports modern Node on GitHub runners. :contentReference[oaicite:0]{index=0}
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
           node-version: 24
 
-      # Run the downloader from its folder so paths resolve cleanly.
-      - name: Download images + build pasta-images.zip
+      # Run the downloader, but DON'T fail the job if some URLs error out.
+      # We capture output to a log so you can inspect failures afterward.
+      - name: Download images + build pasta-images.zip (capture log)
         working-directory: tools/pasta-images-downloader
+        continue-on-error: true
         run: |
-          node ./download_images.js
+          node ./download_images.js | tee download-log.txt
 
-      # Upload the generated zip as an Actions Artifact.
-      # Note: GitHub stores artifacts as a zip internally; uploading our zip simply
-      # means you'll download an artifact that contains pasta-images.zip inside it. :contentReference[oaicite:1]{index=1}
+      # Upload the zip if it exists (this is what you actually want).
       - name: Upload pasta-images.zip artifact
         uses: actions/upload-artifact@v4
         with:
           name: pasta-images-zip
           path: tools/pasta-images-downloader/pasta-images.zip
           if-no-files-found: error
+          retention-days: 7
 
-          # Keep storage low - artifacts default to 90 days, but we only need it short-term. :contentReference[oaicite:2]{index=2}
+      # Upload the log no matter what - it will show any failing URLs.
+      - name: Upload download log artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pasta-images-download-log
+          path: tools/pasta-images-downloader/download-log.txt
+          if-no-files-found: warn
           retention-days: 7
