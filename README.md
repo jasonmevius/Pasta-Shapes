@@ -1,50 +1,31 @@
-# PastaShapes
+# Pasta Shapes - Image Bulk Download Bundle
 
-PastaShapes is a lightweight, static site that helps people **look up pasta shapes by name** and **identify an unknown shape** using a simple, guided question flow.
+This bundle is designed to download every image URL referenced in your tracking spreadsheet, and save them into a consistent folder structure:
 
-Primary goals:
-- Ship something usable quickly
-- Keep the project easy to maintain (CSV-driven content, static deploy)
-- Stay within a simple web stack (11ty + HTML/CSS/vanilla JS)
+- `uncooked/<slug>.<ext>`
+- `cooked/<slug>.<ext>`
 
----
+It also builds `pasta-images.zip` so you can move the entire set around as one artifact.
 
-## Project overview
+## Included files
 
-### 1) Search by name
-- Type a pasta name and get matching results
-- Supports common misspellings / alternate names (when included in the dataset)
-- Links to a dedicated detail page for each shape
+- `manifest.csv` - machine-friendly URL list + intended output paths
+- `download_images.js` - Node.js downloader (recommended)
+- `download_images.py` - Python downloader
 
-### 2) Identify by questions
-- If you have the pasta in front of you, answer a sequence of questions (e.g., hollow, twisted, ridged)
-- Each answer narrows down the candidate list until you reach the best match
+## Run (recommended: Node)
 
----
+```bash
+node download_images.js
+```
 
-## Tech stack
+## Run (Python)
 
-- **Eleventy (11ty)** - static site generation from CSV-backed data
-- **Nunjucks (.njk)** - templating for layouts and pages
-- **Vanilla JavaScript** - client-side search + Identify flow logic + local “Recently Viewed”
-- **CSS (single stylesheet)** - all styling is centralized (no inline CSS)
-- **Netlify + GitHub** - builds and hosting
-- **ImageKit (optional)** - image hosting + transformations where helpful
+```bash
+pip install requests
+python download_images.py
+```
 
----
+## Resume-safe
 
-## Data approach
-
-- **CSV is the source of truth** for pasta shapes and attributes
-- CSV changes trigger a rebuild that regenerates pages and the search index
-- An `/api/...json` endpoint is generated for fast client-side lookup
-
----
-
-## Status
-
-This is an actively evolving personal project focused on learning, speed, and maintainability.
-
-## UX notes
-
-- Tablet/desktop homepage design proposals: `docs-responsive-proposals.md`
+Both scripts skip files that already exist and are non-empty, so you can re-run safely.
